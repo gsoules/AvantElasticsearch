@@ -94,13 +94,13 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $body['track_scores'] = true;
         }
 
-        $params = [
+        $query = [
             'index' => $this->getElasticsearchIndexName(),
             'from' => $offset,
             'size' => $limit,
             'body' => $body
         ];
 
-        return $this->createElasticsearchClient()->search($params);
+        return $query;
     }
 }

@@ -19,12 +19,6 @@ class AvantElasticsearch
         return strtolower(preg_replace('/[^a-zA-Z0-9-_]/', '', $elementName));
     }
 
-    public function createElasticsearchClient(array $options = array())
-    {
-        $client = AvantElasticsearchClient::create($options);
-        return $client;
-    }
-
     public function getDocumentMappingType()
     {
         return '_doc';

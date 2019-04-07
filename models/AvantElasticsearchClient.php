@@ -6,27 +6,31 @@ use Aws\Credentials\Credentials;
 use Aws\Credentials\CredentialProvider;
 use Aws\ElasticsearchService\ElasticsearchPhpHandler;
 
+
 class AvantElasticsearchClient extends AvantElasticsearch
 {
-    public function __construct()
+    private $client;
+
+    public function __construct(array $options = array())
     {
         parent::__construct();
+        $this->createElasticsearchClient($options);
     }
 
-    public static function create(array $options = array())
+    protected function createElasticsearchClient(array $options)
     {
         $timeout = isset($options['timeout']) ? $options['timeout'] : 90;
         $nobody = isset($options['nobody']) ? $options['nobody'] : false;
 
         $builder = ClientBuilder::create();
 
-        $hosts = self::getHosts();
+        $hosts = $this->getHosts();
         if (isset($hosts))
         {
             $builder->setHosts($hosts);
         }
 
-        $handler = self::getHandler();
+        $handler = $this->getHandler();
         if (isset($handler))
         {
             $builder->setHandler($handler);
@@ -39,11 +43,35 @@ class AvantElasticsearchClient extends AvantElasticsearch
         ]);
 
         // Return the Elasticsearch\Client object;
-        $client = $builder->build();
-        return $client;
+        $this->client = $builder->build();
     }
 
-    protected static function getHandler()
+    public function createIndex($params)
+    {
+        $response = $this->client->indices()->create($params);
+        return $response;
+    }
+
+    public function deleteIndex($params)
+    {
+        try
+        {
+            $response = null;
+
+            if ($this->client->indices()->exists($params))
+            {
+                $response = $this->client->indices()->delete($params);
+            }
+
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            return null;
+        }
+    }
+
+    protected function getHandler()
     {
         // Provide a signing handler for use with the official Elasticsearch-PHP client.
         // The handler will load AWS credentials and send requests using a RingPHP cURL handler.
@@ -58,7 +86,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return new ElasticsearchPhpHandler($region, $provider);
     }
 
-    protected static function getHosts()
+    protected function getHosts()
     {
         $host = [
             'host' => ElasticsearchConfig::getOptionValueForHost(),
@@ -69,5 +97,36 @@ class AvantElasticsearchClient extends AvantElasticsearch
         ];
 
         return [$host];
+    }
+
+    public function deleteDocument($params)
+    {
+        try
+        {
+            $response = $this->client->delete($params);
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            return null;
+        }
+    }
+
+    public function indexDocument($params)
+    {
+        $response = $this->client->index($params);
+        return $response;
+    }
+
+    public function indexMultipleDocuments($params)
+    {
+        $response = $this->client->bulk($params);
+        return $response;
+    }
+
+    public function performQuery($params)
+    {
+        $response = $this->client->search($params);
+        return $response;
     }
 }

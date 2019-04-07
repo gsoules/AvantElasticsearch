@@ -18,8 +18,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     public function addDocumentToIndex()
     {
-        $client = $this->createElasticsearchClient();
-        return $client->index($this->constructDocumentParameters());
+        $documentParmas = $this->constructDocumentParameters();
+        $avantElasticsearchClient = new AvantElasticsearchClient();
+        $response = $avantElasticsearchClient->indexDocument($documentParmas);
+        return $response;
     }
 
     public function constructDocumentParameters()
@@ -44,26 +46,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     public function deleteDocumentFromIndex()
     {
-        $client = $this->createElasticsearchClient();
-
-        try
-        {
-            $response = $client->delete($this->constructDocumentParameters());
-            return $response;
-        }
-        catch (Elasticsearch\Common\Exceptions\Missing404Exception $e)
-        {
-            _log($e, Zend_Log::ERR);
-        }
+        $documentParmas = $this->constructDocumentParameters();
+        $avantElasticsearchClient = new AvantElasticsearchClient();
+        $response = $avantElasticsearchClient->deleteDocument($documentParmas);
+        return $response;
     }
-
-//    public function getDocumentFromIndex()
-//    {
-//        $client = $this->createElasticsearchClient();
-//
-//        // Get the document from the index and return it.
-//        return $client->get($this->constructDocumentParameters());
-//    }
 
     public function setField($key, $value)
     {

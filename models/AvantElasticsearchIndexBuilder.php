@@ -322,18 +322,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function deleteIndex()
     {
-        $params = ['index' => $this->docIndex];
-
-        // The call below to indices() times out with a "no alive nodes in your cluster" error unless
+        // The delete times out with a "no alive nodes in your cluster" error unless
         // CURLOPT_NOBODY is set to true. Note that nobody means don't return the body.
         $nobody = true;
 
-        $client = $this->createElasticsearchClient(['nobody' => $nobody]);
-
-        if ($client->indices()->exists($params))
-        {
-            $client->indices()->delete($params);
-        }
+        $params = ['index' => $this->docIndex];
+        $avantElasticsearchClient = new AvantElasticsearchClient(['nobody' => $nobody]);
+        $response = $avantElasticsearchClient->deleteIndex($params);
+        return $response;
     }
 
     public function deleteItem($item)
@@ -440,15 +436,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $timeout = 90;
         $responses = array();
 
-        $client = $this->createElasticsearchClient(['timeout' => $timeout]);
-
-        $params = [
-            'index' => 'omeka',
-            'body' => ['mappings' => $this->constructElasticsearchMapping()]
-        ];
-
-        $paramsResponse = $client->indices()->create($params);
-
         $docs = array();
         if (file_exists($filename))
         {
@@ -458,10 +445,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $docsCount = count($docs);
 
+        $params = [
+            'index' => 'omeka',
+            'body' => ['mappings' => $this->constructElasticsearchMapping()]
+        ];
+
+        $avantElasticsearchClient = new AvantElasticsearchClient(['timeout' => $timeout]);
+        $response = $avantElasticsearchClient->createIndex($params);
+
         for ($offset = 0; $offset < $docsCount; $offset += $batchSize)
         {
             $params = $this->getBulkParams($docs, $offset, $batchSize);
-            $response = $client->bulk($params);
+            $response = $avantElasticsearchClient->indexMultipleDocuments($params);
 
             if ($response['errors'] == true)
             {
