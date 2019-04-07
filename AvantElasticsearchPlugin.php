@@ -11,6 +11,19 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         'install'
     );
 
+    protected $_filters = array(
+        'admin_navigation_main'
+    );
+
+    public function filterAdminNavigationMain($nav)
+    {
+        $nav[] = array(
+            'label' => __('Elasticsearch'),
+            'uri' => url('elasticsearch/indexing')
+        );
+        return $nav;
+    }
+
     public function hookConfig()
     {
         ElasticsearchConfig::saveConfiguration();
