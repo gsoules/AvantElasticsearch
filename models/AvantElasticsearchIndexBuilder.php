@@ -489,11 +489,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $responses;
     }
 
-    public function indexAll()
+    public function indexAll($export, $limit)
     {
-        $limit = 25;
-        $export = false;
-
         $responses = $this->performBulkIndex($export, $limit);
 
         return $responses;
