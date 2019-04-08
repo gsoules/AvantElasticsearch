@@ -24,7 +24,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $response;
     }
 
-    protected function constructAddressElement($elementName, $elasticsearchFieldName, $texts, &$elementData)
+    protected function constructAddressElement($elementName, $elasticsearchFieldName, $texts, &$sortData)
     {
         if ($elementName == 'Address')
         {
@@ -36,8 +36,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $numberMatch = $matches[1];
                 $number = intval($numberMatch);
 
-                $elementData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
-                $elementData[$elasticsearchFieldName . '-street'] = $matches[2];
+                $sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
+                $sortData[$elasticsearchFieldName . '-street'] = $matches[2];
             }
         }
     }
@@ -115,12 +115,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $isHtmlElement;
     }
 
-    protected function constructIntegerElement($elementName, $elasticsearchFieldName, $elementTexts, &$elementData)
+    protected function constructIntegerElement($elementName, $elasticsearchFieldName, $elementTexts, &$sortData)
     {
         $integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
         if (in_array($elementName, $integerSortElements))
         {
-            $elementData[$elasticsearchFieldName . '-sort'] = sprintf('%010d', $elementTexts);
+            $sortData[$elasticsearchFieldName] = sprintf('%010d', $elementTexts);
         }
     }
 
@@ -158,15 +158,15 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $ownerId = $this->getOwnerId();
 
         $this->setFields([
-            'itemid' => $item->id,
+            'itemid' => (int)$item->id,
             'ownerid' => $ownerId,
             'owner' => $owner,
             'title' => $title,
-            'public' => $item->public,
+            'public' => (bool)$item->public,
             'url' => $itemPublicUrl,
             'thumb' => $itemImageThumbUrl,
             'image' => $itemImageOriginalUrl,
-            'files' => $fileCount
+            'files' => (int)$fileCount
         ]);
     }
 
@@ -210,9 +210,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $elementData[$elasticsearchFieldName] = $elementTextsString;
 
                 // Process special cases.
-                $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $elementData);
+                $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $sortData);
                 $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
-                $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $elementData);
+                $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $sortData);
 
                 $avantElasticsearchFacets = new AvantElasticsearchFacets();
                 $avantElasticsearchFacets->constructFacets($elementName, $elasticsearchFieldName, $texts, $facets);
