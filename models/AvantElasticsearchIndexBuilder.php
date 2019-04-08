@@ -2,8 +2,6 @@
 
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
-    private $properties = array();
-
     public function __construct()
     {
         parent::__construct();
@@ -72,68 +70,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $document;
     }
 
-    public function constructElasticsearchMapping()
-    {
-        $elementSet = $this->getElementsForMapping();
-        $mappingType = $this->getDocumentMappingType();
-
-        $this->properties['title'] = [
-            'type' => 'text',
-            'analyzer' => 'english'
-        ];
-
-        $this->properties['element.description'] = [
-            'type' => 'text',
-            'analyzer' => 'english'
-        ];
-
-        foreach ($elementSet as $element)
-        {
-            $elementName = $element['name'];
-
-            if ($elementName == 'Description')
-            {
-                continue;
-            }
-
-            $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
-
-            $this->properties["element.$fieldName"] = [
-                'type' => 'text',
-                'fields' => [
-                    'keyword' => [
-                        'type' => 'keyword',
-                        'ignore_above' => 128
-                    ]
-                ]
-            ];
-        }
-
-        $this->addFieldKeywordMappingToProperties('thumb');
-        $this->addFieldKeywordMappingToProperties('url');
-
-        $mapping = [
-            $mappingType => [
-                'properties' => $this->properties
-            ]
-        ];
-
-        return $mapping;
-    }
-
-    protected function addFieldKeywordMappingToProperties($fieldName)
-    {
-        $this->properties[$fieldName] = [
-            'type' => 'text',
-            'fields' => [
-                'keyword' => [
-                    'type' => 'keyword',
-                    'ignore_above' => 64
-                ]
-            ]
-        ];
-    }
-
     protected function constructElementTextsString($texts, $elementName, $isHtmlElement)
     {
         // Get the element's text and catentate them into a single string separate by EOL breaks.
@@ -152,62 +88,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $elementTexts;
-    }
-
-    protected function constructFacets($elementName, $elasticsearchFieldName, $texts, &$facets)
-    {
-        $facetValues = array();
-        foreach ($texts as $text)
-        {
-//                    if ($elementName == 'Type' || $elementName == 'Subject')
-//                    {
-//                        // Find the first comma.
-//                        $needle = ', ';
-//                        $pos1 = strpos($text, $needle);
-//                        if ($pos1 !== false)
-//                        {
-//                            $pos2 = strpos($text, $needle, $pos1 + strlen($needle));
-//                            if ($pos2 !== false) {
-//                                // Filter out the ancestry to leave just the root text.
-//                                $text = trim(substr($text, 0, $pos2));
-//                            }
-//                        }
-//                        $facetValues[] = $text;
-//                    }
-            if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
-            {
-                // Find the last comma.
-                $index = strrpos($text, ',', -1);
-                if ($index !== false)
-                {
-                    // Filter out the ancestry to leave just the leaf text.
-                    $text = trim(substr($text, $index + 1));
-                }
-                $facetValues[] = $text;
-            }
-            else if ($elementName == 'Date')
-            {
-                // This code is only called if Date element is not empty.
-                // As such, we can't use it to create an "Unknown date" facet value.
-                $year = '';
-                if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
-                {
-                    $year = $matches[1];
-                }
-
-                if (!empty($year))
-                {
-                    $decade = $year - ($year % 10);
-                    $facetValues[] = $decade . "'s";
-                }
-            }
-
-            $facetValuesCount = count($facetValues);
-            if ($facetValuesCount >= 1)
-            {
-                $facets[$elasticsearchFieldName] = $facetValuesCount > 1 ? $facetValues : $facetValues[0];
-            }
-        }
     }
 
     protected function constructHierarchy($elementName, $elasticsearchFieldName, $texts, &$elementData)
@@ -332,7 +212,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $elementData);
                 $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $elementData);
                 $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $elementData);
-                $this->constructFacets($elementName, $elasticsearchFieldName, $texts, $facets);
+
+                $avantElasticsearchFacets = new AvantElasticsearchFacets();
+                $avantElasticsearchFacets->constructFacets($elementName, $elasticsearchFieldName, $texts, $facets);
             }
 
             $doc->setField('element', $elementData);
@@ -449,30 +331,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $docs;
     }
 
-    protected function getElementsForMapping()
-    {
-        $table = get_db()->getTable('Element');
-        $select = $table->getSelect()->order('element_set_id ASC')->order('order ASC');
-        $elementSet = $table->fetchObjects($select);
-
-        $hidePrivate = true;
-        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-        $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
-
-        foreach ($elementSet as $elementName => $element)
-        {
-            $elementId = $element->id;
-            $hideUnused = array_key_exists($elementId, $unusedElementsData);
-            $hide = $hideUnused || ($hidePrivate && array_key_exists($elementId, $privateElementsData));
-            if ($hide)
-            {
-                unset($elementSet[$elementName]);
-            }
-        }
-
-        return $elementSet;
-    }
-
     public function indexItem($item)
     {
         $document = $this->createElasticsearchDocumentFromItem($item);
@@ -506,9 +364,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $docsCount = count($docs);
 
+        $avantelasticSearchMappings = new AvantElasticsearchMappings();
+
         $params = [
             'index' => 'omeka',
-            'body' => ['mappings' => $this->constructElasticsearchMapping()]
+            'body' => ['mappings' => $avantelasticSearchMappings->constructElasticsearchMapping()]
         ];
 
         $avantElasticsearchClient = new AvantElasticsearchClient();
