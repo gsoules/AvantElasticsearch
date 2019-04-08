@@ -322,12 +322,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function deleteIndex()
     {
-        // The delete times out with a "no alive nodes in your cluster" error unless
-        // CURLOPT_NOBODY is set to true. Note that nobody means don't return the body.
-        $nobody = true;
-
         $params = ['index' => $this->docIndex];
-        $avantElasticsearchClient = new AvantElasticsearchClient(['nobody' => $nobody]);
+        $avantElasticsearchClient = new AvantElasticsearchClient();
         $response = $avantElasticsearchClient->deleteIndex($params);
         return $response;
     }
@@ -340,13 +336,20 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $response;
     }
 
-    protected function fetchObjects()
+    protected function fetchAllItems()
     {
-        $db = get_db();
-        $table = $db->getTable('Item');
-        $select = $table->getSelect();
-
-        return $table->fetchObjects($select);
+        try
+        {
+            $db = get_db();
+            $table = $db->getTable('Item');
+            $select = $table->getSelect();
+            $items = $table->fetchObjects($select);
+        }
+        catch (Exception $e)
+        {
+            $items = array();
+        }
+        return $items;
     }
 
     public function getBulkParams(array $documents, $offset, $length)
@@ -395,19 +398,25 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     public function getDocuments(array $items, $limit = 0)
     {
         $docs = array();
-        $limit = $limit == 0 ? count($items) : $limit;
+        $itemsCount = count($items);
 
-        for ($index = 0; $index < $limit; $index++)
+        if ($itemsCount > 0)
         {
-            $item = $items[$index];
+            $limit = $limit == 0 ? $itemsCount : $limit;
 
-            if ($item->public == 0)
+            for ($index = 0; $index < $limit; $index++)
             {
-                // Skip private items.
-                continue;
+                $item = $items[$index];
+
+                if ($item->public == 0)
+                {
+                    // Skip private items.
+                    continue;
+                }
+                $docs[] = $this->createElasticsearchDocumentFromItem($item);
             }
-            $docs[] = $this->createElasticsearchDocumentFromItem($item);
         }
+
         return $docs;
     }
 
@@ -433,7 +442,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function performBulkIndexImport($filename)
     {
         $batchSize = 500;
-        $timeout = 90;
         $responses = array();
 
         $docs = array();
@@ -450,7 +458,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             'body' => ['mappings' => $this->constructElasticsearchMapping()]
         ];
 
-        $avantElasticsearchClient = new AvantElasticsearchClient(['timeout' => $timeout]);
+        $avantElasticsearchClient = new AvantElasticsearchClient();
         $response = $avantElasticsearchClient->createIndex($params);
 
         for ($offset = 0; $offset < $docsCount; $offset += $batchSize)
@@ -473,11 +481,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if ($export)
         {
-            $items = $this->fetchObjects('Item');
-            if (empty($items))
-            {
-                return array();
-            }
+            $items = $this->fetchAllItems();
             $responses = $this->preformBulkIndexExport($items, $filename, $limit);
         }
         else
