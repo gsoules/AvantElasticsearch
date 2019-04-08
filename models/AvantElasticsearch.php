@@ -40,8 +40,43 @@ class AvantElasticsearch
         return $documentId;
     }
 
+    public function getElasticsearchExceptionMessage(Exception $e)
+    {
+        $message = $e->getMessage();
+
+        if ($this->isJson($message))
+        {
+            $message = json_decode($message);
+            if (is_object($message))
+            {
+                if (isset($message->error))
+                {
+                    $error = $message->error;
+                    $message = "Type: $error->type<br/>Reason: $error->reason";
+                }
+                else if (isset($message->message))
+                {
+                    $message = $message->message;
+                }
+                else
+                {
+                    // Don't know what kind of object this is so just return the raw message.
+                    $message = $e->getMessage();
+                }
+            }
+        }
+        return $message;
+    }
+
     public function getOwnerId()
     {
         return ElasticsearchConfig::getOptionValueForOwner();
     }
+
+    public function isJson($string)
+    {
+        json_decode($string);
+        return (json_last_error() == JSON_ERROR_NONE);
+    }
+
 }
