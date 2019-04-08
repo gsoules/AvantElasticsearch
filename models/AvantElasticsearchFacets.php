@@ -6,18 +6,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         parent::__construct();
     }
 
-    public function addFacetToQuery($queryString, $facetToAdd, $value)
-    {
-        $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($value);
-
-        if (strpos($queryString, $arg) === FALSE)
-        {
-            return "$queryString&$arg";
-        }
-
-        return $queryString;
-    }
-
     public function constructFacets($elementName, $elasticsearchFieldName, $texts, &$facets)
     {
         $facetValues = array();
@@ -110,10 +98,22 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filters;
     }
 
+    public function createFacetLink($queryString, $facetToAdd, $value)
+    {
+        $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($value);
+
+        if (strpos($queryString, $arg) === FALSE)
+        {
+            return "$queryString&$arg";
+        }
+
+        return $queryString;
+    }
+
     public function createQueryStringWithFacets($query)
     {
         $terms = isset($query['query']) ? $query['query'] : '';
-        $facets = isset($query['facets']) ? $query['facets'] : array();
+        $facets = isset($query['facet']) ? $query['facet'] : array();
         $queryString = "query=".urlencode($terms);
 
         foreach ($facets as $facet_name => $facet_values)
