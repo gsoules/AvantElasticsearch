@@ -116,18 +116,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facets = isset($query['facet']) ? $query['facet'] : array();
         $queryString = "query=".urlencode($terms);
 
-        foreach ($facets as $facet_name => $facet_values)
+        foreach ($facets as $facetName => $facetValues)
         {
-            if (is_array($facet_values))
+            if (is_array($facetValues))
             {
-                foreach($facet_values as $k => $v)
+                foreach($facetValues as $k => $v)
                 {
-                    $queryString .= '&'.urlencode("facet_{$facet_name}[]") . '=' . urlencode($v);
+                    $queryString .= '&'.urlencode("facet_{$facetName}[]") . '=' . urlencode($v);
                 }
             }
             else
             {
-                $queryString .= '&'.urlencode("facet_{$facet_name}") . '=' . urlencode($facet_values);
+                $queryString .= '&'.urlencode("facet_{$facetName}") . '=' . urlencode($facetValues[0]);
             }
         }
 
