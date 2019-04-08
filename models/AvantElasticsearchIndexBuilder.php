@@ -72,33 +72,46 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function constructElasticsearchMapping()
     {
-        // Force the Date field to be of type text so that ES does not infer that it's a date field and then get an error
-        // when indexing a non-conformming date like '1929 c.'. Also add the keyword version of date so it can be used
-        // for aggregation. Normally fields are both text and keyword, but since we are setting the type we also have
-        // to set it to keyword. See https://www.elastic.co/guide/en/elasticsearch/reference/current/multi-fields.html
-
+        $elementSet = $this->getElementsForMapping();
         $mappingType = $this->getDocumentMappingType();
+
+        $properties = array();
+
+        $properties['title'] = [
+            'type' => 'text',
+            'analyzer' => 'english'
+        ];
+
+        $properties['element.description'] = [
+            'type' => 'text',
+            'analyzer' => 'english'
+        ];
+
+        foreach ($elementSet as $element)
+        {
+            $elementName = $element['name'];
+
+            if ($elementName == 'Description')
+            {
+                continue;
+            }
+
+            $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
+
+            $properties["element.$fieldName"] = [
+                'type' => 'text',
+                'fields' => [
+                    'keyword' => [
+                        'type' => 'keyword',
+                        'ignore_above' => 128
+                    ]
+                ]
+            ];
+        }
 
         $mapping = [
             $mappingType => [
-                'properties' => [
-                    'title' => [
-                        'type' => 'text',
-                        'analyzer' => 'english'
-                    ],
-                    'element.description' => [
-                        'type' => 'text',
-                        'analyzer' => 'english'
-                    ],
-                    'element.date' => [
-                        'type' => 'text',
-                        'fields' => [
-                            'keyword' => [
-                                'type' => 'keyword'
-                            ]
-                        ]
-                    ]
-                ]
+                'properties' => $properties
             ]
         ];
 
@@ -418,6 +431,30 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $docs;
+    }
+
+    protected function getElementsForMapping()
+    {
+        $table = get_db()->getTable('Element');
+        $select = $table->getSelect()->order('element_set_id ASC')->order('order ASC');
+        $elementSet = $table->fetchObjects($select);
+
+        $hidePrivate = true;
+        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+        $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
+
+        foreach ($elementSet as $elementName => $element)
+        {
+            $elementId = $element->id;
+            $hideUnused = array_key_exists($elementId, $unusedElementsData);
+            $hide = $hideUnused || ($hidePrivate && array_key_exists($elementId, $privateElementsData));
+            if ($hide)
+            {
+                unset($elementSet[$elementName]);
+            }
+        }
+
+        return $elementSet;
     }
 
     public function indexItem($item)
