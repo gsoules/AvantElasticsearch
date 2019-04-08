@@ -20,7 +20,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $offset = isset($options['offset']) ? $options['offset'] : 0;
         $limit = isset($options['limit']) ? $options['limit'] : 20;
         $terms = isset($options['query']['query']) ? $options['query']['query'] : '';
-        $facets = isset($options['query']['facets']) ? $options['query']['facets'] : [];
+        $facets = isset($options['query']['facet']) ? $options['query']['facet'] : [];
         $sort = isset($options['sort']) ? $options['sort'] : null;
 
         $aggregations = $this->facets->createAggregationsForElasticsearchQuery();

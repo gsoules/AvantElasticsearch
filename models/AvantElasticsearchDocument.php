@@ -82,7 +82,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $elementTexts;
     }
 
-    protected function constructHierarchy($elementName, $elasticsearchFieldName, $texts, &$elementData)
+    protected function constructHierarchy($elementName, $elasticsearchFieldName, $texts, &$sortData)
     {
         if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
         {
@@ -95,7 +95,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // Filter out the ancestry to leave just the leaf text.
                 $text = trim(substr($text, $index + 1));
             }
-            $elementData[$elasticsearchFieldName . '-sort'] = $text;
+            $sortData[$elasticsearchFieldName] = $text;
         }
     }
 
@@ -179,6 +179,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         try
         {
             $elementData = [];
+            $sortData = [];
             $facets = [];
             $htmlFields = [];
 
@@ -210,7 +211,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
                 // Process special cases.
                 $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $elementData);
-                $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $elementData);
+                $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
                 $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $elementData);
 
                 $avantElasticsearchFacets = new AvantElasticsearchFacets();
@@ -218,7 +219,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
 
             $this->setField('element', $elementData);
-            $this->setField('facets', $facets);
+            $this->setField('sort', $sortData);
+            $this->setField('facet', $facets);
             $this->setField('html', $htmlFields);
         }
         catch (Omeka_Record_Exception $e)

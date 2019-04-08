@@ -88,7 +88,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             $terms[$aggregationName] = [
                 'terms' => [
-                    'field' => "facets.$aggregationName.keyword",
+                    'field' => "facet.$aggregationName.keyword",
                     'size' => 50,
                     'order' => ['_key' => 'asc']
                 ]
@@ -141,7 +141,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($facetNames as $aggregationName => $facetName)
         {
-            $filters = $this->createFacetFilter($filters, $facets, "facets.$aggregationName.keyword", $aggregationName);
+            $filters = $this->createFacetFilter($filters, $facets, "facet.$aggregationName.keyword", $aggregationName);
         }
 
         return $filters;

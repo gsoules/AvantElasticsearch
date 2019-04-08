@@ -53,8 +53,18 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             ];
         }
 
+        $this->addFieldKeywordMappingToProperties('image');
+        $this->addFieldKeywordMappingToProperties('owner');
+        $this->addFieldKeywordMappingToProperties('ownerid');
         $this->addFieldKeywordMappingToProperties('thumb');
         $this->addFieldKeywordMappingToProperties('url');
+
+        $this->addFieldKeywordMappingToProperties('address-number');
+        $this->addFieldKeywordMappingToProperties('address-street');
+
+        $this->addFieldKeywordMappingToProperties('sort.place');
+        $this->addFieldKeywordMappingToProperties('sort.subject');
+        $this->addFieldKeywordMappingToProperties('sort.type');
 
         $mapping = [
             $mappingType => [
