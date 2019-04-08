@@ -82,6 +82,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
             $response = $this->client->indices()->delete($params);
             return $response;
         }
+        catch (\Elasticsearch\Common\Exceptions\Missing404Exception $e)
+        {
+            // Index not found.
+            // This should never happen under normal operation, but can occur while debugging if execution gets
+            // stopped after an index is deleted, but before it gets recreated. The next attempt to delete the
+            // index will trigger this exception. We are handling the exception instead of first testing with
+            // indices()->exists() since the exists call caused a timeout with a "no alive nodes in your cluster"
+            // error unless CURLOPT_NOBODY was set to true.  Note that 'nobody' means don't return the body.
+            return null;
+        }
         catch (Exception $e)
         {
             $this->reportClientException($e);
