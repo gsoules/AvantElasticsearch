@@ -9,6 +9,7 @@ use Aws\ElasticsearchService\ElasticsearchPhpHandler;
 
 class AvantElasticsearchClient extends AvantElasticsearch
 {
+    /* @var $client Elasticsearch\Client */
     private $client;
 
     public function __construct(array $options = array())
@@ -19,7 +20,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function createElasticsearchClient(array $options)
     {
-        $timeout = isset($options['timeout']) ? $options['timeout'] : 90;
+        $timeout = isset($options['timeout']) ? $options['timeout'] : 30;
         $nobody = isset($options['nobody']) ? $options['nobody'] : false;
 
         $builder = ClientBuilder::create();
@@ -48,25 +49,42 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     public function createIndex($params)
     {
-        $response = $this->client->indices()->create($params);
-        return $response;
+        try
+        {
+            $response = $this->client->indices()->create($params);
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            return null;
+        }
+    }
+
+    public function deleteDocument($params)
+    {
+        try
+        {
+            $response = $this->client->delete($params);
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            return null;
+        }
     }
 
     public function deleteIndex($params)
     {
         try
         {
-            $response = null;
-
-            if ($this->client->indices()->exists($params))
-            {
-                $response = $this->client->indices()->delete($params);
-            }
-
+            $response = $this->client->indices()->delete($params);
             return $response;
         }
         catch (Exception $e)
         {
+            $this->reportClientException($e);
             return null;
         }
     }
@@ -99,34 +117,52 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return [$host];
     }
 
-    public function deleteDocument($params)
+    public function indexDocument($params)
     {
         try
         {
-            $response = $this->client->delete($params);
+            $response = $this->client->index($params);
             return $response;
         }
         catch (Exception $e)
         {
+            $this->reportClientException($e);
             return null;
         }
     }
 
-    public function indexDocument($params)
-    {
-        $response = $this->client->index($params);
-        return $response;
-    }
-
     public function indexMultipleDocuments($params)
     {
-        $response = $this->client->bulk($params);
-        return $response;
+        try
+        {
+            $response = $this->client->bulk($params);
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            return null;
+        }
     }
 
     public function performQuery($params)
     {
-        $response = $this->client->search($params);
-        return $response;
+        try
+        {
+            $response = $this->client->search($params);
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            return null;
+        }
+    }
+
+    protected function reportClientException(Exception $e)
+    {
+        // Need to figure out what to do in this situation. For now keep a breakpoint here.
+        $exceptionMessage = $this->getElasticsearchExceptionMessage($e);
+        return;
     }
 }
