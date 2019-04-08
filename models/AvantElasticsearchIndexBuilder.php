@@ -2,6 +2,8 @@
 
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
+    private $properties = array();
+
     public function __construct()
     {
         parent::__construct();
@@ -75,14 +77,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $elementSet = $this->getElementsForMapping();
         $mappingType = $this->getDocumentMappingType();
 
-        $properties = array();
-
-        $properties['title'] = [
+        $this->properties['title'] = [
             'type' => 'text',
             'analyzer' => 'english'
         ];
 
-        $properties['element.description'] = [
+        $this->properties['element.description'] = [
             'type' => 'text',
             'analyzer' => 'english'
         ];
@@ -98,7 +98,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
 
-            $properties["element.$fieldName"] = [
+            $this->properties["element.$fieldName"] = [
                 'type' => 'text',
                 'fields' => [
                     'keyword' => [
@@ -109,13 +109,29 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             ];
         }
 
+        $this->addFieldKeywordMappingToProperties('thumb');
+        $this->addFieldKeywordMappingToProperties('url');
+
         $mapping = [
             $mappingType => [
-                'properties' => $properties
+                'properties' => $this->properties
             ]
         ];
 
         return $mapping;
+    }
+
+    protected function addFieldKeywordMappingToProperties($fieldName)
+    {
+        $this->properties[$fieldName] = [
+            'type' => 'text',
+            'fields' => [
+                'keyword' => [
+                    'type' => 'keyword',
+                    'ignore_above' => 64
+                ]
+            ]
+        ];
     }
 
     protected function constructElementTextsString($texts, $elementName, $isHtmlElement)
