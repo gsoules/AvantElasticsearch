@@ -38,7 +38,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
     }
 
-    protected function consructElasticsearchDocument($item, $texts)
+    protected function constructElasticsearchDocument($item, $texts)
     {
         $title = $this->constructTitle($texts);
         $itemPath = public_url('items/show/' . metadata('item', 'id'));
@@ -49,7 +49,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemImageOriginalUrl = ItemPreview::getImageUrl($item, false, false);
         $itemFiles = $item->Files;
         $fileCount = count($itemFiles);
-        $ownerSite = get_option('site_title');
+        $owner = get_option('site_title');
         $ownerId = $this->getOwnerId();
         $documentId = $this->getDocumentIdForItem($item);
 
@@ -58,7 +58,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setFields([
             'itemid' => $item->id,
             'ownerid' => $ownerId,
-            'ownersite' => $ownerSite,
+            'owner' => $owner,
             'title' => $title,
             'public' => $item->public,
             'url' => $itemPublicUrl,
@@ -174,7 +174,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         set_current_record('Item', $item);
         $texts = ItemMetadata::getAllElementTextsForElementName($item, 'Title');
-        $doc = $this->consructElasticsearchDocument($item, $texts);
+        $doc = $this->constructElasticsearchDocument($item, $texts);
 
         try
         {

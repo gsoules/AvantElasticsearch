@@ -29,7 +29,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $source = [
             'itemid',
             'ownerid',
-            'ownersite',
+            'owner',
             'public',
             'url',
             'thumb',
