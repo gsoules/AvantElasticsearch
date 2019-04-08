@@ -36,7 +36,7 @@ $secret = ElasticsearchConfig::getOptionValueForSecret();
         <label><?php echo CONFIG_LABEL_ES_HOST; ?></label>
     </div>
     <div class="inputs five columns omega">
-        <p class="explanation"><?php echo __('Example: your-domain-abcdefg12345.us-east-2.es.amazonaws.com'); ?></p>
+        <p class="explanation"><?php echo __('Example: search-something-xxxxxxxxxxxx.us-east-2.es.amazonaws.com'); ?></p>
         <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_HOST, $host); ?>
     </div>
 </div>
