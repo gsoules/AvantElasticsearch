@@ -122,7 +122,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             {
                 $item = $items[$index];
 
-                if ($item->public == 0 || $item->id != 98)
+                if ($item->public == 0)
                 {
                     // Skip private items.
                     continue;

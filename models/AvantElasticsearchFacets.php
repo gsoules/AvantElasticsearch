@@ -185,7 +185,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function getFacetValueForHierarchy($elementName, $text)
     {
-        $facetValues = array();
         $root = '';
 
         if ($elementName == 'Type' || $elementName == 'Subject')
@@ -224,7 +223,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Form the facet value using the root and the leave (ignoring anything in the middle).
         $separator = empty($root) || empty($leaf) ? '' : ', ';
-        $facetValues[] = $root . $separator . $leaf;
+        $value = $root . $separator . $leaf;
 
 //        if ($elementName == 'Type' || $elementName == 'Subject')
 //        {
@@ -234,6 +233,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 //            }
 //        }
 
-        return $facetValues;
+        return $value;
     }
 }
