@@ -126,12 +126,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function constructTags($item)
     {
-        $tags = [];
+        $tags = array();
         foreach ($item->getTags() as $tag)
         {
             $tags[] = $tag->name;
         }
-        $this->setField('tags', $tags);
+        return $tags;
     }
 
     protected function constructTitle($texts)
@@ -230,17 +230,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $avantElasticsearchFacets->getFacetValue('Date', 'date', array(''), $facets);
             }
 
+            $tags = $this->constructTags($item);
+            $facets['tag'] = $tags;
+
             $this->setField('element', $elementData);
             $this->setField('sort', $sortData);
             $this->setField('facet', $facets);
             $this->setField('html', $htmlFields);
+            $this->setField('tags', $tags);
         }
         catch (Omeka_Record_Exception $e)
         {
             return null;
         }
-
-        $this->constructTags($item);
     }
 
     public function deleteDocumentFromIndex()

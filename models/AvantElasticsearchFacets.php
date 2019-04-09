@@ -8,7 +8,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
     {
-        if ($facetToAdd == 'subject')
+        if ($facetToAdd == 'subject' || $facetToAdd == 'tag')
         {
             $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($facetValue);
         }
@@ -52,11 +52,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if (isset($facets[$aggregationName]))
         {
             $values = $facets[$aggregationName];
-
-            if ($facetName != 'facet.subject.keyword')
-            {
-                $values = array($values);
-            }
 
             // Create a separate term filter for each value so that the filters are ANDed
             // as opposed to using a single terms filter with multiple values that are ORed.
@@ -125,11 +120,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function getFacetNames()
     {
+        // The order here determines the filter order on the search results page.
         $facetNames = array(
             'type' => 'Item Types',
             'subject' => 'Subjects',
             'place' => 'Places',
-            'date' => 'Dates'
+            'date' => 'Dates',
+            'tag' => 'Tags'
         );
         return $facetNames;
     }
@@ -149,18 +146,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $facetValues = $this->getFacetValueForDate($text, $facetValues);
             }
 
-            $facetValuesCount = count($facetValues);
-            if ($facetValuesCount >= 1)
+            if (count($facetValues) >= 1)
             {
-                if ($facetValuesCount > 1)
-                {
-                    $values = $facetValues;
-                }
-                else
-                {
-                    $values = $facetValues[0];
-                }
-                $facets[$elasticsearchFieldName] = $values;
+                $facets[$elasticsearchFieldName] = $facetValues;
             }
         }
     }
@@ -232,6 +220,14 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Form the facet value using the root and the leave (ignoring anything in the middle).
         $separator = empty($root) || empty($leaf) ? '' : ', ';
         $facetValues[] = $root . $separator . $leaf;
+
+        if ($elementName == 'Type' || $elementName == 'Subject')
+        {
+            if (!empty($root) && !empty($leaf)) {
+                // Emit the root as the top of the hierarchy.
+                $facetValues[] = $root;
+            }
+        }
 
         return $facetValues;
     }

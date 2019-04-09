@@ -75,6 +75,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addTextFieldToMappingProperties('facet.date');
         $this->addTextFieldToMappingProperties('facet.place');
         $this->addTextFieldToMappingProperties('facet.subject');
+        $this->addTextFieldToMappingProperties('facet.tag');
         $this->addTextFieldToMappingProperties('facet.type');
 
         $this->addTextFieldToMappingProperties('sort.address-number');
