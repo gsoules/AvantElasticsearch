@@ -133,33 +133,38 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function getFacetValue($elementName, $elasticsearchFieldName, $texts, &$facets)
     {
-        $facetValues = array();
+        $values = array();
 
         foreach ($texts as $text)
         {
             if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
             {
-                $facetValues = $this->getFacetValueForHierarchy($elementName, $text, $facetValues);
+                $value = $this->getFacetValueForHierarchy($elementName, $text);
             }
             else if ($elementName == 'Date')
             {
-                $facetValues = $this->getFacetValueForDate($text, $facetValues);
+                $value = $this->getFacetValueForDate($text);
             }
 
-            if (count($facetValues) >= 1)
+            if (!empty($value))
             {
-                $facets[$elasticsearchFieldName] = $facetValues;
+                $values[] = $value;
             }
+        }
+
+        if (!empty($values))
+        {
+            $facets[$elasticsearchFieldName] = $values;
         }
     }
 
     protected function getFacetValueForDate($text)
     {
-        $facetValues = array();
+        $value = array();
 
         if ($text == '')
         {
-            $facetValues[] = __('Unknown');
+            $value[] = __('Unknown');
         }
         else
         {
@@ -171,11 +176,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             if (!empty($year)) {
                 $decade = $year - ($year % 10);
-                $facetValues[] = $decade . "'s";
+                $value[] = $decade . "'s";
             }
         }
 
-        return $facetValues;
+        return $value;
     }
 
     protected function getFacetValueForHierarchy($elementName, $text)
@@ -221,13 +226,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $separator = empty($root) || empty($leaf) ? '' : ', ';
         $facetValues[] = $root . $separator . $leaf;
 
-        if ($elementName == 'Type' || $elementName == 'Subject')
-        {
-            if (!empty($root) && !empty($leaf)) {
-                // Emit the root as the top of the hierarchy.
-                $facetValues[] = $root;
-            }
-        }
+//        if ($elementName == 'Type' || $elementName == 'Subject')
+//        {
+//            if (!empty($root) && !empty($leaf)) {
+//                // Emit the root as the top of the hierarchy.
+//                $facetValues[] = $root;
+//            }
+//        }
 
         return $facetValues;
     }
