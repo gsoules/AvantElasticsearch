@@ -39,18 +39,23 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
             else if ($elementName == 'Date')
             {
-                // This code is only called if Date element is not empty.
-                // As such, we can't use it to create an "Unknown date" facet value.
-                $year = '';
-                if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
+                if ($text == '')
                 {
-                    $year = $matches[1];
+                    $facetValues[] = __('Unknown');
                 }
-
-                if (!empty($year))
+                else
                 {
-                    $decade = $year - ($year % 10);
-                    $facetValues[] = $decade . "'s";
+                    $year = '';
+                    if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
+                    {
+                        $year = $matches[1];
+                    }
+
+                    if (!empty($year))
+                    {
+                        $decade = $year - ($year % 10);
+                        $facetValues[] = $decade . "'s";
+                    }
                 }
             }
 

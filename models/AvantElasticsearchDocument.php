@@ -176,17 +176,21 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $texts = ItemMetadata::getAllElementTextsForElementName($item, 'Title');
         $this->loadFields($item, $texts);
 
+        $avantElasticsearchFacets = new AvantElasticsearchFacets();
+
+        $elementData = [];
+        $sortData = [];
+        $facets = [];
+        $htmlFields = [];
+
+        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+        $elementTexts = $item->getAllElementTexts();
+        $avantElasticsearch = new AvantElasticsearch();
+
+        $hasDateElement = false;
+
         try
         {
-            $elementData = [];
-            $sortData = [];
-            $facets = [];
-            $htmlFields = [];
-
-            $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-            $elementTexts = $item->getAllElementTexts();
-            $avantElasticsearch = new AvantElasticsearch();
-
             foreach ($elementTexts as $elementText)
             {
                 $element = $item->getElementById($elementText->element_id);
@@ -200,6 +204,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // Get the element name and create the corresponding Elasticsearch field name.
                 $elementName = $element->name;
                 $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
+                if ($elementName == 'Date')
+                {
+                    $hasDateElement = true;
+                }
 
                 // Get the element's text values as a single string with the values catenated.
                 $isHtmlElement = $this->constructHtmlElement($elementName, $elasticsearchFieldName, $item, $htmlFields);
@@ -214,8 +222,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
                 $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $sortData);
 
-                $avantElasticsearchFacets = new AvantElasticsearchFacets();
                 $avantElasticsearchFacets->constructFacets($elementName, $elasticsearchFieldName, $texts, $facets);
+            }
+
+            if (!$hasDateElement)
+            {
+                $avantElasticsearchFacets->constructFacets('Date', 'date', array(''), $facets);
             }
 
             $this->setField('element', $elementData);
