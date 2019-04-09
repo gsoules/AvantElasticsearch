@@ -222,12 +222,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
                 $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $sortData);
 
-                $avantElasticsearchFacets->constructFacets($elementName, $elasticsearchFieldName, $texts, $facets);
+                $avantElasticsearchFacets->getFacetValue($elementName, $elasticsearchFieldName, $texts, $facets);
             }
 
             if (!$hasDateElement)
             {
-                $avantElasticsearchFacets->constructFacets('Date', 'date', array(''), $facets);
+                $avantElasticsearchFacets->getFacetValue('Date', 'date', array(''), $facets);
             }
 
             $this->setField('element', $elementData);

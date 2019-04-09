@@ -6,67 +6,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         parent::__construct();
     }
 
-    public function constructFacets($elementName, $elasticsearchFieldName, $texts, &$facets)
-    {
-        $facetValues = array();
-        foreach ($texts as $text)
-        {
-//                    if ($elementName == 'Type' || $elementName == 'Subject')
-//                    {
-//                        // Find the first comma.
-//                        $needle = ', ';
-//                        $pos1 = strpos($text, $needle);
-//                        if ($pos1 !== false)
-//                        {
-//                            $pos2 = strpos($text, $needle, $pos1 + strlen($needle));
-//                            if ($pos2 !== false) {
-//                                // Filter out the ancestry to leave just the root text.
-//                                $text = trim(substr($text, 0, $pos2));
-//                            }
-//                        }
-//                        $facetValues[] = $text;
-//                    }
-            if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
-            {
-                // Find the last comma.
-                $index = strrpos($text, ',', -1);
-                if ($index !== false)
-                {
-                    // Filter out the ancestry to leave just the leaf text.
-                    $text = trim(substr($text, $index + 1));
-                }
-                $facetValues[] = $text;
-            }
-            else if ($elementName == 'Date')
-            {
-                if ($text == '')
-                {
-                    $facetValues[] = __('Unknown');
-                }
-                else
-                {
-                    $year = '';
-                    if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
-                    {
-                        $year = $matches[1];
-                    }
-
-                    if (!empty($year))
-                    {
-                        $decade = $year - ($year % 10);
-                        $facetValues[] = $decade . "'s";
-                    }
-                }
-            }
-
-            $facetValuesCount = count($facetValues);
-            if ($facetValuesCount >= 1)
-            {
-                $facets[$elasticsearchFieldName] = $facetValuesCount > 1 ? $facetValues : $facetValues[0];
-            }
-        }
-    }
-
     public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
     {
         if ($facetToAdd == 'subject')
@@ -193,5 +132,107 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'date' => 'Dates'
         );
         return $facetNames;
+    }
+
+    public function getFacetValue($elementName, $elasticsearchFieldName, $texts, &$facets)
+    {
+        $facetValues = array();
+
+        foreach ($texts as $text)
+        {
+            if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
+            {
+                $facetValues = $this->getFacetValueForHierarchy($elementName, $text, $facetValues);
+            }
+            else if ($elementName == 'Date')
+            {
+                $facetValues = $this->getFacetValueForDate($text, $facetValues);
+            }
+
+            $facetValuesCount = count($facetValues);
+            if ($facetValuesCount >= 1)
+            {
+                if ($facetValuesCount > 1)
+                {
+                    $values = $facetValues;
+                }
+                else
+                {
+                    $values = $facetValues[0];
+                }
+                $facets[$elasticsearchFieldName] = $values;
+            }
+        }
+    }
+
+    protected function getFacetValueForDate($text)
+    {
+        $facetValues = array();
+
+        if ($text == '')
+        {
+            $facetValues[] = __('Unknown');
+        }
+        else
+        {
+            $year = '';
+            if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
+            {
+                $year = $matches[1];
+            }
+
+            if (!empty($year)) {
+                $decade = $year - ($year % 10);
+                $facetValues[] = $decade . "'s";
+            }
+        }
+
+        return $facetValues;
+    }
+
+    protected function getFacetValueForHierarchy($elementName, $text)
+    {
+        $facetValues = array();
+        $root = '';
+
+        if ($elementName == 'Type' || $elementName == 'Subject')
+        {
+            // Find the first comma, the one that follows the root value.
+            $index = strpos($text, ', ');
+            if ($index === false)
+            {
+                // The root is the entire string.
+                $root = $text;
+            }
+            else
+            {
+                $root = trim(substr($text, 0, $index));
+            }
+        }
+
+        // Find the last comma, the one that precedes the leaf value.
+        $index = strrpos($text, ',', -1);
+        if ($index === false)
+        {
+            // The leaf is the entire string.
+            $leaf = $text;
+        }
+        else
+        {
+            // Filter out the ancestry to leave just the leaf text.
+            $leaf = trim(substr($text, $index + 1));
+        }
+
+        if ($root == $leaf)
+        {
+            // The leaf and root are the same so get rid of the leaf value.
+            $leaf = '';
+        }
+
+        // Form the facet value using the root and the leave (ignoring anything in the middle).
+        $separator = empty($root) || empty($leaf) ? '' : ', ';
+        $facetValues[] = $root . $separator . $leaf;
+
+        return $facetValues;
     }
 }
