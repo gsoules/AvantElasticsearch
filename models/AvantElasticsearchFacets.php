@@ -62,9 +62,23 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
     }
 
-    public function convertFacetValuesToString($value)
+    public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
     {
-        return is_array($value) ? implode(', ', $value) : $value;
+        if ($facetToAdd == 'subject')
+        {
+            $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($facetValue);
+        }
+        else
+        {
+            $arg = "facet_{$facetToAdd}=" . urlencode($facetValue);
+        }
+
+        if (strpos($queryString, $arg) === FALSE)
+        {
+            return "$queryString&$arg";
+        }
+
+        return $queryString;
     }
 
     public function createAggregationsForElasticsearchQuery()
@@ -93,33 +107,21 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         if (isset($facets[$aggregationName]))
         {
-            $value = $facets[$aggregationName];
+            $values = $facets[$aggregationName];
+
             if ($facetName != 'facet.subject.keyword')
             {
-                $value = array($value);
+                $values = array($values);
             }
-            $filters[] = ['terms' => [$facetName => $value]];
+
+            // Create a separate term filter for each value so that the filters are ANDed
+            // as opposed to using a single terms filter with multiple values that are ORed.
+            foreach ($values as $value)
+            {
+                $filters[] = ['term' => [$facetName => $value]];
+            }
         }
         return $filters;
-    }
-
-    public function createFacetLink($queryString, $facetToAdd, $value)
-    {
-        if ($facetToAdd == 'subject')
-        {
-            $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($value);
-        }
-        else
-        {
-            $arg = "facet_{$facetToAdd}=" . urlencode($value);
-        }
-
-        if (strpos($queryString, $arg) === FALSE)
-        {
-            return "$queryString&$arg";
-        }
-
-        return $queryString;
     }
 
     public function createQueryStringWithFacets($query)
@@ -146,6 +148,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $queryString;
     }
 
+    public function createRemoveFacetLink($queryString, $facetToRemove, $facetValue)
+    {
+        $beforeArgs = explode('&', $queryString);
+        $afterArgs = array();
+
+        foreach ($beforeArgs as $arg)
+        {
+            $argContainsFacet = strpos($arg, $facetToRemove) !== false;
+            $argContainsValue = strpos($arg, $facetValue) !== false;
+            if (!($argContainsFacet && $argContainsValue))
+            {
+                // Keep this arg since it not the one to be removed.
+                $afterArgs[] = $arg;
+            }
+        }
+        return implode('&', $afterArgs);
+    }
+
     public function getFacetFiltersForElasticsearchQuery($facets)
     {
         $filters = array();
@@ -168,20 +188,5 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'date' => 'Dates'
         );
         return $facetNames;
-    }
-
-    public function removeFacetFromQuery($queryString, $facetToRemove)
-    {
-        $beforeArgs = explode('&', $queryString);
-        $afterArgs = array();
-
-        foreach ($beforeArgs as $arg)
-        {
-            if (strpos($arg, $facetToRemove) === FALSE)
-            {
-                $afterArgs[] = $arg;
-            }
-        }
-        return implode('&', $afterArgs);
     }
 }
