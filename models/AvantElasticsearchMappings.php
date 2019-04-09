@@ -97,24 +97,24 @@ class AvantElasticsearchMappings extends AvantElasticsearch
     protected function getElementsForMapping()
     {
         $table = get_db()->getTable('Element');
-        $select = $table->getSelect()->order('element_set_id ASC')->order('order ASC');
-        $elementSet = $table->fetchObjects($select);
+        $select = $table->getSelect();
+        $elements = $table->fetchObjects($select);
 
         $hidePrivate = true;
         $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
         $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
 
-        foreach ($elementSet as $elementName => $element)
+        foreach ($elements as $elementName => $element)
         {
             $elementId = $element->id;
             $hideUnused = array_key_exists($elementId, $unusedElementsData);
             $hide = $hideUnused || ($hidePrivate && array_key_exists($elementId, $privateElementsData));
             if ($hide)
             {
-                unset($elementSet[$elementName]);
+                unset($elements[$elementName]);
             }
         }
 
-        return $elementSet;
+        return $elements;
     }
 }

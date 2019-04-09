@@ -26,6 +26,33 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $messageString;
     }
 
+    public function createDocumentsForAllItems($limit = 0)
+    {
+        $documents = array();
+        $items = $this->fetchAllItems();
+        $itemsCount = count($items);
+
+        if ($itemsCount > 0)
+        {
+            $limit = $limit == 0 ? $itemsCount : $limit;
+
+            for ($index = 0; $index < $limit; $index++)
+            {
+                $item = $items[$index];
+
+                if ($item->public == 0 || $item->id != 49)
+                {
+                    // Skip private items.
+                    continue;
+                }
+                $documents[] = $this->createElasticsearchDocumentFromItem($item);
+                release_object($item);
+            }
+        }
+
+        return $documents;
+    }
+
     public function createElasticsearchDocumentFromItem($item)
     {
         $documentId = $this->getDocumentIdForItem($item);
@@ -109,31 +136,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $params;
     }
 
-    public function getDocuments(array $items, $limit = 0)
-    {
-        $documents = array();
-        $itemsCount = count($items);
-
-        if ($itemsCount > 0)
-        {
-            $limit = $limit == 0 ? $itemsCount : $limit;
-
-            for ($index = 0; $index < $limit; $index++)
-            {
-                $item = $items[$index];
-
-                if ($item->public == 0 || $item->id != 49)
-                {
-                    // Skip private items.
-                    continue;
-                }
-                $documents[] = $this->createElasticsearchDocumentFromItem($item);
-            }
-        }
-
-        return $documents;
-    }
-
     public function indexItem($item)
     {
         $document = $this->createElasticsearchDocumentFromItem($item);
@@ -143,9 +145,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $response;
     }
 
-    protected function preformBulkIndexExport(array $items, $filename, $limit = 0)
+    protected function preformBulkIndexExport($filename, $limit = 0)
     {
-        $documents = $this->getDocuments($items, $limit);
+        $documents = $this->createDocumentsForAllItems($limit);
         $formattedData = json_encode($documents);
         $handle = fopen($filename, 'w+');
         fwrite($handle, $formattedData);
@@ -198,8 +200,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if ($export)
         {
-            $items = $this->fetchAllItems();
-            $responses = $this->preformBulkIndexExport($items, $filename, $limit);
+            $responses = $this->preformBulkIndexExport($filename, $limit);
         }
         else
         {

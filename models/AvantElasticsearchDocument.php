@@ -146,7 +146,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected function loadFields($item, $texts)
     {
         $title = $this->constructTitle($texts);
-        $itemPath = public_url('items/show/' . metadata('item', 'id'));
+        $itemPath = public_url('items/show/' . $item->id);
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $serverUrl = $serverUrlHelper->serverUrl();
         $itemPublicUrl = $serverUrl . $itemPath;
@@ -170,11 +170,38 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         ]);
     }
 
+    protected function getItemElementValues($item)
+    {
+        // Get all the elements and all element texts.
+        $elements = $this->getElementsForIndex();
+        $elementTexts = get_db()->getTable('ElementText')->findByRecord($item);
+
+        // Loop over the elements and for each, find its text value(s).
+        foreach ($elements as $element)
+        {
+            $elementId = $element->id;
+            $elementName = $element->name;
+
+            foreach ($elementTexts as $elementText)
+            {
+                if ($elementText->element_id == $elementId)
+                {
+                    // Found text for the current element. Add it to the texts for the element.
+                    // Continue looping for the texts to see if any others belong to this element.
+                    $itemElements[$elementName][] = $elementText->text;
+                }
+            }
+        }
+
+        return $itemElements;
+    }
+
     public function loadItemContent($item)
     {
-        set_current_record('Item', $item);
-        $texts = ItemMetadata::getAllElementTextsForElementName($item, 'Title');
-        $this->loadFields($item, $texts);
+        $elementValues = $this->getItemElementValues($item);
+
+        $titleTexts = isset($elementValues['Title']) ? $elementValues['Title'] : array();
+        $this->loadFields($item, $titleTexts);
 
         $avantElasticsearchFacets = new AvantElasticsearchFacets();
 
@@ -183,66 +210,47 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $facets = [];
         $htmlFields = [];
 
-        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-        $elementTexts = $item->getAllElementTexts();
         $avantElasticsearch = new AvantElasticsearch();
 
         $hasDateElement = false;
 
-        try
+        foreach ($elementValues as $elementName => $texts)
         {
-            foreach ($elementTexts as $elementText)
+            // Get the element name and create the corresponding Elasticsearch field name.
+            $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
+            if ($elementName == 'Date')
             {
-                $element = $item->getElementById($elementText->element_id);
-
-                if (array_key_exists($element->id, $privateElementsData))
-                {
-                    // Skip private elements.
-                    continue;
-                }
-
-                // Get the element name and create the corresponding Elasticsearch field name.
-                $elementName = $element->name;
-                $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
-                if ($elementName == 'Date')
-                {
-                    $hasDateElement = true;
-                }
-
-                // Get the element's text values as a single string with the values catenated.
-                $isHtmlElement = $this->constructHtmlElement($elementName, $elasticsearchFieldName, $item, $htmlFields);
-                $texts = ItemMetadata::getAllElementTextsForElementName($item, $elementName);
-                $elementTextsString = $this->constructElementTextsString($texts, $elementName, $isHtmlElement);
-
-                // Save the element's text.
-                $elementData[$elasticsearchFieldName] = $elementTextsString;
-
-                // Process special cases.
-                $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $sortData);
-                $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
-                $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $sortData);
-
-                $avantElasticsearchFacets->getFacetValue($elementName, $elasticsearchFieldName, $texts, $facets);
+                $hasDateElement = true;
             }
 
-            if (!$hasDateElement)
-            {
-                $avantElasticsearchFacets->getFacetValue('Date', 'date', array(''), $facets);
-            }
+            // Get the element's text values as a single string with the values catenated.
+            $isHtmlElement = $this->constructHtmlElement($elementName, $elasticsearchFieldName, $item, $htmlFields);
+            $elementTextsString = $this->constructElementTextsString($texts, $elementName, $isHtmlElement);
 
-            $tags = $this->constructTags($item);
-            $facets['tag'] = $tags;
+            // Save the element's text.
+            $elementData[$elasticsearchFieldName] = $elementTextsString;
 
-            $this->setField('element', $elementData);
-            $this->setField('sort', $sortData);
-            $this->setField('facet', $facets);
-            $this->setField('html', $htmlFields);
-            $this->setField('tags', $tags);
+            // Process special cases.
+            $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $sortData);
+            $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
+            $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $sortData);
+
+            $avantElasticsearchFacets->getFacetValue($elementName, $elasticsearchFieldName, $texts, $facets);
         }
-        catch (Omeka_Record_Exception $e)
+
+        if (!$hasDateElement)
         {
-            return null;
+            $avantElasticsearchFacets->getFacetValue('Date', 'date', array(''), $facets);
         }
+
+        $tags = $this->constructTags($item);
+        $facets['tag'] = $tags;
+
+        $this->setField('element', $elementData);
+        $this->setField('sort', $sortData);
+        $this->setField('facet', $facets);
+        $this->setField('html', $htmlFields);
+        $this->setField('tags', $tags);
     }
 
     public function deleteDocumentFromIndex()

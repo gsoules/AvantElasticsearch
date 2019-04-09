@@ -6,6 +6,8 @@ use Elasticsearch\ClientBuilder;
 class AvantElasticsearch
 {
     protected $docIndex;
+    protected $elementsForIndex = array();
+    protected $ignorePrivateElements = true;
 
     public function __construct()
     {
@@ -79,6 +81,34 @@ class AvantElasticsearch
             }
         }
         return $message;
+    }
+
+    public function getElementsForIndex($ignorePrivate = true)
+    {
+        if (empty($this->elementsForIndex) || $this->ignorePrivateElements != $ignorePrivate)
+        {
+            $this->ignorePrivateElements = $ignorePrivate;
+
+            $table = get_db()->getTable('Element');
+            $select = $table->getSelect();
+            $this->elementsForIndex = $table->fetchObjects($select);
+
+            $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+            $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
+
+            foreach ($this->elementsForIndex as $elementName => $element)
+            {
+                $elementId = $element->id;
+                $ingoreUnused = array_key_exists($elementId, $unusedElementsData);
+                $ignore = $ingoreUnused || ($this->ignorePrivateElements && array_key_exists($elementId, $privateElementsData));
+                if ($ignore)
+                {
+                    unset($this->elementsForIndex[$elementName]);
+                }
+            }
+        }
+
+        return $this->elementsForIndex;
     }
 
     public function getOwnerId()
