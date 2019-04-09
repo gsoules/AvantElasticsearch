@@ -1,9 +1,20 @@
 <?php
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
+    protected $facetNames = array();
+
     public function __construct()
     {
         parent::__construct();
+
+        // The order here determines the filter order on the search results page.
+        $this->facetNames = array(
+            'type' => 'Item Types',
+            'subject' => 'Subjects',
+            'place' => 'Places',
+            'date' => 'Dates',
+            'tag' => 'Tags'
+        );
     }
 
     public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
@@ -120,20 +131,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function getFacetNames()
     {
-        // The order here determines the filter order on the search results page.
-        $facetNames = array(
-            'type' => 'Item Types',
-            'subject' => 'Subjects',
-            'place' => 'Places',
-            'date' => 'Dates',
-            'tag' => 'Tags'
-        );
-        return $facetNames;
+        return $this->facetNames;
     }
 
     public function getFacetValue($elementName, $elasticsearchFieldName, $texts, &$facets)
     {
-        $values = array();
+        if (!array_key_exists($elasticsearchFieldName, $this->facetNames))
+        {
+            return;
+        }
 
         foreach ($texts as $text)
         {
@@ -148,13 +154,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             if (!empty($value))
             {
-                $values[] = $value;
+                $facets[$elasticsearchFieldName][] = $value;
             }
-        }
-
-        if (!empty($values))
-        {
-            $facets[$elasticsearchFieldName] = $values;
         }
     }
 
