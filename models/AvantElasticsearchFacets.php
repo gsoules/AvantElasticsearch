@@ -93,14 +93,26 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         if (isset($facets[$aggregationName]))
         {
-            $filters[] = ['terms' => [$facetName => $facets[$aggregationName]]];
+            $value = $facets[$aggregationName];
+            if ($facetName != 'facet.subject.keyword')
+            {
+                $value = array($value);
+            }
+            $filters[] = ['terms' => [$facetName => $value]];
         }
         return $filters;
     }
 
     public function createFacetLink($queryString, $facetToAdd, $value)
     {
-        $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($value);
+        if ($facetToAdd == 'subject')
+        {
+            $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($value);
+        }
+        else
+        {
+            $arg = "facet_{$facetToAdd}=" . urlencode($value);
+        }
 
         if (strpos($queryString, $arg) === FALSE)
         {
@@ -127,7 +139,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
             else
             {
-                $queryString .= '&'.urlencode("facet_{$facetName}") . '=' . urlencode($facetValues[0]);
+                $queryString .= '&'.urlencode("facet_{$facetName}") . '=' . urlencode($facetValues);
             }
         }
 
