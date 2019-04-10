@@ -28,6 +28,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createDocumentsForAllItems($limit = 0)
     {
+        $mem1 = memory_get_usage();
         $documents = array();
         $items = $this->fetchAllItems();
         $itemsCount = count($items);
@@ -40,16 +41,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             {
                 $item = $items[$index];
 
-                if ($item->public == 0 || $item->id != 49)
+                if ($item->public == 0)
                 {
                     // Skip private items.
                     continue;
                 }
+                $mem2 = memory_get_usage();
                 $documents[] = $this->createElasticsearchDocumentFromItem($item);
                 release_object($item);
+                $mem3 = memory_get_usage();
             }
         }
-
+        $mem4 = memory_get_usage();
         return $documents;
     }
 
@@ -77,13 +80,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $response;
     }
 
-    protected function fetchAllItems()
+    protected function fetchAllItems($getOnlyPublic = true)
     {
         try
         {
             $db = get_db();
             $table = $db->getTable('Item');
             $select = $table->getSelect();
+            if ($getOnlyPublic)
+            {
+                $select->where('items.public = 1');
+            }
+
             $items = $table->fetchObjects($select);
         }
         catch (Exception $e)
