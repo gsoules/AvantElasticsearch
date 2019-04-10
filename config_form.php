@@ -5,6 +5,7 @@ $exportFile = ElasticsearchConfig::getOptionValueForExportFile();
 $host = ElasticsearchConfig::getOptionValueForHost();
 $key = ElasticsearchConfig::getOptionValueForKey();
 $owner = ElasticsearchConfig::getOptionValueForOwner();
+$ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
 $port = ElasticsearchConfig::getOptionValueForPort();
 $region = ElasticsearchConfig::getOptionValueForRegion();
 $scheme = ElasticsearchConfig::getOptionValueForScheme();
@@ -23,10 +24,20 @@ $secret = ElasticsearchConfig::getOptionValueForSecret();
 
 <div class="field">
     <div class="two columns alpha">
-        <label><?php echo CONFIG_LABEL_ES_OWNER; ?></label>
+        <label><?php echo CONFIG_LABEL_ES_OWNERID; ?></label>
     </div>
     <div class="inputs five columns omega">
         <p class="explanation"><?php echo __('Identification for this organizaton (3 to 6 lower case letters a-z)'); ?></p>
+        <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_OWNERID, $ownerId); ?>
+    </div>
+</div>
+
+<div class="field">
+    <div class="two columns alpha">
+        <label><?php echo CONFIG_LABEL_ES_OWNER; ?></label>
+    </div>
+    <div class="inputs five columns omega">
+        <p class="explanation"><?php echo __('Organization name as it should be shown for the owner of its data'); ?></p>
         <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_OWNER, $owner); ?>
     </div>
 </div>

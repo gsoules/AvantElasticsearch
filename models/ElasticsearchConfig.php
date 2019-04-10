@@ -3,7 +3,8 @@
 define('CONFIG_LABEL_ES_EXPORT_FILE',  __('Export Filename'));
 define('CONFIG_LABEL_ES_HOST', __('Host'));
 define('CONFIG_LABEL_ES_KEY', __('Key'));
-define('CONFIG_LABEL_ES_OWNER', __('Owner Id'));
+define('CONFIG_LABEL_ES_OWNER', __('Owner'));
+define('CONFIG_LABEL_ES_OWNERID', __('Owner Id'));
 define('CONFIG_LABEL_ES_PORT', __('Port'));
 define('CONFIG_LABEL_ES_REGION', __('Region'));
 define('CONFIG_LABEL_ES_SCHEME', __('Scheme'));
@@ -14,7 +15,8 @@ class ElasticsearchConfig extends ConfigOptions
     const OPTION_ES_EXPORT_FILE = 'avantelasticsearch_es_export_file';
     const OPTION_ES_HOST = 'avantelasticsearch_es_host';
     const OPTION_ES_KEY = 'avantelasticsearch_es_key';
-    const OPTION_ES_OWNER = 'avantelasticsearch_es_owner_id';
+    const OPTION_ES_OWNER = 'avantelasticsearch_es_owner';
+    const OPTION_ES_OWNERID = 'avantelasticsearch_es_owner_id';
     const OPTION_ES_PORT = 'avantelasticsearch_es_port';
     const OPTION_ES_REGION = 'avantelasticsearch_es_region';
     const OPTION_ES_SCHEME = 'avantelasticsearch_es_scheme';
@@ -38,6 +40,11 @@ class ElasticsearchConfig extends ConfigOptions
     public static function getOptionValueForOwner()
     {
         return self::getOptionText(self::OPTION_ES_OWNER);
+    }
+
+    public static function getOptionValueForOwnerId()
+    {
+        return self::getOptionText(self::OPTION_ES_OWNERID);
     }
 
     public static function getOptionValueForPort()
@@ -66,6 +73,7 @@ class ElasticsearchConfig extends ConfigOptions
         self::saveOptionDataForHost();
         self::saveOptionDataForKey();
         self::saveOptionDataForOwner();
+        self::saveOptionDataForOwnerId();
         self::saveOptionDataForPort();
         self::saveOptionDataForRegion();
         self::saveOptionDataForScheme();
@@ -89,8 +97,13 @@ class ElasticsearchConfig extends ConfigOptions
 
     public static function saveOptionDataForOwner()
     {
-        $optionName = self::OPTION_ES_OWNER;
-        $optionLabel = CONFIG_LABEL_ES_OWNER;
+        self::saveOptionText(self::OPTION_ES_OWNER , CONFIG_LABEL_ES_OWNER);
+    }
+
+    public static function saveOptionDataForOwnerId()
+    {
+        $optionName = self::OPTION_ES_OWNERID;
+        $optionLabel = CONFIG_LABEL_ES_OWNERID;
         $value = self::getOptionText($optionName);
         self::errorIfEmpty($value, $optionName, $optionLabel);
         $strippedValue = strtolower(preg_replace('/[^a-z]/', '', $value));
