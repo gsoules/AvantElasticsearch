@@ -62,26 +62,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $params;
     }
 
-    protected function constructElementTextsString($texts, $elementName, $isHtmlElement)
-    {
-        // Get the element's text and catentate them into a single string separate by EOL breaks.
-        // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
-        // sorting based on the first value as is required by AvantSearch when a user sorts by column.
-        // By catenating the values, sorting will work as desired.
-
-        $elementTexts = $this->catentateElementTexts($texts);
-
-        // Change Description content to plain text for two reasons:
-        // 1. Prevent searches from finding HTML tag names like span or strong.
-        // 2. Allow proper hit highlighting in search results with showing highlighted HTML tags.
-        if ($elementName == 'Description' && $isHtmlElement)
-        {
-            $elementTexts = strip_tags($texts[0]);
-        }
-
-        return $elementTexts;
-    }
-
     protected function constructHierarchy($elementName, $elasticsearchFieldName, $texts, &$sortData)
     {
         if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
@@ -99,19 +79,21 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function constructHtmlElement($elementName, $elasticsearchFieldName, $item, &$htmlFields)
+    protected function constructHtmlElement($elasticsearchFieldName, $text, &$htmlFields)
     {
-        // Determine if this element is from a field that allows HTML and uses HTML.
-        // If so, add the element's name to a list of fields that contain HTML content.
-        // This will be needed so that search results will show the content properly and not as raw HTML.
+        // Determine if this element's text contains HTML. If so, add the element's name to the item's HTML list
+        // So that the search results display logic will know to show the content properly and not as raw HTML.
+        // We used to do this with Omeka calls to query if the element allowed HTML, but the underlying SQL queries
+        // were too expensive and slowed down document processing. Now we simply see if the text changes after
+        // stripping any HTML tags.
 
-        $elementSetName = ItemMetadata::getElementSetNameForElementName($elementName);
-        $isHtmlElement = $item->getElementTexts($elementSetName, $elementName)[0]->isHtml();
+        $strippedText = strip_tags($text);
+        $isHtmlElement = $strippedText != $text;
+
         if ($isHtmlElement)
         {
             $htmlFields[] = $elasticsearchFieldName;
         }
-
         return $isHtmlElement;
     }
 
@@ -224,9 +206,22 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $hasDateElement = true;
             }
 
-            // Get the element's text values as a single string with the values catenated.
-            $isHtmlElement = $this->constructHtmlElement($elementName, $elasticsearchFieldName, $item, $htmlFields);
-            $elementTextsString = $this->constructElementTextsString($texts, $elementName, $isHtmlElement);
+            // Get the element's text and catentate them into a single string separate by EOL breaks.
+            // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
+            // sorting based on the first value as is required by AvantSearch when a user sorts by column.
+            // By catenating the values, sorting will work as desired.
+            $elementTextsString = $this->catentateElementTexts($texts);
+
+            // Determine if the element's text contains HTML and if so, add the element to the item's HTML list.
+            $isHtmlElement = $this->constructHtmlElement($elasticsearchFieldName, $elementTextsString, $htmlFields);
+
+            // Change Description content to plain text for two reasons:
+            // 1. Prevent searches from finding HTML tag names like span or strong.
+            // 2. Allow proper hit highlighting in search results with showing highlighted HTML tags.
+            if ($elementName == 'Description' && $isHtmlElement)
+            {
+                $elementTextsString = strip_tags($elementTextsString);
+            }
 
             // Save the element's text.
             $elementData[$elasticsearchFieldName] = $elementTextsString;
