@@ -8,6 +8,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $body = [];
 
     private $integerSortElements = array();
+    private $itemImageThumbUrl;
+    private $itemImageOriginalUrl;
+    private $itemFiles;
 
     public function __construct($documentId)
     {
@@ -129,17 +132,57 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $title;
     }
 
+    protected function getImageUrl($item, $thumbnail)
+    {
+        $itemImageUrl = $this->getItemFileUrl($thumbnail);
+
+        if (empty($itemImageUrl))
+        {
+            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($item->id);
+            if (!empty($coverImageIdentifier))
+            {
+                $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
+                $itemImageUrl = empty($coverImageItem) ? '' : ItemPreview::getItemFileUrl($coverImageItem, $thumbnail);
+            }
+        }
+
+        return $itemImageUrl;
+    }
+
+    protected function getItemFileUrl($thumbnail)
+    {
+        // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFiles
+        // which allows this method to get called multiple times without having to fetch the files array each time.
+        // This improvement saves a significant amount of time when indexing all items.
+
+        $url = '';
+        $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
+        if (!empty($file) && $file->hasThumbnail())
+        {
+            $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
+            if (strlen($url) > 4 && strpos(strtolower($url), '.jpg', strlen($url) - 4) === false)
+            {
+                // The original image is not a jpg (it's probably a pdf) so return its derivative image instead.
+                $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'fullsize');
+            }
+        }
+        return $url;
+    }
+
     protected function loadFields($item, $texts)
     {
         $title = $this->constructTitle($texts);
+
         $itemPath = public_url('items/show/' . $item->id);
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $serverUrl = $serverUrlHelper->serverUrl();
         $itemPublicUrl = $serverUrl . $itemPath;
-        $itemImageThumbUrl = ItemPreview::getImageUrl($item, false, true);
-        $itemImageOriginalUrl = ItemPreview::getImageUrl($item, false, false);
-        $itemFiles = $item->Files;
-        $fileCount = count($itemFiles);
+
+        $this->itemFiles = $item->Files;
+        $this->itemImageThumbUrl = $this->getImageUrl($item, true);
+        $this->itemImageOriginalUrl = $this->getImageUrl($item, false);
+        $fileCount = count($this->itemFiles);
+
         $owner = ElasticsearchConfig::getOptionValueForOwner();
         $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
 
@@ -150,8 +193,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'title' => $title,
             'public' => (bool)$item->public,
             'url' => $itemPublicUrl,
-            'thumb' => $itemImageThumbUrl,
-            'image' => $itemImageOriginalUrl,
+            'thumb' => $this->itemImageThumbUrl,
+            'image' => $this->itemImageOriginalUrl,
             'files' => (int)$fileCount
         ]);
     }
