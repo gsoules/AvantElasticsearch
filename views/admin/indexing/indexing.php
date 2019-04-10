@@ -1,5 +1,5 @@
 <?php
-ini_set('max_execution_time', 1000);
+ini_set('max_execution_time', 1200);
 
 $pageTitle = __('Elasticsearch Indexing');
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
@@ -21,6 +21,8 @@ if (isset($_REQUEST['export']))
     $current = intval($mem2 /  $mb);
     $peak = intval(memory_get_peak_usage() /  $mb);
 
+    $executionTime = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
+
     $message = $avantElasticsearchIndexBuilder->convertResponsesToMessageString($responses);
 
     if (empty($message))
@@ -36,6 +38,7 @@ if (isset($_REQUEST['export']))
     echo "<p>Memory used: $used MB</p>";
     echo "<p>Current usage: $current MB</p>";
     echo "<p>Peak usage: $peak MB</p>";
+    echo "<p>Execution time: $executionTime seconds</p>";
 }
 
 echo foot();
