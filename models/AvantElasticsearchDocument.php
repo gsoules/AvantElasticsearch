@@ -101,7 +101,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function constructHtmlElement($elementName, $elasticsearchFieldName, $item, &$htmlFields)
     {
-        // Determine if this element is from a field that allows HTML and use HTML.
+        // Determine if this element is from a field that allows HTML and uses HTML.
         // If so, add the element's name to a list of fields that contain HTML content.
         // This will be needed so that search results will show the content properly and not as raw HTML.
 
@@ -174,26 +174,27 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         // Get all the elements and all element texts.
         $elements = $this->getElementsForIndex();
-        $elementTexts = get_db()->getTable('ElementText')->findByRecord($item);
+        $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
+        $elementTexts = array();
 
-        // Loop over the elements and for each, find its text value(s).
+        // Loop over the elements and for each one, find its text value(s).
         foreach ($elements as $element)
         {
             $elementId = $element->id;
             $elementName = $element->name;
 
-            foreach ($elementTexts as $elementText)
+            foreach ($allElementTexts as $elementText)
             {
                 if ($elementText->element_id == $elementId)
                 {
                     // Found text for the current element. Add it to the texts for the element.
                     // Continue looping for the texts to see if any others belong to this element.
-                    $itemElements[$elementName][] = $elementText->text;
+                    $elementTexts[$elementName][] = $elementText->text;
                 }
             }
         }
 
-        return $itemElements;
+        return $elementTexts;
     }
 
     public function loadItemContent($item)
