@@ -7,6 +7,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
+    private $integerSortElements = array();
+
     public function __construct($documentId)
     {
         parent::__construct();
@@ -36,7 +38,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $numberMatch = $matches[1];
                 $number = intval($numberMatch);
 
+                // Pad the beginning of the number with leading zeros so that it can be sorted correctly as text.
                 $sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
+
                 $sortData[$elasticsearchFieldName . '-street'] = $matches[2];
             }
         }
@@ -99,9 +103,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function constructIntegerElement($elementName, $elasticsearchFieldName, $elementTexts, &$sortData)
     {
-        $integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
-        if (in_array($elementName, $integerSortElements))
+        if (in_array($elementName, $this->integerSortElements))
         {
+            // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
             $sortData[$elasticsearchFieldName] = sprintf('%010d', $elementTexts);
         }
     }
@@ -265,5 +269,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public function setFields(array $params = array())
     {
         $this->body = array_merge($this->body, $params);
+    }
+
+    public function setIntegerSortElements($names)
+    {
+        $this->integerSortElements = $names;
     }
 }

@@ -2,6 +2,8 @@
 
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
+    private $integerSortElements = array();
+
     public function __construct()
     {
         parent::__construct();
@@ -28,6 +30,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createDocumentsForAllItems($filename, $limit = 0)
     {
+        $this->fetchIntegerSortElements();
+
         $items = $this->fetchAllItems();
         $itemsCount = count($items);
 
@@ -56,6 +60,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         $documentId = $this->getDocumentIdForItem($item);
         $document = new AvantElasticsearchDocument($documentId);
+        $document->setIntegerSortElements($this->integerSortElements);
         $document->loadItemContent($item);
         return $document;
     }
@@ -95,6 +100,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $items = array();
         }
         return $items;
+    }
+
+    protected function fetchIntegerSortElements()
+    {
+        // Get a list of the elements that should be sorted numerically. The call to getOptionData is expensive
+        // because it requires SQL queries to first get a list of the element Ids for the integer elements, and
+        // then additional SQL queries to derive the element names from their element Ids. It's too expensive to
+        // perform for each document so it's done once by this method's caller add made available to each document.
+        $this->integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
     }
 
     public function getBulkParams(array $documents, $offset, $length)
