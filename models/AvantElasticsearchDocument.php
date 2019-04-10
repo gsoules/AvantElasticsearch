@@ -170,7 +170,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         ]);
     }
 
-    protected function getItemElementValues($item)
+    protected function getItemElementTexts($item)
     {
         // Get all the elements and all element texts.
         $elements = $this->getElementsForIndex();
@@ -198,9 +198,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     public function loadItemContent($item)
     {
-        $elementValues = $this->getItemElementValues($item);
+        $elementTexts = $this->getItemElementTexts($item);
 
-        $titleTexts = isset($elementValues['Title']) ? $elementValues['Title'] : array();
+        $titleTexts = isset($elementTexts['Title']) ? $elementTexts['Title'] : array();
         $this->loadFields($item, $titleTexts);
 
         $avantElasticsearchFacets = new AvantElasticsearchFacets();
@@ -214,7 +214,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $hasDateElement = false;
 
-        foreach ($elementValues as $elementName => $texts)
+        foreach ($elementTexts as $elementName => $texts)
         {
             // Get the element name and create the corresponding Elasticsearch field name.
             $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
