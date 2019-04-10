@@ -26,34 +26,30 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $messageString;
     }
 
-    public function createDocumentsForAllItems($limit = 0)
+    public function createDocumentsForAllItems($filename, $limit = 0)
     {
-        $mem1 = memory_get_usage();
-        $documents = array();
         $items = $this->fetchAllItems();
         $itemsCount = count($items);
 
         if ($itemsCount > 0)
         {
+            $this->writeToJsonFile($filename, '[', 0, false);
+
             $limit = $limit == 0 ? $itemsCount : $limit;
 
             for ($index = 0; $index < $limit; $index++)
             {
-                $item = $items[$index];
+                $document = $this->createElasticsearchDocumentFromItem($items[$index]);
 
-                if ($item->public == 0)
-                {
-                    // Skip private items.
-                    continue;
-                }
-                $mem2 = memory_get_usage();
-                $documents[] = $this->createElasticsearchDocumentFromItem($item);
-                release_object($item);
-                $mem3 = memory_get_usage();
+                $this->writeToJsonFile($filename, $document, $index, true);
+
+                // Let PHP know that it can garbage-collect these objects.
+                unset($items[$index]);
+                unset($document);
             }
+
+            $this->writeToJsonFile($filename, ']', 0, false);
         }
-        $mem4 = memory_get_usage();
-        return $documents;
     }
 
     public function createElasticsearchDocumentFromItem($item)
@@ -155,12 +151,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function preformBulkIndexExport($filename, $limit = 0)
     {
-        $documents = $this->createDocumentsForAllItems($limit);
-        $formattedData = json_encode($documents);
-        $handle = fopen($filename, 'w+');
-        fwrite($handle, $formattedData);
-        fclose($handle);
-        return array();
+        if (file_exists($filename))
+        {
+            unlink($filename);
+        }
+
+        $this->createDocumentsForAllItems($filename, $limit);
     }
 
     protected function performBulkIndexImport($filename)
@@ -204,11 +200,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function performBulkIndex($export, $limit)
     {
+        $responses = array();
         $filename = ElasticsearchConfig::getOptionValueForExportFile();
 
         if ($export)
         {
-            $responses = $this->preformBulkIndexExport($filename, $limit);
+            $this->preformBulkIndexExport($filename, $limit);
         }
         else
         {
@@ -224,5 +221,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $responses = $this->performBulkIndex($export, $limit);
 
         return $responses;
+    }
+
+    public function writeToJsonFile($filename, $document, $index, $jsonEncode)
+    {
+        $text = $jsonEncode ? json_encode($document) : $document;
+        $separator = $index > 0 ? ',' : '';
+        file_put_contents($filename, "{$separator}{$text}", FILE_APPEND);
     }
 }
