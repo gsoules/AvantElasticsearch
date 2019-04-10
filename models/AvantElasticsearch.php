@@ -50,7 +50,7 @@ class AvantElasticsearch
         // The item Id alone is not sufficient since multiple organizations may have an item with
         // that Id. However, the item Id combined with the item's owner Id is unique.
 
-        $ownerId = $this->getOwnerId();
+        $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
         $documentId = "$ownerId-$item->id";
         return $documentId;
     }
@@ -109,11 +109,6 @@ class AvantElasticsearch
         }
 
         return $this->elementsForIndex;
-    }
-
-    public function getOwnerId()
-    {
-        return ElasticsearchConfig::getOptionValueForOwner();
     }
 
     public function isJson($string)

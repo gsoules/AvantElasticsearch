@@ -154,8 +154,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $itemImageOriginalUrl = ItemPreview::getImageUrl($item, false, false);
         $itemFiles = $item->Files;
         $fileCount = count($itemFiles);
-        $owner = get_option('site_title');
-        $ownerId = $this->getOwnerId();
+        $owner = ElasticsearchConfig::getOptionValueForOwner();
+        $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
 
         $this->setFields([
             'itemid' => (int)$item->id,
