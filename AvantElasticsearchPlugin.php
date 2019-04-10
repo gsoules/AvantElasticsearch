@@ -5,6 +5,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     protected $item;
 
     protected $_hooks = array(
+        'admin_head',
         'config',
         'config_form',
         'define_routes',
@@ -22,6 +23,11 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
             'uri' => url('elasticsearch/indexing')
         );
         return $nav;
+    }
+
+    public function hookAdminHead($args)
+    {
+        queue_css_file('avantelasticsearch-admin');
     }
 
     public function hookConfig()
