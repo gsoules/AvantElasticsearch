@@ -63,6 +63,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if (isset($facets[$aggregationName]))
         {
             $values = $facets[$aggregationName];
+            if (!is_array($values))
+            {
+                $values = array($values);
+            }
 
             // Create a separate term filter for each value so that the filters are ANDed
             // as opposed to using a single terms filter with multiple values that are ORed.
