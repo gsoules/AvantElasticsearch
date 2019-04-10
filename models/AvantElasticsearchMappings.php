@@ -5,7 +5,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     protected function addAnalyzerFieldToMappingProperties($fieldName)
     {
-        $this->properties['$fieldName'] = [
+        $this->properties[$fieldName] = [
             'type' => 'text',
             'analyzer' => 'english'
         ];
@@ -40,10 +40,10 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     public function constructElasticsearchMapping()
     {
-        $elementSet = $this->getElementsForMapping();
+        $elements = $this->getElementsForIndex();
         $mappingType = $this->getDocumentMappingType();
 
-        foreach ($elementSet as $element)
+        foreach ($elements as $element)
         {
             $elementName = $element['name'];
 
@@ -66,6 +66,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addNumericFieldToMappingProperties('itemid');
 
         $this->addTextFieldToMappingProperties('html');
+        $this->addTextFieldToMappingProperties('tags');
         $this->addTextFieldToMappingProperties('image');
         $this->addTextFieldToMappingProperties('owner');
         $this->addTextFieldToMappingProperties('ownerid');
@@ -92,29 +93,5 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
 
         return $mapping;
-    }
-
-    protected function getElementsForMapping()
-    {
-        $table = get_db()->getTable('Element');
-        $select = $table->getSelect();
-        $elements = $table->fetchObjects($select);
-
-        $hidePrivate = true;
-        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-        $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
-
-        foreach ($elements as $elementName => $element)
-        {
-            $elementId = $element->id;
-            $hideUnused = array_key_exists($elementId, $unusedElementsData);
-            $hide = $hideUnused || ($hidePrivate && array_key_exists($elementId, $privateElementsData));
-            if ($hide)
-            {
-                unset($elements[$elementName]);
-            }
-        }
-
-        return $elements;
     }
 }
