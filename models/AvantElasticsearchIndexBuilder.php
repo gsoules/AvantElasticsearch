@@ -3,7 +3,6 @@
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
     private $installation;
-    private $json = '';
 
     public function __construct()
     {
@@ -50,6 +49,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createDocumentsForAllItems($filename, $limit = 0)
     {
+        $json = '';
         $this->cacheInstallationParameters();
 
         // Get all the items for this installation.
@@ -61,9 +61,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // The limit is only used during development so that we don't always have
         // to index all the items. It serves no purpose in a production environment
         $itemsCount = $limit == 0 ? count($items) : $limit;
-
-        // Start the JSON array of document objects.
-        $this->writeToExportFile($filename, '[');
 
         for ($index = 0; $index < $itemsCount; $index++)
         {
@@ -78,10 +75,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             // Create a document for the item.
             $document = $this->createElasticsearchDocumentFromItem($items[$index], $itemFiles);
 
-            // Write the document as an object to the JSON array. Separate each object by a comma.
-            $json = json_encode($document);
+            // Write the document as an object to the JSON array, separating each object by a comma.
             $separator = $index > 0 ? ',' : '';
-            $this->writeToExportFile($filename, $separator . $json);
+            $json .= $separator . json_encode($document);
 
             // Let PHP know that it can garbage-collect these objects.
             unset($items[$index]);
@@ -92,8 +88,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             unset($document);
         }
 
-        // End the JSON array.
-        $this->writeToExportFile($filename, ']');
+        file_put_contents($filename, "[$json]");
     }
 
     public function createElasticsearchDocumentFromItem($item, $files)
@@ -307,15 +302,5 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $responses = $this->performBulkIndex($export, $limit);
 
         return $responses;
-    }
-
-    protected function writeToExportFile($filename, $text)
-    {
-        $this->json .= $text;
-        if ($text == ']')
-        {
-            //file_put_contents($filename, $text, FILE_APPEND);
-            file_put_contents($filename, $this->json);
-        }
     }
 }
