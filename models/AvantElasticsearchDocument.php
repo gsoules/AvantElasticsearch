@@ -130,9 +130,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $title;
     }
 
-    public function copyItemElementValuesToDocument($item)
+    public function copyItemElementValuesToDocument($item, $files)
     {
         $elementTexts = $this->getItemElementTexts($item);
+        $this->itemFiles = $files;
 
         $titleTexts = isset($elementTexts['Title']) ? $elementTexts['Title'] : array();
         $this->copyItemAttributesToDocument($item, $titleTexts);
@@ -208,9 +209,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $serverUrl = $this->installation['server_url'];
         $itemPublicUrl = $serverUrl . $itemPath;
 
-        $this->itemFiles = $this->getItemFiles($item->id);
-        $fileCount = count($this->itemFiles);
-
         $itemImageThumbUrl = $this->getImageUrl($item, true);
         $itemImageOriginalUrl = $this->getImageUrl($item, false);
 
@@ -223,7 +221,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'url' => $itemPublicUrl,
             'thumb' => $itemImageThumbUrl,
             'image' => $itemImageOriginalUrl,
-            'files' => (int)$fileCount
+            'files' => count($this->itemFiles)
         ]);
     }
 
@@ -288,25 +286,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
 
         return $elementTexts;
-    }
-
-    protected function getItemFiles($itemId)
-    {
-        $itemFiles = array();
-
-        // Get the files for this item. The $files array is indexed by item Ids
-        // and each element is in the array is an array of the files for that Id.
-        // This is faster than calling $item->Files since it avoids a SQL query.
-        foreach ($this->installation['files'] as $filesItemId => $fileList)
-        {
-            if ($filesItemId == $itemId)
-            {
-                $itemFiles = $fileList;
-                break;
-            }
-        }
-
-        return $itemFiles;
     }
 
     public function deleteDocumentFromIndex()

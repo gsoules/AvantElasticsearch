@@ -3,6 +3,7 @@
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
     private $installation;
+    private $json = '';
 
     public function __construct()
     {
@@ -26,9 +27,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
-
-        // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
-        $this->installation['files'] = $this->fetchAllFiles();
     }
 
     public function convertResponsesToMessageString($responses)
@@ -57,6 +55,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Get all the items for this installation.
         $items = $this->fetchAllItems();
 
+        // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
+        $files = $this->fetchAllFiles();
+
         // The limit is only used during development so that we don't always have
         // to index all the items. It serves no purpose in a production environment
         $itemsCount = $limit == 0 ? count($items) : $limit;
@@ -66,20 +67,28 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         for ($index = 0; $index < $itemsCount; $index++)
         {
+            $itemId = $items[$index]->id;
+
+            $itemFiles = array();
+            if (isset($files[$itemId]))
+            {
+                $itemFiles = $files[$itemId];
+            }
+
             // Create a document for the item.
-            $document = $this->createElasticsearchDocumentFromItem($items[$index]);
+            $document = $this->createElasticsearchDocumentFromItem($items[$index], $itemFiles);
 
             // Write the document as an object to the JSON array. Separate each object by a comma.
             $json = json_encode($document);
             $separator = $index > 0 ? ',' : '';
             $this->writeToExportFile($filename, $separator . $json);
 
-            // Remove the item's files from the files list. This will shorten the list making it
-            // faster to find the files for subsequent items.
-            unset($this->installation['files'][$items[$index]->id]);
-
             // Let PHP know that it can garbage-collect these objects.
             unset($items[$index]);
+            if (isset($files[$itemId]))
+            {
+                unset($files[$itemId]);
+            }
             unset($document);
         }
 
@@ -87,7 +96,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->writeToExportFile($filename, ']');
     }
 
-    public function createElasticsearchDocumentFromItem($item)
+    public function createElasticsearchDocumentFromItem($item, $files)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($item);
@@ -97,7 +106,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setInstallationParameters($this->installation);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($item);
+        $document->copyItemElementValuesToDocument($item, $files);
 
         return $document;
     }
@@ -219,7 +228,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function indexItem($item)
     {
-        $document = $this->createElasticsearchDocumentFromItem($item);
+        $document = $this->createElasticsearchDocumentFromItem($item, $item->Files);
 
         // Add the document to the index.
         $response = $document->addDocumentToIndex();
@@ -302,6 +311,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function writeToExportFile($filename, $text)
     {
-        file_put_contents($filename, $text, FILE_APPEND);
+        $this->json .= $text;
+        if ($text == ']')
+        {
+            //file_put_contents($filename, $text, FILE_APPEND);
+            file_put_contents($filename, $this->json);
+        }
     }
 }
