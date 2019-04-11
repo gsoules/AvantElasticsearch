@@ -40,7 +40,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     public function constructElasticsearchMapping()
     {
-        $elements = $this->getElementsForIndex();
+        $elements = $this->getElementsUsedByThisInstallation();
         $mappingType = $this->getDocumentMappingType();
 
         foreach ($elements as $element)

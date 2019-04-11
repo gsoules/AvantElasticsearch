@@ -83,7 +83,7 @@ class AvantElasticsearch
         return $message;
     }
 
-    public function getElementsForIndex($ignorePrivate = true)
+    public function getElementsUsedByThisInstallation($ignorePrivate = true)
     {
         if (empty($this->elementsForIndex) || $this->ignorePrivateElements != $ignorePrivate)
         {

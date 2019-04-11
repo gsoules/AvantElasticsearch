@@ -7,6 +7,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
+    private $elementsUsedByThisInstallation = array();
     private $integerSortElements = array();
     private $itemImageThumbUrl;
     private $itemImageOriginalUrl;
@@ -132,106 +133,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $title;
     }
 
-    protected function getImageUrl($item, $thumbnail)
-    {
-        $itemImageUrl = $this->getItemFileUrl($thumbnail);
-
-        if (empty($itemImageUrl))
-        {
-            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($item->id);
-            if (!empty($coverImageIdentifier))
-            {
-                $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
-                $itemImageUrl = empty($coverImageItem) ? '' : ItemPreview::getItemFileUrl($coverImageItem, $thumbnail);
-            }
-        }
-
-        return $itemImageUrl;
-    }
-
-    protected function getItemFileUrl($thumbnail)
-    {
-        // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFiles
-        // which allows this method to get called multiple times without having to fetch the files array each time.
-        // This improvement saves a significant amount of time when indexing all items.
-
-        $url = '';
-        $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
-        if (!empty($file) && $file->hasThumbnail())
-        {
-            $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
-            if (strlen($url) > 4 && strpos(strtolower($url), '.jpg', strlen($url) - 4) === false)
-            {
-                // The original image is not a jpg (it's probably a pdf) so return its derivative image instead.
-                $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'fullsize');
-            }
-        }
-        return $url;
-    }
-
-    protected function loadFields($item, $texts)
-    {
-        $title = $this->constructTitle($texts);
-
-        $itemPath = public_url('items/show/' . $item->id);
-        $serverUrlHelper = new Zend_View_Helper_ServerUrl;
-        $serverUrl = $serverUrlHelper->serverUrl();
-        $itemPublicUrl = $serverUrl . $itemPath;
-
-        $this->itemFiles = $item->Files;
-        $this->itemImageThumbUrl = $this->getImageUrl($item, true);
-        $this->itemImageOriginalUrl = $this->getImageUrl($item, false);
-        $fileCount = count($this->itemFiles);
-
-        $owner = ElasticsearchConfig::getOptionValueForOwner();
-        $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
-
-        $this->setFields([
-            'itemid' => (int)$item->id,
-            'ownerid' => $ownerId,
-            'owner' => $owner,
-            'title' => $title,
-            'public' => (bool)$item->public,
-            'url' => $itemPublicUrl,
-            'thumb' => $this->itemImageThumbUrl,
-            'image' => $this->itemImageOriginalUrl,
-            'files' => (int)$fileCount
-        ]);
-    }
-
-    protected function getItemElementTexts($item)
-    {
-        // Get all the elements and all element texts.
-        $elements = $this->getElementsForIndex();
-        $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
-        $elementTexts = array();
-
-        // Loop over the elements and for each one, find its text value(s).
-        foreach ($elements as $element)
-        {
-            $elementId = $element->id;
-            $elementName = $element->name;
-
-            foreach ($allElementTexts as $elementText)
-            {
-                if ($elementText->element_id == $elementId)
-                {
-                    // Found text for the current element. Add it to the texts for the element.
-                    // Continue looping for the texts to see if any others belong to this element.
-                    $elementTexts[$elementName][] = $elementText->text;
-                }
-            }
-        }
-
-        return $elementTexts;
-    }
-
-    public function loadItemContent($item)
+    public function copyItemElementValuesToDocument($item)
     {
         $elementTexts = $this->getItemElementTexts($item);
 
         $titleTexts = isset($elementTexts['Title']) ? $elementTexts['Title'] : array();
-        $this->loadFields($item, $titleTexts);
+        $this->copyItemAttributesToDocument($item, $titleTexts);
 
         $avantElasticsearchFacets = new AvantElasticsearchFacets();
 
@@ -296,12 +203,110 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->setField('tags', $tags);
     }
 
+    protected function copyItemAttributesToDocument($item, $texts)
+    {
+        $title = $this->constructTitle($texts);
+
+        $itemPath = public_url('items/show/' . $item->id);
+        $serverUrlHelper = new Zend_View_Helper_ServerUrl;
+        $serverUrl = $serverUrlHelper->serverUrl();
+        $itemPublicUrl = $serverUrl . $itemPath;
+
+        $this->itemFiles = $item->Files;
+        $this->itemImageThumbUrl = $this->getImageUrl($item, true);
+        $this->itemImageOriginalUrl = $this->getImageUrl($item, false);
+        $fileCount = count($this->itemFiles);
+
+        $owner = ElasticsearchConfig::getOptionValueForOwner();
+        $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
+
+        $this->setFields([
+            'itemid' => (int)$item->id,
+            'ownerid' => $ownerId,
+            'owner' => $owner,
+            'title' => $title,
+            'public' => (bool)$item->public,
+            'url' => $itemPublicUrl,
+            'thumb' => $this->itemImageThumbUrl,
+            'image' => $this->itemImageOriginalUrl,
+            'files' => (int)$fileCount
+        ]);
+    }
+
+    protected function getImageUrl($item, $thumbnail)
+    {
+        $itemImageUrl = $this->getItemFileUrl($thumbnail);
+
+        if (empty($itemImageUrl))
+        {
+            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($item->id);
+            if (!empty($coverImageIdentifier))
+            {
+                $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
+                $itemImageUrl = empty($coverImageItem) ? '' : ItemPreview::getItemFileUrl($coverImageItem, $thumbnail);
+            }
+        }
+
+        return $itemImageUrl;
+    }
+
+    protected function getItemFileUrl($thumbnail)
+    {
+        // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFiles
+        // which allows this method to get called multiple times without having to fetch the files array each time.
+        // This improvement saves a significant amount of time when indexing all items.
+
+        $url = '';
+        $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
+        if (!empty($file) && $file->hasThumbnail())
+        {
+            $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
+            if (strlen($url) > 4 && strpos(strtolower($url), '.jpg', strlen($url) - 4) === false)
+            {
+                // The original image is not a jpg (it's probably a pdf) so return its derivative image instead.
+                $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'fullsize');
+            }
+        }
+        return $url;
+    }
+
+    protected function getItemElementTexts($item)
+    {
+        // Get all the elements and all element texts.
+        $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
+        $elementTexts = array();
+
+        // Loop over the elements and for each one, find its text value(s).
+        foreach ($this->elementsUsedByThisInstallation as $element)
+        {
+            $elementId = $element->id;
+            $elementName = $element->name;
+
+            foreach ($allElementTexts as $elementText)
+            {
+                if ($elementText->element_id == $elementId)
+                {
+                    // Found text for the current element. Add it to the texts for the element.
+                    // Continue looping for the texts to see if any others belong to this element.
+                    $elementTexts[$elementName][] = $elementText->text;
+                }
+            }
+        }
+
+        return $elementTexts;
+    }
+
     public function deleteDocumentFromIndex()
     {
         $documentParmas = $this->constructDocumentParameters();
         $avantElasticsearchClient = new AvantElasticsearchClient();
         $response = $avantElasticsearchClient->deleteDocument($documentParmas);
         return $response;
+    }
+
+    public function setElementsUsedByThisInstallation($elements)
+    {
+        $this->elementsUsedByThisInstallation = $elements;
     }
 
     public function setField($key, $value)

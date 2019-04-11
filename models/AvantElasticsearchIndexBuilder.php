@@ -2,6 +2,7 @@
 
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
+    private $elementsUsedByThisInstallation = array();
     private $integerSortElements = array();
 
     public function __construct()
@@ -30,10 +31,17 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createDocumentsForAllItems($filename, $limit = 0)
     {
-        $this->fetchIntegerSortElements();
+        // Perform expensive SQL queries to get and cache data that every document will use during its creation.
+        // Doing this significantly improves performance when creating thousands of documents.
+        // When enhancing this code, be very careful about using method calls that depend on SQL queries, and
+        // whenever possible, make the calls just once and cache the values here.
+        $this->integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
+        $this->elementsUsedByThisInstallation = $this->getElementsUsedByThisInstallation();
 
+        // Get all the items for this installation.
         $items = $this->fetchAllItems();
         $itemsCount = count($items);
+
 
         if ($itemsCount > 0)
         {
@@ -58,10 +66,17 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createElasticsearchDocumentFromItem($item)
     {
+        // Create a new document.
         $documentId = $this->getDocumentIdForItem($item);
         $document = new AvantElasticsearchDocument($documentId);
+
+        // Set data that has been cached here by the index builder so that the document can access it.
+        $document->setElementsUsedByThisInstallation($this->elementsUsedByThisInstallation);
         $document->setIntegerSortElements($this->integerSortElements);
-        $document->loadItemContent($item);
+
+       // Populate the document fields with the item's element values;
+        $document->copyItemElementValuesToDocument($item);
+
         return $document;
     }
 
@@ -100,15 +115,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $items = array();
         }
         return $items;
-    }
-
-    protected function fetchIntegerSortElements()
-    {
-        // Get a list of the elements that should be sorted numerically. The call to getOptionData is expensive
-        // because it requires SQL queries to first get a list of the element Ids for the integer elements, and
-        // then additional SQL queries to derive the element names from their element Ids. It's too expensive to
-        // perform for each document so it's done once by this method's caller add made available to each document.
-        $this->integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
     }
 
     public function getBulkParams(array $documents, $offset, $length)
