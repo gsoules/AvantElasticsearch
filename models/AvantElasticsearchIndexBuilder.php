@@ -2,22 +2,30 @@
 
 class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 {
-    private $elementsUsedByThisInstallation = array();
-    private $integerSortElements = array();
+    private $installation;
 
     public function __construct()
     {
         parent::__construct();
     }
 
-    protected function cacheDataUsedByAllDocuments()
+    protected function cacheInstallationParameters()
     {
-        // Perform expensive SQL queries to get and cache data that every document will use during its creation.
-        // Doing this significantly improves performance when creating thousands of documents.
-        // When enhancing this code, be very careful about using method calls that depend on SQL queries, and
-        // whenever possible, make the calls just once and cache the values here.
-        $this->integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
-        $this->elementsUsedByThisInstallation = $this->getElementsUsedByThisInstallation();
+        // Perform expensive operations, many of which involve SQL queries to get and cache data that every document
+        // will use during its creation. Doing this significantly improves performance when creating documents for
+        // all the items in the installation. When enhancing this index builder or AvantElasticsearchDocument, be
+        // be very careful not to introduce logic that uses expensive method calls each time a document is created.
+        // Instead, whenever possible, make the calls just once here so that they get cached. By caching this data,
+        // the time to create 10,000 documents was reduced by 75%.
+
+        $this->installation['integer_sort_elements'] = SearchConfig::getOptionDataForIntegerSorting();
+        $this->installation['installation_elements'] = $this->getElementsUsedByThisInstallation();
+        $this->installation['owner'] = ElasticsearchConfig::getOptionValueForOwner();
+        $this->installation['ownerid'] = ElasticsearchConfig::getOptionValueForOwnerId();
+        $this->installation['item_path'] = public_url('items/show/');
+
+        $serverUrlHelper = new Zend_View_Helper_ServerUrl;
+        $this->installation['server_url'] = $serverUrlHelper->serverUrl();
     }
 
     public function convertResponsesToMessageString($responses)
@@ -41,7 +49,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createDocumentsForAllItems($filename, $limit = 0)
     {
-        $this->cacheDataUsedByAllDocuments();
+        $this->cacheInstallationParameters();
 
         // Get all the items for this installation.
         $items = $this->fetchAllItems();
@@ -78,9 +86,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $documentId = $this->getDocumentIdForItem($item);
         $document = new AvantElasticsearchDocument($documentId);
 
-        // Set data that has been cached here by the index builder so that the document can access it.
-        $document->setElementsUsedByThisInstallation($this->elementsUsedByThisInstallation);
-        $document->setIntegerSortElements($this->integerSortElements);
+        // Provide data that has been cached here by the index builder to improve performance.
+        $document->setInstallationParameters($this->installation);
 
        // Populate the document fields with the item's element values;
         $document->copyItemElementValuesToDocument($item);

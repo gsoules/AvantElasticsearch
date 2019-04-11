@@ -7,11 +7,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
-    private $elementsUsedByThisInstallation = array();
-    private $integerSortElements = array();
     private $itemImageThumbUrl;
     private $itemImageOriginalUrl;
     private $itemFiles;
+
+    private $installation;
 
     public function __construct($documentId)
     {
@@ -107,7 +107,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function constructIntegerElement($elementName, $elasticsearchFieldName, $elementTexts, &$sortData)
     {
-        if (in_array($elementName, $this->integerSortElements))
+        if (in_array($elementName, $this->installation['integer_sort_elements']))
         {
             // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
             $sortData[$elasticsearchFieldName] = sprintf('%010d', $elementTexts);
@@ -207,9 +207,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         $title = $this->constructTitle($texts);
 
-        $itemPath = public_url('items/show/' . $item->id);
-        $serverUrlHelper = new Zend_View_Helper_ServerUrl;
-        $serverUrl = $serverUrlHelper->serverUrl();
+        $itemPath = $this->installation['item_path'] . $item->id;
+        $serverUrl = $this->installation['server_url'];
         $itemPublicUrl = $serverUrl . $itemPath;
 
         $this->itemFiles = $item->Files;
@@ -217,13 +216,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->itemImageOriginalUrl = $this->getImageUrl($item, false);
         $fileCount = count($this->itemFiles);
 
-        $owner = ElasticsearchConfig::getOptionValueForOwner();
-        $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
-
         $this->setFields([
             'itemid' => (int)$item->id,
-            'ownerid' => $ownerId,
-            'owner' => $owner,
+            'ownerid' => $this->installation['ownerid'],
+            'owner' => $this->installation['owner'],
             'title' => $title,
             'public' => (bool)$item->public,
             'url' => $itemPublicUrl,
@@ -277,7 +273,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $elementTexts = array();
 
         // Loop over the elements and for each one, find its text value(s).
-        foreach ($this->elementsUsedByThisInstallation as $element)
+        foreach ($this->installation['installation_elements'] as $element)
         {
             $elementId = $element->id;
             $elementName = $element->name;
@@ -319,8 +315,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->body = array_merge($this->body, $params);
     }
 
-    public function setIntegerSortElements($names)
+    public function setInstallationParameters($installation)
     {
-        $this->integerSortElements = $names;
+        $this->installation = $installation;
     }
 }
