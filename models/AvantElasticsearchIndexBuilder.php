@@ -26,6 +26,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
+
+        // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
+        $this->installation['files'] = $this->fetchAllFiles();
     }
 
     public function convertResponsesToMessageString($responses)
@@ -71,6 +74,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $separator = $index > 0 ? ',' : '';
             $this->writeToExportFile($filename, $separator . $json);
 
+            // Remove the item's files from the files list. This will shorten the list making it
+            // faster to find the files for subsequent items.
+            unset($this->installation['files'][$items[$index]->id]);
+
             // Let PHP know that it can garbage-collect these objects.
             unset($items[$index]);
             unset($document);
@@ -111,14 +118,49 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $response;
     }
 
-    protected function fetchAllItems($getOnlyPublic = true)
+    protected function fetchAllFiles($public = true)
+    {
+        try
+        {
+            $db = get_db();
+            $table = $db->getTable('File');
+            $select = $table->getSelect();
+            $select->order('files.item_id ASC');
+
+            if ($public)
+            {
+                // Note that a get of the Files table automatically joins with the Items table and so the
+                // WHERE clause below works even though this code does not explicitly join the two tables.
+                $select->where('items.public = 1');
+            }
+            $files = $table->fetchObjects($select);
+
+            // Create an array indexed by item Id where each element contains an array of that
+            // item's files. This will make it possible to very quickly find an item's files.
+            $itemFiles = array();
+            foreach ($files as $file)
+            {
+                $itemFiles[$file->item_id][] = $file;
+            }
+            return $itemFiles;
+        }
+        catch (Exception $e)
+        {
+            $files = array();
+        }
+        return $files;
+    }
+
+    protected function fetchAllItems($public = true)
     {
         try
         {
             $db = get_db();
             $table = $db->getTable('Item');
             $select = $table->getSelect();
-            if ($getOnlyPublic)
+            $select->order('items.id ASC');
+
+            if ($public)
             {
                 $select->where('items.public = 1');
             }

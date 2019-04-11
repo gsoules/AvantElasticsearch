@@ -7,11 +7,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
-    private $itemImageThumbUrl;
-    private $itemImageOriginalUrl;
-    private $itemFiles;
-
     private $installation;
+    private $itemFiles;
 
     public function __construct($documentId)
     {
@@ -211,10 +208,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $serverUrl = $this->installation['server_url'];
         $itemPublicUrl = $serverUrl . $itemPath;
 
-        $this->itemFiles = $item->Files;
-        $this->itemImageThumbUrl = $this->getImageUrl($item, true);
-        $this->itemImageOriginalUrl = $this->getImageUrl($item, false);
+        $this->itemFiles = $this->getItemFiles($item->id);
         $fileCount = count($this->itemFiles);
+
+        $itemImageThumbUrl = $this->getImageUrl($item, true);
+        $itemImageOriginalUrl = $this->getImageUrl($item, false);
 
         $this->setFields([
             'itemid' => (int)$item->id,
@@ -223,8 +221,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'title' => $title,
             'public' => (bool)$item->public,
             'url' => $itemPublicUrl,
-            'thumb' => $this->itemImageThumbUrl,
-            'image' => $this->itemImageOriginalUrl,
+            'thumb' => $itemImageThumbUrl,
+            'image' => $itemImageOriginalUrl,
             'files' => (int)$fileCount
         ]);
     }
@@ -290,6 +288,25 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
 
         return $elementTexts;
+    }
+
+    protected function getItemFiles($itemId)
+    {
+        $itemFiles = array();
+
+        // Get the files for this item. The $files array is indexed by item Ids
+        // and each element is in the array is an array of the files for that Id.
+        // This is faster than calling $item->Files since it avoids a SQL query.
+        foreach ($this->installation['files'] as $filesItemId => $fileList)
+        {
+            if ($filesItemId == $itemId)
+            {
+                $itemFiles = $fileList;
+                break;
+            }
+        }
+
+        return $itemFiles;
     }
 
     public function deleteDocumentFromIndex()
