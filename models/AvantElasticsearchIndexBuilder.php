@@ -10,6 +10,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         parent::__construct();
     }
 
+    protected function cacheDataUsedByAllDocuments()
+    {
+        // Perform expensive SQL queries to get and cache data that every document will use during its creation.
+        // Doing this significantly improves performance when creating thousands of documents.
+        // When enhancing this code, be very careful about using method calls that depend on SQL queries, and
+        // whenever possible, make the calls just once and cache the values here.
+        $this->integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
+        $this->elementsUsedByThisInstallation = $this->getElementsUsedByThisInstallation();
+    }
+
     public function convertResponsesToMessageString($responses)
     {
         $messageString = '';
@@ -31,37 +41,35 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createDocumentsForAllItems($filename, $limit = 0)
     {
-        // Perform expensive SQL queries to get and cache data that every document will use during its creation.
-        // Doing this significantly improves performance when creating thousands of documents.
-        // When enhancing this code, be very careful about using method calls that depend on SQL queries, and
-        // whenever possible, make the calls just once and cache the values here.
-        $this->integerSortElements = SearchConfig::getOptionDataForIntegerSorting();
-        $this->elementsUsedByThisInstallation = $this->getElementsUsedByThisInstallation();
+        $this->cacheDataUsedByAllDocuments();
 
         // Get all the items for this installation.
         $items = $this->fetchAllItems();
-        $itemsCount = count($items);
 
+        // The limit is only used during development so that we don't always have
+        // to index all the items. It serves no purpose in a production environment
+        $itemsCount = $limit == 0 ? count($items) : $limit;
 
-        if ($itemsCount > 0)
+        // Start the JSON array of document objects.
+        $this->writeToExportFile($filename, '[');
+
+        for ($index = 0; $index < $itemsCount; $index++)
         {
-            $this->writeToJsonFile($filename, '[', 0, false);
+            // Create a document for the item.
+            $document = $this->createElasticsearchDocumentFromItem($items[$index]);
 
-            $limit = $limit == 0 ? $itemsCount : $limit;
+            // Write the document as an object to the JSON array. Separate each object by a comma.
+            $json = json_encode($document);
+            $separator = $index > 0 ? ',' : '';
+            $this->writeToExportFile($filename, $separator . $json);
 
-            for ($index = 0; $index < $limit; $index++)
-            {
-                $document = $this->createElasticsearchDocumentFromItem($items[$index]);
-
-                $this->writeToJsonFile($filename, $document, $index, true);
-
-                // Let PHP know that it can garbage-collect these objects.
-                unset($items[$index]);
-                unset($document);
-            }
-
-            $this->writeToJsonFile($filename, ']', 0, false);
+            // Let PHP know that it can garbage-collect these objects.
+            unset($items[$index]);
+            unset($document);
         }
+
+        // End the JSON array.
+        $this->writeToExportFile($filename, ']');
     }
 
     public function createElasticsearchDocumentFromItem($item)
@@ -243,10 +251,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $responses;
     }
 
-    public function writeToJsonFile($filename, $document, $index, $jsonEncode)
+    protected function writeToExportFile($filename, $text)
     {
-        $text = $jsonEncode ? json_encode($document) : $document;
-        $separator = $index > 0 ? ',' : '';
-        file_put_contents($filename, "{$separator}{$text}", FILE_APPEND);
+        file_put_contents($filename, $text, FILE_APPEND);
     }
 }
