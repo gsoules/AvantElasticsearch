@@ -87,14 +87,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Determine if the element's text contains HTML and if so, add the element to the item's HTML list.
             $isHtmlElement = $this->createHtmlData($elasticsearchFieldName, $fieldTexts, $htmlFields);
 
-            //if ($elementName == 'Description' && $isHtmlElement)
-            {
-                // Change Description content to plain text so that Elasticsearch won't get hits on HTML tags. For
-                // example, if the query contained 'strong' we don't want the search to find <strong>. Not only
-                // would that be incorrect, that text would get highlighted.
-                // FINISH: Determine if this is a problem for any field containing HTML.
-                $fieldTextsString = strip_tags($fieldTextsString);
-            }
+            // Change any HTML content to plain text so that Elasticsearch won't get hits on HTML tags. For
+            // example, if the query contained 'strong' we don't want the search to find the <strong> tag.
+            $fieldTextsString = strip_tags($fieldTextsString);
 
             if ($elementName == 'Title')
             {
