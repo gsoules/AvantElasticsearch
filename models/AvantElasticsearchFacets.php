@@ -138,31 +138,33 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $this->facetNames;
     }
 
-    public function getFacetValue($elementName, $elasticsearchFieldName, $fieldTexts, &$facets)
+    public function getFacetValuesForElement($elementName, $elasticsearchFieldName, $fieldTexts)
     {
-        if (!array_key_exists($elasticsearchFieldName, $this->facetNames))
+        $values = array();
+
+        if (array_key_exists($elasticsearchFieldName, $this->facetNames))
         {
-            return;
+            foreach ($fieldTexts as $fieldText)
+            {
+                $text = $fieldText['text'];
+
+                if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
+                {
+                    $value = $this->getFacetValueForHierarchy($elementName, $text);
+                }
+                else if ($elementName == 'Date')
+                {
+                    $value = $this->getFacetValueForDate($text);
+                }
+
+                if (!empty($value))
+                {
+                    $values[] = $value;
+                }
+            }
         }
 
-        foreach ($fieldTexts as $fieldText)
-        {
-            $text = $fieldText['text'];
-
-            if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
-            {
-                $value = $this->getFacetValueForHierarchy($elementName, $text);
-            }
-            else if ($elementName == 'Date')
-            {
-                $value = $this->getFacetValueForDate($text);
-            }
-
-            if (!empty($value))
-            {
-                $facets[$elasticsearchFieldName][] = $value;
-            }
-        }
+        return $values;
     }
 
     protected function getFacetValueForDate($text)
