@@ -56,7 +56,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             "multi_match" => [
                 'query' => $terms,
                 'type' => "cross_fields",
-                'operator' => "or",
+                'operator' => "and",
                 'fields' => [
                     "title^5",
                     "element.title^15",
