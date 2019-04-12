@@ -57,7 +57,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setInstallationParameters($this->installation);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($item, $itemFieldTexts[$item->id], $files);
+        $document->copyItemElementValuesToDocument($item, $itemFieldTexts, $files);
 
         return $document;
     }
@@ -111,17 +111,26 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $sql = "
                 SELECT
-                  $table.record_id,
-                  $table.element_id,
-                  $table.text,
-                  $table.html
+                  record_id,
+                  element_id,
+                  text,
+                  html
                 FROM
                   $table
+                INNER JOIN
+                  {$db->prefix}items AS items ON items.id = record_id
                 WHERE
-                  $table.record_type = 'Item'
+                  record_type = 'Item' 
             ";
 
+            if ($public)
+            {
+                $sql .= " AND public = 1";
+            }
+
+            $t0 = microtime(true);
             $results = $db->query($sql)->fetchAll();
+            $t1 = microtime(true);
         }
         catch (Exception $e)
         {
@@ -129,16 +138,23 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemFieldTexts = null;
         }
 
+        $t2 = microtime(true);
         foreach ($results as $result)
         {
-            $itemId = $result['record_id'];
             $elementId = $result['element_id'];
+
+            if ($public && !array_key_exists($elementId, $this->elementsForIndex))
+            {
+                // Ignore private elements.
+                continue;
+            }
+
+            $itemId = $result['record_id'];
             $text = $result['text'];
             $html = $result['html'];
             $itemFieldTexts[$itemId][$elementId][] = $this->createFieldText($text, $html);
         }
-        return $itemFieldTexts;
-
+        $t3 = microtime(true);
         return $itemFieldTexts;
     }
 

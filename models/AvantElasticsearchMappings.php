@@ -43,10 +43,8 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $elements = $this->getElementsUsedByThisInstallation();
         $mappingType = $this->getDocumentMappingType();
 
-        foreach ($elements as $element)
+        foreach ($elements as $elementName)
         {
-            $elementName = $element['name'];
-
             if ($elementName == 'Description')
             {
                 // The text field is added separately below because it uses a different analyzer.

@@ -77,13 +77,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $elementName = $this->installation['installation_elements'][$elementId];
             $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
 
-            foreach ($fieldTexts as $fieldText)
+            foreach ($fieldTexts as $key => $fieldText)
             {
                 if ($fieldText['html'] == 1)
                 {
                     // Change any HTML content to plain text so that Elasticsearch won't get hits on HTML tags. For
                     // example, if the query contained 'strong' we don't want the search to find the <strong> tag.
-                    $fieldText['text'] = strip_tags($fieldText['text']);
+                    $fieldTexts[$key]['text'] = strip_tags($fieldText['text']);
                 }
             }
 
@@ -121,7 +121,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (!$hasDateElement)
         {
-            $this->createElementFacetData('Date', 'date', array(''), $facets);
+            // Create an empty field to represent date unknown.
+            $emptyDateFieldTexts = array(array('text' => '', 'html' => 0));
+            $this->createElementFacetData('Date', 'date', $emptyDateFieldTexts, $facets);
         }
 
         $tags = $this->constructTags($item);
@@ -158,11 +160,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         ]);
     }
 
-    protected function createAddressElementSortData($elementName, $elasticsearchFieldName, $texts, &$sortData)
+    protected function createAddressElementSortData($elementName, $elasticsearchFieldName, $fieldText, &$sortData)
     {
         if ($elementName == 'Address')
         {
-            $text = $texts[0];
+            $text = $fieldText[0]['text'];
 
             if (preg_match('/([^a-zA-Z]+)?(.*)/', $text, $matches))
             {
