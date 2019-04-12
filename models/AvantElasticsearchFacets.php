@@ -138,15 +138,17 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $this->facetNames;
     }
 
-    public function getFacetValue($elementName, $elasticsearchFieldName, $texts, &$facets)
+    public function getFacetValue($elementName, $elasticsearchFieldName, $fieldTexts, &$facets)
     {
         if (!array_key_exists($elasticsearchFieldName, $this->facetNames))
         {
             return;
         }
 
-        foreach ($texts as $text)
+        foreach ($fieldTexts as $fieldText)
         {
+            $text = $fieldText['text'];
+
             if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
             {
                 $value = $this->getFacetValueForHierarchy($elementName, $text);

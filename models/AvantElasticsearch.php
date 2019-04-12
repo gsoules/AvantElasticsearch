@@ -14,17 +14,18 @@ class AvantElasticsearch
         $this->docIndex = $this->getElasticsearchIndexName();
     }
 
-    protected function catentateElementTexts($texts)
+    protected function catentateElementTexts($fieldTexts)
     {
-        $elementTexts = '';
-        foreach ($texts as $text) {
-            if (!empty($elementTexts))
+        $catenatedText = '';
+        foreach ($fieldTexts as $fieldText)
+        {
+            if (!empty($catenatedText))
             {
-                $elementTexts .= PHP_EOL;
+                $catenatedText .= PHP_EOL;
             }
-            $elementTexts .= $text;
+            $catenatedText .= $fieldText['text'];
         }
-        return $elementTexts;
+        return $catenatedText;
     }
 
     public function convertElementNameToElasticsearchFieldName($elementName)
@@ -85,26 +86,41 @@ class AvantElasticsearch
 
     public function getElementsUsedByThisInstallation($ignorePrivate = true)
     {
-        if (empty($this->elementsForIndex) || $this->ignorePrivateElements != $ignorePrivate)
+        // Determine if the elements are already cached. Note that they might be in cache, but don't
+        // match the private option,  in which case, they need to be fetched again per the option.
+        $getElementsFromDatabase = empty($this->elementsForIndex) || $this->ignorePrivateElements != $ignorePrivate;
+
+        if ($getElementsFromDatabase)
         {
             $this->ignorePrivateElements = $ignorePrivate;
 
-            $table = get_db()->getTable('Element');
-            $select = $table->getSelect();
-            $this->elementsForIndex = $table->fetchObjects($select);
+            $db = get_db();
+            $table = "{$db->prefix}elements";
+
+            $sql = "
+            SELECT $table.id, $table.name
+            FROM $table";
+
+            $elements = $db->query($sql)->fetchAll();
 
             $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
             $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
 
-            foreach ($this->elementsForIndex as $elementName => $element)
+            $this->elementsForIndex = array();
+
+            foreach ($elements as $element)
             {
-                $elementId = $element->id;
-                $ingoreUnused = array_key_exists($elementId, $unusedElementsData);
-                $ignore = $ingoreUnused || ($this->ignorePrivateElements && array_key_exists($elementId, $privateElementsData));
+                $elementId = $element['id'];
+
+                $ignoreUnused = array_key_exists($elementId, $unusedElementsData);
+                $ignore = $ignoreUnused || ($this->ignorePrivateElements && array_key_exists($elementId, $privateElementsData));
                 if ($ignore)
                 {
-                    unset($this->elementsForIndex[$elementName]);
+                    continue;
                 }
+
+                $elementName = $element['name'];
+                $this->elementsForIndex[$elementId] = $elementName;
             }
         }
 

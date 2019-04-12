@@ -27,26 +27,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $response;
     }
 
-    protected function constructAddressElement($elementName, $elasticsearchFieldName, $texts, &$sortData)
-    {
-        if ($elementName == 'Address')
-        {
-            $text = $texts[0];
-
-            if (preg_match('/([^a-zA-Z]+)?(.*)/', $text, $matches))
-            {
-                // Try to get a number from the number portion. If there is none, intval return 0 which is good for sorting.
-                $numberMatch = $matches[1];
-                $number = intval($numberMatch);
-
-                // Pad the beginning of the number with leading zeros so that it can be sorted correctly as text.
-                $sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
-
-                $sortData[$elasticsearchFieldName . '-street'] = $matches[2];
-            }
-        }
-    }
-
     public function constructDocumentParameters()
     {
         $params = [
@@ -67,23 +47,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $params;
     }
 
-    protected function constructHierarchy($elementName, $elasticsearchFieldName, $texts, &$sortData)
-    {
-        if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
-        {
-            $text = $texts[0];
-
-            // Find the last comma.
-            $index = strrpos($text, ',', -1);
-            if ($index !== false)
-            {
-                // Filter out the ancestry to leave just the leaf text.
-                $text = trim(substr($text, $index + 1));
-            }
-            $sortData[$elasticsearchFieldName] = $text;
-        }
-    }
-
     protected function constructHtmlElement($elasticsearchFieldName, $text, &$htmlFields)
     {
         // Determine if this element's text contains HTML. If so, add the element's name to the item's HTML list
@@ -102,12 +65,50 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $isHtmlElement;
     }
 
-    protected function constructIntegerElement($elementName, $elasticsearchFieldName, $elementTexts, &$sortData)
+    protected function createAddressElementSortData($elementName, $elasticsearchFieldName, $texts, &$sortData)
+    {
+        if ($elementName == 'Address')
+        {
+            $text = $texts[0];
+
+            if (preg_match('/([^a-zA-Z]+)?(.*)/', $text, $matches))
+            {
+                // Try to get a number from the number portion. If there is none, intval return 0 which is good for sorting.
+                $numberMatch = $matches[1];
+                $number = intval($numberMatch);
+
+                // Pad the beginning of the number with leading zeros so that it can be sorted correctly as text.
+                $sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
+
+                $sortData[$elasticsearchFieldName . '-street'] = $matches[2];
+            }
+        }
+    }
+
+    protected function createHierarchyElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, &$sortData)
+    {
+        if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
+        {
+            // Get only the first value for this element since that's all that's used for sorting purposes.
+            $text = $fieldTexts[0]['text'];
+
+            // Find the last comma.
+            $index = strrpos($text, ',', -1);
+            if ($index !== false)
+            {
+                // Filter out the ancestry to leave just the leaf text.
+                $text = trim(substr($text, $index + 1));
+            }
+            $sortData[$elasticsearchFieldName] = $text;
+        }
+    }
+
+    protected function createIntegerElementSortData($elementName, $elasticsearchFieldName, $textString, &$sortData)
     {
         if (in_array($elementName, $this->installation['integer_sort_elements']))
         {
             // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
-            $sortData[$elasticsearchFieldName] = sprintf('%010d', $elementTexts);
+            $sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
         }
     }
 
@@ -121,22 +122,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $tags;
     }
 
-    protected function constructTitle($texts)
+    public function copyItemElementValuesToDocument($item, $itemFieldTexts, $files)
     {
-        $title = $this->catentateElementTexts($texts);
-        if (strlen($title) == 0) {
-            $title = __('Untitled');
-        }
-        return $title;
-    }
-
-    public function copyItemElementValuesToDocument($item, $files)
-    {
-        $elementTexts = $this->getItemElementTexts($item);
         $this->itemFiles = $files;
-
-        $titleTexts = isset($elementTexts['Title']) ? $elementTexts['Title'] : array();
-        $this->copyItemAttributesToDocument($item, $titleTexts);
 
         $avantElasticsearchFacets = new AvantElasticsearchFacets();
 
@@ -148,10 +136,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $avantElasticsearch = new AvantElasticsearch();
 
         $hasDateElement = false;
+        $titleString = '';
 
-        foreach ($elementTexts as $elementName => $texts)
+        foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
             // Get the element name and create the corresponding Elasticsearch field name.
+            $elementName = $this->installation['installation_elements'][$elementId];
+
             $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
             if ($elementName == 'Date')
             {
@@ -162,28 +153,37 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
             // sorting based on the first value as is required by AvantSearch when a user sorts by column.
             // By catenating the values, sorting will work as desired.
-            $elementTextsString = $this->catentateElementTexts($texts);
+            $fieldTextsString = $this->catentateElementTexts($fieldTexts);
 
             // Determine if the element's text contains HTML and if so, add the element to the item's HTML list.
-            $isHtmlElement = $this->constructHtmlElement($elasticsearchFieldName, $elementTextsString, $htmlFields);
+            $isHtmlText = $fieldTexts['html'] == 1;
+            $isHtmlElement = $this->constructHtmlElement($elasticsearchFieldName, $fieldTextsString, $htmlFields);
 
             // Change Description content to plain text for two reasons:
             // 1. Prevent searches from finding HTML tag names like span or strong.
             // 2. Allow proper hit highlighting in search results with showing highlighted HTML tags.
             if ($elementName == 'Description' && $isHtmlElement)
             {
-                $elementTextsString = strip_tags($elementTextsString);
+                $fieldTextsString = strip_tags($fieldTextsString);
+            }
+
+            if ($elementName == 'Title')
+            {
+                $titleString = $fieldTextsString;
+                if (strlen($titleString) == 0) {
+                    $titleString = __('Untitled');
+                }
             }
 
             // Save the element's text.
-            $elementData[$elasticsearchFieldName] = $elementTextsString;
+            $elementData[$elasticsearchFieldName] = $fieldTextsString;
 
             // Process special cases.
-            $this->constructIntegerElement($elementName, $elasticsearchFieldName, $elementTextsString, $sortData);
-            $this->constructHierarchy($elementName, $elasticsearchFieldName, $texts, $sortData);
-            $this->constructAddressElement($elementName, $elasticsearchFieldName, $texts, $sortData);
+            $this->createIntegerElementSortData($elementName, $elasticsearchFieldName, $fieldTextsString, $sortData);
+            $this->createHierarchyElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, $sortData);
+            $this->createAddressElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, $sortData);
 
-            $avantElasticsearchFacets->getFacetValue($elementName, $elasticsearchFieldName, $texts, $facets);
+            $avantElasticsearchFacets->getFacetValue($elementName, $elasticsearchFieldName, $fieldTexts, $facets);
         }
 
         if (!$hasDateElement)
@@ -199,12 +199,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->setField('facet', $facets);
         $this->setField('html', $htmlFields);
         $this->setField('tags', $tags);
+
+        $this->copyItemAttributesToDocument($item, $titleString);
     }
 
-    protected function copyItemAttributesToDocument($item, $texts)
+    protected function copyItemAttributesToDocument($item, $titleString)
     {
-        $title = $this->constructTitle($texts);
-
         $itemPath = $this->installation['item_path'] . $item->id;
         $serverUrl = $this->installation['server_url'];
         $itemPublicUrl = $serverUrl . $itemPath;
@@ -216,7 +216,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'itemid' => (int)$item->id,
             'ownerid' => $this->installation['ownerid'],
             'owner' => $this->installation['owner'],
-            'title' => $title,
+            'title' => $titleString,
             'public' => (bool)$item->public,
             'url' => $itemPublicUrl,
             'thumb' => $itemImageThumbUrl,
@@ -260,32 +260,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
         }
         return $url;
-    }
-
-    protected function getItemElementTexts($item)
-    {
-        // Get all the elements and all element texts.
-        $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
-        $elementTexts = array();
-
-        // Loop over the elements and for each one, find its text value(s).
-        foreach ($this->installation['installation_elements'] as $element)
-        {
-            $elementId = $element->id;
-            $elementName = $element->name;
-
-            foreach ($allElementTexts as $elementText)
-            {
-                if ($elementText->element_id == $elementId)
-                {
-                    // Found text for the current element. Add it to the texts for the element.
-                    // Continue looping for the texts to see if any others belong to this element.
-                    $elementTexts[$elementName][] = $elementText->text;
-                }
-            }
-        }
-
-        return $elementTexts;
     }
 
     public function deleteDocumentFromIndex()

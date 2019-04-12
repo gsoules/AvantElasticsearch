@@ -47,51 +47,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $messageString;
     }
 
-    public function createDocumentsForAllItems($filename, $limit = 0)
-    {
-        $json = '';
-        $this->cacheInstallationParameters();
-
-        // Get all the items for this installation.
-        $items = $this->fetchAllItems();
-
-        // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
-        $files = $this->fetchAllFiles();
-
-        // The limit is only used during development so that we don't always have
-        // to index all the items. It serves no purpose in a production environment
-        $itemsCount = $limit == 0 ? count($items) : $limit;
-
-        for ($index = 0; $index < $itemsCount; $index++)
-        {
-            $itemId = $items[$index]->id;
-
-            $itemFiles = array();
-            if (isset($files[$itemId]))
-            {
-                $itemFiles = $files[$itemId];
-            }
-
-            // Create a document for the item.
-            $document = $this->createElasticsearchDocumentFromItem($items[$index], $itemFiles);
-
-            // Write the document as an object to the JSON array, separating each object by a comma.
-            $separator = $index > 0 ? ',' : '';
-            $json .= $separator . json_encode($document);
-
-            // Let PHP know that it can garbage-collect these objects.
-            unset($items[$index]);
-            if (isset($files[$itemId]))
-            {
-                unset($files[$itemId]);
-            }
-            unset($document);
-        }
-
-        file_put_contents($filename, "[$json]");
-    }
-
-    public function createElasticsearchDocumentFromItem($item, $files)
+    public function createElasticsearchDocumentFromItem($item, $itemFieldTexts, $files)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($item);
@@ -101,9 +57,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setInstallationParameters($this->installation);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($item, $files);
+        $document->copyItemElementValuesToDocument($item, $itemFieldTexts[$item->id], $files);
 
         return $document;
+    }
+
+    protected function createFieldText($text, $html)
+    {
+        return array('text' => $text, 'html' => $html);
     }
 
     public function deleteIndex()
@@ -120,6 +81,65 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document = new AvantElasticsearchDocument($documentId);
         $response = $document->deleteDocumentFromIndex();
         return $response;
+    }
+
+    protected function fetchFieldTextsForAllItems($public = true)
+    {
+        // This method gets all element texts for all items in the database. It returns them as an array of item-field-texts.
+        // * Each item-field-texts contains an array of field-texts, one for each of the item's elements.
+        // * Each field-texts contains an array of field-text, one for each of the element's values.
+        // * Each field-text contains two values: the element value text and a flag to indicate if the the text is HTML.
+        //
+        // The html flag is only true when the user entered text into an Omeka element that displays the HTML checkbox
+        // on the admin Edit page AND they checked the box. Note that an element can have multiple values with some as
+        // HTML and others as plain text, thus the need to have the flag for each field-text. Knowledge of whether the
+        // text is HTML is important when displaying search results because HTML text has to be displayed as HTML, not
+        // as plain text containing HTML tags.
+        //
+        // We use the term field texts to differentiate from the Omeka ElementText object which contains much more
+        // information than is needed for creating Elasticsearch fields. The SQL below fetches only the text and html
+        // columns from the element_texts table instead of returning an entire ElementText object as would happen if
+        // the code called fetchObjects().
+
+        $itemFieldTexts = array();
+        $results = array();
+
+        try
+        {
+            $db = get_db();
+            $table = "{$db->prefix}element_texts";
+
+            $sql = "
+                SELECT
+                  $table.record_id,
+                  $table.element_id,
+                  $table.text,
+                  $table.html
+                FROM
+                  $table
+                WHERE
+                  $table.record_type = 'Item'
+            ";
+
+            $results = $db->query($sql)->fetchAll();
+        }
+        catch (Exception $e)
+        {
+            // FINISH: Report exception
+            $itemFieldTexts = null;
+        }
+
+        foreach ($results as $result)
+        {
+            $itemId = $result['record_id'];
+            $elementId = $result['element_id'];
+            $text = $result['text'];
+            $html = $result['html'];
+            $itemFieldTexts[$itemId][$elementId][] = $this->createFieldText($text, $html);
+        }
+        return $itemFieldTexts;
+
+        return $itemFieldTexts;
     }
 
     protected function fetchAllFiles($public = true)
@@ -221,9 +241,33 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $params;
     }
 
-    public function indexItem($item)
+    protected function getItemFieldTexts($item)
     {
-        $document = $this->createElasticsearchDocumentFromItem($item, $item->Files);
+        // Get all the elements and all element texts.
+        $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
+        $fieldTexts = array();
+
+        // Loop over the elements and for each one, find its text value(s).
+        foreach ($this->installation['installation_elements'] as $elementId => $elementName)
+        {
+            foreach ($allElementTexts as $elementText)
+            {
+                if ($elementText->element_id == $elementId)
+                {
+                    $fieldTexts[$item->id][$elementId][] = $this->createFieldText($elementText->text, $elementText->html);
+                }
+            }
+        }
+
+        return $fieldTexts;
+    }
+    public function indexSingleItem($item)
+    {
+        $this->cacheInstallationParameters();
+
+        $itemFieldTexts = $this->getItemFieldTexts($item);
+        $files = $item->Files;
+        $document = $this->createElasticsearchDocumentFromItem($item, $itemFieldTexts, $files);
 
         // Add the document to the index.
         $response = $document->addDocumentToIndex();
@@ -232,12 +276,47 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function preformBulkIndexExport($filename, $limit = 0)
     {
-        if (file_exists($filename))
+        $json = '';
+        $this->cacheInstallationParameters();
+
+        // Get all the items for this installation.
+        $items = $this->fetchAllItems();
+
+        // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
+        $files = $this->fetchAllFiles();
+        $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems();
+
+        // The limit is only used during development so that we don't always have
+        // to index all the items. It serves no purpose in a production environment
+        $itemsCount = $limit == 0 ? count($items) : $limit;
+
+        for ($index = 0; $index < $itemsCount; $index++)
         {
-            unlink($filename);
+            $itemId = $items[$index]->id;
+
+            $itemFiles = array();
+            if (isset($files[$itemId]))
+            {
+                $itemFiles = $files[$itemId];
+            }
+
+            // Create a document for the item.
+            $document = $this->createElasticsearchDocumentFromItem($items[$index], $fieldTextsForAllItems[$itemId], $itemFiles);
+
+            // Write the document as an object to the JSON array, separating each object by a comma.
+            $separator = $index > 0 ? ',' : '';
+            $json .= $separator . json_encode($document);
+
+            // Let PHP know that it can garbage-collect these objects.
+            unset($items[$index]);
+            if (isset($files[$itemId]))
+            {
+                unset($files[$itemId]);
+            }
+            unset($document);
         }
 
-        $this->createDocumentsForAllItems($filename, $limit);
+        file_put_contents($filename, "[$json]");
     }
 
     protected function performBulkIndexImport($filename)

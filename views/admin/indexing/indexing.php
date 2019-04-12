@@ -12,16 +12,18 @@ if (isset($_REQUEST['export']))
     $limit = isset($_REQUEST['limit']) ? intval($_REQUEST['limit']) : 25;
     $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
 
-    $mem1 = memory_get_usage();
-    $responses = $avantElasticsearchIndexBuilder->indexAll($export, $limit);
-    $mem2 = memory_get_usage();
-
     $mb = 1048576;
-    $used = intval(($mem2 - $mem1) / $mb);
-    $current = intval($mem2 /  $mb);
+    $mem1 = intval(memory_get_usage() / $mb);
+
+    // Perform indexing.
+    $responses = $avantElasticsearchIndexBuilder->indexAll($export, $limit);
+
+    $mem2 = intval(memory_get_usage() / $mb);
+
+    $used = intval($mem2 - $mem1);
     $peak = intval(memory_get_peak_usage() /  $mb);
 
-    $executionTime = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
+    $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
 
     $message = $avantElasticsearchIndexBuilder->convertResponsesToMessageString($responses);
 
@@ -36,7 +38,7 @@ if (isset($_REQUEST['export']))
     }
 
     echo "<p>Memory used: $used MB</p>";
-    echo "<p>Current usage: $current MB</p>";
+    echo "<p>Start/End usage: $mem1 MB / $mem2 MB</p>";
     echo "<p>Peak usage: $peak MB</p>";
     echo "<p>Execution time: $executionTime seconds</p>";
 }
