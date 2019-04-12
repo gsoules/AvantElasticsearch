@@ -75,6 +75,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             // Get the element name and create the corresponding Elasticsearch field name.
             $elementName = $this->installation['installation_elements'][$elementId];
+            $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
+
+            foreach ($fieldTexts as $fieldText)
+            {
+                if ($fieldText['html'] == 1)
+                {
+                    // Change any HTML content to plain text so that Elasticsearch won't get hits on HTML tags. For
+                    // example, if the query contained 'strong' we don't want the search to find the <strong> tag.
+                    $fieldText['text'] = strip_tags($fieldText['text']);
+                }
+            }
 
             // Get the element's text and catentate them into a single string separate by EOL breaks.
             // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
@@ -82,14 +93,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // By catenating the values, sorting will work as desired.
             $fieldTextsString = $this->catentateElementTexts($fieldTexts);
 
-            $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
-
-            // Determine if the element's text contains HTML and if so, add the element to the item's HTML list.
-            $isHtmlElement = $this->createHtmlData($elasticsearchFieldName, $fieldTexts, $htmlFields);
-
-            // Change any HTML content to plain text so that Elasticsearch won't get hits on HTML tags. For
-            // example, if the query contained 'strong' we don't want the search to find the <strong> tag.
-            $fieldTextsString = strip_tags($fieldTextsString);
+            // Identify which if any of this element's text values contain HTML.
+            $this->createHtmlData($elasticsearchFieldName, $fieldTexts, $htmlFields);
 
             if ($elementName == 'Title')
             {
@@ -204,12 +209,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function createHtmlData($elasticsearchFieldName, $fieldTexts, &$htmlFields)
     {
-        // Determine if this element contains and HTML texts. If so, return the field name
+        // Determine if this element contains and HTML texts. If so, record the field name
         // followed by a comma-separated list of the indices of containing HTML. For example,
         // if the Creator element has three values and the first (index 0) and last (index 2)
-        // contain HTML, return "creator,0,2".
+        // contain HTML, create the value "creator,0,2".
 
-        $isHtmlElement = false;
         $index = 0;
         $htmlTextIndices = '';
 
@@ -225,10 +229,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($htmlTextIndices))
         {
             $htmlFields[] = $elasticsearchFieldName . $htmlTextIndices;
-            $isHtmlElement = true;
         }
-
-        return $isHtmlElement;
     }
 
     protected function createIntegerElementSortData($elementName, $elasticsearchFieldName, $textString, &$sortData)
