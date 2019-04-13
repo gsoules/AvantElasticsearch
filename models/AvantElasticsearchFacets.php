@@ -113,10 +113,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $arg = urldecode($rawArg);
             $facetArg = "facet_$facetToRemove";
 
-            $argContainsFacet = strpos($arg, $facetArg) !== false;
-            $argContainsFacetValue = strpos($arg, $facetValue) !== false;
+            $target = "$facetArg=$facetValue";
+            $argContainsTarget = preg_match("~\b$target\b~", $arg);
+            //$argContainsFacetValue = strpos($arg, $facetValue) !== false;
 
-            if (!($argContainsFacet && $argContainsFacetValue))
+            if (!$argContainsTarget)
             {
                 // Keep this arg since it not the one to be removed.
                 $afterArgs[] = $arg;
@@ -156,15 +157,25 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
                 {
                     $value = $this->getFacetValueForHierarchy($elementName, $text);
+                    $root = $value['root'];
+                    $leaf = $value['leaf'];
+
+                    // Form the facet value using the root and the leave (ignoring anything in the middle).
+                    $separator = empty($root) || empty($leaf) ? '' : ', ';
+                    $values[] = $root . $separator . $leaf;
+
+                    if ($elementName == 'Type' || $elementName == 'Subject')
+                    {
+                        if (!empty($root) && !empty($leaf))
+                        {
+                            // Emit just the root as the top of the hierarchy.
+                            $values[] = $root;
+                        }
+                    }
                 }
                 else if ($elementName == 'Date')
                 {
-                    $value = $this->getFacetValueForDate($text);
-                }
-
-                if (!empty($value))
-                {
-                    $values[] = $value;
+                    $values[] = $this->getFacetValueForDate($text);
                 }
             }
         }
@@ -235,18 +246,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $leaf = '';
         }
 
-        // Form the facet value using the root and the leave (ignoring anything in the middle).
-        $separator = empty($root) || empty($leaf) ? '' : ', ';
-        $value = $root . $separator . $leaf;
-
-//        if ($elementName == 'Type' || $elementName == 'Subject')
-//        {
-//            if (!empty($root) && !empty($leaf)) {
-//                // Emit the root as the top of the hierarchy.
-//                $facetValues[] = $root;
-//            }
-//        }
-
-        return $value;
+        return array('root' => $root, 'leaf' => $leaf);
     }
 }
