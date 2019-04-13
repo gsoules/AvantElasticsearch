@@ -96,6 +96,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($facets as $facetName => $facetValues)
         {
+            if (!is_array($facetValues))
+            {
+                // This should only happen if the query string syntax in invalid because someone edited or mistyped it.
+                break;
+            }
+
             foreach ($facetValues as $facetValue)
             {
                 $queryString .= '&'.urlencode("facet_{$facetName}[]") . '=' . urlencode($facetValue);
