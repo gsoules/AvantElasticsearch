@@ -20,10 +20,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
     {
         $args = explode('&', $queryString);
-
-        $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($facetValue);
-
-        $skip = false;
+        $addFacet = true;
 
         foreach ($args as $rawArg)
         {
@@ -36,12 +33,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             if ($argContainsTarget)
             {
-                $skip = true;
+                $addFacet = false;
                 break;
             }
         }
 
-        if (!$skip)
+        if ($addFacet)
         {
             $queryString = "$queryString&$target";
         }
