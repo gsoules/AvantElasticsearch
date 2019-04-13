@@ -132,7 +132,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            // FINISH: Report exception
+            // TO-DO: Report exception
             $itemFieldTexts = null;
         }
 

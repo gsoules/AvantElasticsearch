@@ -171,7 +171,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function reportClientException(Exception $e)
     {
-        // FINISH: Need to figure out what to do in this situation. For now keep a breakpoint here.
+        // TO-DO: Log and report/email this exception. For now keep a breakpoint here.
         $exceptionMessage = $this->getElasticsearchExceptionMessage($e);
         return;
     }
