@@ -128,9 +128,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $sql .= " AND public = 1";
             }
 
-            $t0 = microtime(true);
             $results = $db->query($sql)->fetchAll();
-            $t1 = microtime(true);
         }
         catch (Exception $e)
         {
@@ -138,8 +136,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemFieldTexts = null;
         }
 
-        $t2 = microtime(true);
-        foreach ($results as $result)
+        foreach ($results as $index => $result)
         {
             $elementId = $result['element_id'];
 
@@ -154,7 +151,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $html = $result['html'];
             $itemFieldTexts[$itemId][$elementId][] = $this->createFieldText($text, $html);
         }
-        $t3 = microtime(true);
+
         return $itemFieldTexts;
     }
 
