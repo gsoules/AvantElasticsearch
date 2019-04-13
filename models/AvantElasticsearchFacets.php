@@ -107,11 +107,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $beforeArgs = explode('&', $queryString);
         $afterArgs = array();
 
-        foreach ($beforeArgs as $arg)
+        foreach ($beforeArgs as $rawArg)
         {
-            $argContainsFacet = strpos($arg, $facetToRemove) !== false;
-            $argContainsValue = strpos($arg, $facetValue) !== false;
-            if (!($argContainsFacet && $argContainsValue))
+            // Decode any %## encoding in the arg and change '+' to a space character.
+            $arg = urldecode($rawArg);
+            $facetArg = "facet_$facetToRemove";
+
+            $argContainsFacet = strpos($arg, $facetArg) !== false;
+            $argContainsFacetValue = strpos($arg, $facetValue) !== false;
+
+            if (!($argContainsFacet && $argContainsFacetValue))
             {
                 // Keep this arg since it not the one to be removed.
                 $afterArgs[] = $arg;
