@@ -19,18 +19,31 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
     {
-        if ($facetToAdd == 'subject' || $facetToAdd == 'tag')
+        $args = explode('&', $queryString);
+
+        $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($facetValue);
+
+        $skip = false;
+
+        foreach ($args as $rawArg)
         {
-            $arg = urlencode("facet_{$facetToAdd}[]") . "=" . urlencode($facetValue);
-        }
-        else
-        {
-            $arg = "facet_{$facetToAdd}=" . urlencode($facetValue);
+            // Decode any %## encoding in the arg and change '+' to a space character.
+            $arg = urldecode($rawArg);
+            $facetArg = "facet_{$facetToAdd}[]";
+
+            $target = "$facetArg=$facetValue";
+            $argContainsTarget = $target == $arg;
+
+            if ($argContainsTarget)
+            {
+                $skip = true;
+                break;
+            }
         }
 
-        if (strpos($queryString, $arg) === FALSE)
+        if (!$skip)
         {
-            return "$queryString&$arg";
+            $queryString = "$queryString&$target";
         }
 
         return $queryString;
@@ -86,16 +99,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($facets as $facetName => $facetValues)
         {
-            if (is_array($facetValues))
+            foreach ($facetValues as $facetValue)
             {
-                foreach($facetValues as $k => $v)
-                {
-                    $queryString .= '&'.urlencode("facet_{$facetName}[]") . '=' . urlencode($v);
-                }
-            }
-            else
-            {
-                $queryString .= '&'.urlencode("facet_{$facetName}") . '=' . urlencode($facetValues);
+                $queryString .= '&'.urlencode("facet_{$facetName}[]") . '=' . urlencode($facetValue);
             }
         }
 
@@ -111,11 +117,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             // Decode any %## encoding in the arg and change '+' to a space character.
             $arg = urldecode($rawArg);
-            $facetArg = "facet_$facetToRemove";
+            $facetArg = "facet_{$facetToRemove}[]";
 
             $target = "$facetArg=$facetValue";
-            $argContainsTarget = preg_match("~\b$target\b~", $arg);
-            //$argContainsFacetValue = strpos($arg, $facetValue) !== false;
+            $argContainsTarget = $target == $arg;
 
             if (!$argContainsTarget)
             {
