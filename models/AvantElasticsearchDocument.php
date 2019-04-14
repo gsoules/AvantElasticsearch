@@ -141,7 +141,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->createElementFacetData('Date', 'date', $emptyDateFieldTexts, $facets);
         }
 
-        $this->CreateSuggestionsData($titleFieldTexts, $isTypeReference, $isSubjectPeople);
+        if (!empty($titleFieldTexts))
+        {
+            $avantLogicSuggest = new AvantElasticsearchSuggest();
+            $suggestionData = $avantLogicSuggest->CreateSuggestionsDataForTitle($titleFieldTexts, $isTypeReference, $isSubjectPeople);
+            $this->body['suggestions'] = $suggestionData;
+        }
 
         $tags = $this->constructTags($item);
         $facets['tag'] = $tags;
@@ -258,109 +263,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
             $sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
         }
-    }
-
-    protected function CreateSuggestionsData($titleFieldTexts, $isReferenceType, $isSubjectPeople)
-    {
-        // Add weight for items that have non-blank descriptions (and for items with relationships?)
-
-        // Only create suggestions from firt n words.
-
-        if (!empty($titleFieldTexts))
-        {
-            $isPersonReference = $isReferenceType && $isSubjectPeople;
-            $this->body['suggestions']['input'] = $this->createSuggestionInputs($titleFieldTexts, $isPersonReference);
-            if ($isReferenceType)
-            {
-                $this->body['suggestions']['weight'] = $isSubjectPeople ? 5 : 2;
-            }
-        }
-    }
-
-    protected function createSuggestionInputs($fieldTexts, $isPersonReference)
-    {
-        $suggestions = array();
-
-        foreach ($fieldTexts as $fieldText)
-        {
-            $text = $fieldText['text'];
-            $pattern = $isPersonReference ? "/[^a-zA-Z ]+/" : "/[^a-zA-Z 0-9]+/";
-            $text = preg_replace($pattern, " ", $text);
-            $parts = explode(' ', $text);
-            $parts = array_map('trim', $parts);
-            $words = array();
-
-            foreach ($parts as $part)
-            {
-                if (strlen($part) > 1)
-                {
-                    $words[] = $part;
-                }
-            }
-
-            $maxWordsInSuggestion = 10;
-            $last = min(count($words), $maxWordsInSuggestion);
-
-            if ($isPersonReference & $last >= 3)
-            {
-                // Determine if title is in the form <surname> <first> <middle> <surname>, or just <first> <middle> <surname>.
-                // Start by assuming that the first word is the surname. Note that this logic may not be perfect, but sould
-                // be good enough for the purpose of making suggestions.
-                $surname = $words[0];
-                $startsWithSurname = false;
-                for ($index = 1; $index < $last; $index++)
-                {
-                    // See if the first word appears again in the title. If yes, assume that the first word is the surname.
-                    if ($words[$index] == $surname)
-                    {
-                        $startsWithSurname = true;
-                        break;
-                    }
-                }
-
-                $firstName = $startsWithSurname ? $words[1] : $words[0];
-
-                for ($i = 0; $i < $last; $i++)
-                {
-                    $suggestion = '';
-                    for ($j = $i; $j < $last; $j++)
-                    {
-                        if (strtolower($words[$j]) == 'aka')
-                        {
-                            // Ignore aka (Also Known As) name because their use is inconsistent and won't generally
-                            // be effective for suggestion purposes.
-                            break;
-                        }
-                        $suggestion .= $words[$j] . ' ';
-                    }
-
-                    $suggestion = trim($suggestion);
-                    $firstIndexThatNeedsFirstNameAdded = $startsWithSurname ? 3 : 2;
-
-                    if ($i >= $firstIndexThatNeedsFirstNameAdded)
-                    {
-                        $suggestion = "$firstName $suggestion";
-                    }
-                    $suggestions[] = $suggestion;
-                }
-            }
-            else
-            {
-                for ($i = 0; $i < $last; $i++)
-                {
-                    // Create a string of all the words staritng from the ith word.
-                    $suggestion = '';
-                    for ($j = $i; $j < $last; $j++)
-                    {
-                        $suggestion .= $words[$j] . ' ';
-                    }
-                    $suggestions[] = trim($suggestion);
-                }
-            }
-        }
-
-        $suggestions = array_unique($suggestions);
-        return $suggestions;
     }
 
     protected function getImageUrl($item, $thumbnail)
