@@ -47,19 +47,22 @@ if (isset($_REQUEST['suggest']))
 {
     $prefix = $_REQUEST['suggest'];
 
+    $maxRequests = 10;
+    $maxShown = 5;
+
     $avantElasticsearchClient = new AvantElasticsearchClient();
     $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
     $avantElasticsearchSuggest = new AvantElasticsearchSuggest();
 
     $prefix = $avantElasticsearchSuggest->stripPunctuation($prefix);
 
-    $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, 10);
+    $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, $maxRequests);
     $options = $avantElasticsearchClient->suggest($params);
 
     if (empty($options))
     {
         // Add fuzziness to see if that will get some results.
-        $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, true, 10);
+        $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, true, $maxRequests);
         $options = $avantElasticsearchClient->suggest($params);
     }
 
@@ -75,6 +78,9 @@ if (isset($_REQUEST['suggest']))
         {
             $suggestions[] = $option["_source"]["title"];
         }
+
+        // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.
+        $suggestions = array_unique($suggestions);
 
         foreach ($suggestions as $suggestion)
         {
