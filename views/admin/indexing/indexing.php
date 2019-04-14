@@ -50,7 +50,7 @@ if (isset($_REQUEST['suggest']))
         'index' => 'omeka',
         'body' => [
             '_source' => [
-              'suggestions'
+              'suggestions', 'title'
             ],
             'suggest' => [
                 'keywords-suggest' => [
@@ -58,10 +58,10 @@ if (isset($_REQUEST['suggest']))
                     'completion' => [
                         'field' => 'suggestions',
                         'skip_duplicates' => true,
-                        'size' => 5,
+                        'size' => 20,
                         'fuzzy' =>
                         [
-                            'fuzziness' => 0
+                            'fuzziness' => 1
                         ]
                     ]
                 ]
@@ -76,7 +76,7 @@ if (isset($_REQUEST['suggest']))
 
     foreach ($response["suggest"]["keywords-suggest"][0]["options"] as $option)
     {
-        $suggestions[] = $option['text'];
+        $suggestions[] = $option["_source"]["title"];
     }
 
     foreach ($suggestions as $suggestion)

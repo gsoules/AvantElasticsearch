@@ -276,9 +276,34 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         foreach ($fieldTexts as $fieldText)
         {
-            $suggestions[] = $fieldText['text'];
+            $text = $fieldText['text'];
+            $text = preg_replace("/[^a-zA-Z 0-9]+/", " ", $text);
+            $parts = explode(' ', $text);
+            $parts = array_map('trim', $parts);
+            $words = array();
+
+            foreach ($parts as $part)
+            {
+                if (strlen($part) > 1)
+                {
+                    $words[] = $part;
+                }
+            }
+
+            $maxWordsInSuggestion = 10;
+            $last = min(count($words), $maxWordsInSuggestion);
+            for ($i = 0; $i < $last; $i++)
+            {
+                $suggestion = '';
+                for ($j = $i; $j < $last; $j++)
+                {
+                    $suggestion .= $words[$j] . ' ';
+                }
+                $suggestions[] = trim($suggestion);
+            }
         }
 
+        $suggestions = array_unique($suggestions);
         return $suggestions;
     }
 
