@@ -57,7 +57,7 @@ if (isset($_REQUEST['suggest']))
                     'prefix' => $query,
                     'completion' => [
                         'field' => 'suggestions',
-                        'skip_duplicates' => true,
+                        'skip_duplicates' => false,
                         'size' => 20,
                         'fuzzy' =>
                         [

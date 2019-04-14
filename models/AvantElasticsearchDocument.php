@@ -71,7 +71,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $hasDateElement = false;
         $titleString = '';
         $titleFieldTexts = null;
-        $isReferenceType = false;
+        $isTypeReference = false;
+        $isSubjectPeople = false;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
@@ -110,7 +111,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
             if ($elementName == 'Type')
             {
-                $isReferenceType = $fieldTextsString == 'Reference';
+                $isTypeReference = $fieldTextsString == 'Reference';
+            }
+
+            if ($elementName == 'Subject')
+            {
+                $isSubjectPeople = strpos($fieldTextsString, 'People') !== false;
             }
 
             if ($elementName == 'Date')
@@ -135,7 +141,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->createElementFacetData('Date', 'date', $emptyDateFieldTexts, $facets);
         }
 
-        $this->CreateSuggestionsData($titleFieldTexts, $isReferenceType);
+        $this->CreateSuggestionsData($titleFieldTexts, $isTypeReference, $isSubjectPeople);
 
         $tags = $this->constructTags($item);
         $facets['tag'] = $tags;
@@ -254,7 +260,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function CreateSuggestionsData($titleFieldTexts, $isReferenceType)
+    protected function CreateSuggestionsData($titleFieldTexts, $isReferenceType, $isSubjectPeople)
     {
         // Add weight for items that have non-blank descriptions (and for items with relationships?)
 
@@ -262,22 +268,24 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (!empty($titleFieldTexts))
         {
-            $this->body['suggestions']['input'] = $this->createSuggestionInputs($titleFieldTexts);
+            $isPersonReference = $isReferenceType && $isSubjectPeople;
+            $this->body['suggestions']['input'] = $this->createSuggestionInputs($titleFieldTexts, $isPersonReference);
             if ($isReferenceType)
             {
-                $this->body['suggestions']['weight'] = 2;
+                $this->body['suggestions']['weight'] = $isSubjectPeople ? 5 : 2;
             }
         }
     }
 
-    protected function createSuggestionInputs($fieldTexts)
+    protected function createSuggestionInputs($fieldTexts, $isPersonReference)
     {
         $suggestions = array();
 
         foreach ($fieldTexts as $fieldText)
         {
             $text = $fieldText['text'];
-            $text = preg_replace("/[^a-zA-Z 0-9]+/", " ", $text);
+            $pattern = $isPersonReference ? "/[^a-zA-Z ]+/" : "/[^a-zA-Z 0-9]+/";
+            $text = preg_replace($pattern, " ", $text);
             $parts = explode(' ', $text);
             $parts = array_map('trim', $parts);
             $words = array();
@@ -292,14 +300,61 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
             $maxWordsInSuggestion = 10;
             $last = min(count($words), $maxWordsInSuggestion);
-            for ($i = 0; $i < $last; $i++)
+
+            if ($isPersonReference & $last >= 3)
             {
-                $suggestion = '';
-                for ($j = $i; $j < $last; $j++)
+                // Determine if title is in the form <surname> <first> <middle> <surname>, or just <first> <middle> <surname>.
+                // Start by assuming that the first word is the surname. Note that this logic may not be perfect, but sould
+                // be good enough for the purpose of making suggestions.
+                $surname = $words[0];
+                $startsWithSurname = false;
+                for ($index = 1; $index < $last; $index++)
                 {
-                    $suggestion .= $words[$j] . ' ';
+                    // See if the first word appears again in the title. If yes, assume that the first word is the surname.
+                    if ($words[$index] == $surname)
+                    {
+                        $startsWithSurname = true;
+                        break;
+                    }
                 }
-                $suggestions[] = trim($suggestion);
+
+                $firstName = $startsWithSurname ? $words[1] : $words[0];
+
+                for ($i = 0; $i < $last; $i++)
+                {
+                    $suggestion = '';
+                    for ($j = $i; $j < $last; $j++)
+                    {
+                        if (strtolower($words[$j]) == 'aka')
+                        {
+                            // Ignore aka (Also Known As indicator for nicknames)
+                            continue;
+                        }
+                        $suggestion .= $words[$j] . ' ';
+                    }
+
+                    $suggestion = trim($suggestion);
+                    $firstIndexThatNeedsFirstNameAdded = $startsWithSurname ? 3 : 2;
+
+                    if ($i >= $firstIndexThatNeedsFirstNameAdded)
+                    {
+                        $suggestion = "$firstName $suggestion";
+                    }
+                    $suggestions[] = $suggestion;
+                }
+            }
+            else
+            {
+                for ($i = 0; $i < $last; $i++)
+                {
+                    // Create a string of all the words staritng from the ith word.
+                    $suggestion = '';
+                    for ($j = $i; $j < $last; $j++)
+                    {
+                        $suggestion .= $words[$j] . ' ';
+                    }
+                    $suggestions[] = trim($suggestion);
+                }
             }
         }
 
