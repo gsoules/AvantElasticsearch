@@ -49,6 +49,9 @@ if (isset($_REQUEST['suggest']))
 
     $avantElasticsearchClient = new AvantElasticsearchClient();
     $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+    $avantElasticsearchSuggest = new AvantElasticsearchSuggest();
+
+    $prefix = $avantElasticsearchSuggest->stripPunctuation($prefix);
 
     $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, 10);
     $options = $avantElasticsearchClient->suggest($params);
