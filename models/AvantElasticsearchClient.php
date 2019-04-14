@@ -155,7 +155,14 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
     }
 
-    public function performQuery($params)
+    protected function reportClientException(Exception $e)
+    {
+        // FINISH: Need to figure out what to do in this situation. For now keep a breakpoint here.
+        $exceptionMessage = $this->getElasticsearchExceptionMessage($e);
+        return;
+    }
+
+    public function search($params)
     {
         try
         {
@@ -167,12 +174,5 @@ class AvantElasticsearchClient extends AvantElasticsearch
             $this->reportClientException($e);
             return null;
         }
-    }
-
-    protected function reportClientException(Exception $e)
-    {
-        // TO-DO: Log and report/email this exception. For now keep a breakpoint here.
-        $exceptionMessage = $this->getElasticsearchExceptionMessage($e);
-        return;
     }
 }
