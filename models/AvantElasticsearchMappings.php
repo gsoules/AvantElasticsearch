@@ -18,6 +18,13 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
+    protected function addCompletionFieldToMappingProperties($fieldName)
+    {
+        $this->properties[$fieldName] = [
+            'type' => 'completion'
+        ];
+    }
+
     protected function addNumericFieldToMappingProperties($fieldName)
     {
         $this->properties[$fieldName] = [
@@ -56,7 +63,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         }
 
         $this->addAnalyzerFieldToMappingProperties('element.description');
-        $this->addAnalyzerFieldToMappingProperties('title');
+        //$this->addAnalyzerFieldToMappingProperties('title');
+
+        $this->addCompletionFieldToMappingProperties('title');
 
         $this->addBooleanFieldToMappingProperties('public');
 

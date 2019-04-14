@@ -43,5 +43,28 @@ if (isset($_REQUEST['export']))
     echo "<p>Execution time: $executionTime seconds</p>";
 }
 
+if (isset($_REQUEST['suggest']))
+{
+    $query = $_REQUEST['suggest'];
+    $params = [
+        'index' => 'omeka',
+        'body' => [
+            'suggest' => [
+                'suggestion-1' => [
+                    'prefix' => $query,
+                    'completion' => [
+                        'field' => 'title',
+                        'size' => 10,
+                    ]
+                ]
+            ]
+        ]
+    ];
+
+    $avantElasticsearchClient = new AvantElasticsearchClient();
+    $response = $avantElasticsearchClient->search($params);
+    return;
+}
+
 echo foot();
 ?>
