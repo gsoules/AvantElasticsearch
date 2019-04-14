@@ -267,7 +267,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             {
                 if ($elementText->element_id == $elementId)
                 {
-                    $fieldTexts[$item->id][$elementId][] = $this->createFieldText($elementText->text, $elementText->html);
+                    $fieldTexts[$elementId][] = $this->createFieldText($elementText->text, $elementText->html);
                 }
             }
         }
