@@ -49,12 +49,20 @@ if (isset($_REQUEST['suggest']))
     $params = [
         'index' => 'omeka',
         'body' => [
+            '_source' => [
+              'title'
+            ],
             'suggest' => [
                 'suggestion-1' => [
                     'prefix' => $query,
                     'completion' => [
                         'field' => 'title',
+                        'skip_duplicates' => true,
                         'size' => 10,
+                        'fuzzy' =>
+                        [
+                            'fuzziness' => 1
+                        ]
                     ]
                 ]
             ]
