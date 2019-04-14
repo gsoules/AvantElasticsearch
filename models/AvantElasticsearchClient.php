@@ -175,4 +175,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
             return null;
         }
     }
+
+    public function suggest($params)
+    {
+        $response = $this->search($params);
+        $options = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
+        return $options;
+    }
 }

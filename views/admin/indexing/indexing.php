@@ -50,18 +50,15 @@ if (isset($_REQUEST['suggest']))
     $avantElasticsearchClient = new AvantElasticsearchClient();
     $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
 
-    $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, 0, 10);
-    $response = $avantElasticsearchClient->search($params);
+    $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, 10);
+    $options = $avantElasticsearchClient->suggest($params);
 
-    $options = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
     if (empty($options))
     {
         // Add fuzziness to see if that will get some results.
-        $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, 1, 10);
-        $response = $avantElasticsearchClient->search($params);
+        $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, true, 10);
+        $options = $avantElasticsearchClient->suggest($params);
     }
-
-    $options = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
 
     if (empty($options))
     {
@@ -71,7 +68,7 @@ if (isset($_REQUEST['suggest']))
     else
     {
         $suggestions = array();
-        foreach ($response["suggest"]["keywords-suggest"][0]["options"] as $option)
+        foreach ($options as $option)
         {
             $suggestions[] = $option["_source"]["title"];
         }

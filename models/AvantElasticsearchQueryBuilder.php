@@ -106,6 +106,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     public function constructSuggestQueryParams($prefix, $fuzziness, $size = 5)
     {
+        // Note that skip_duplicates is false to ensure that all the right values are returned.
+        // The Elasticsearch documentation also says that performance is better when false.
+
         $params = [
             'index' => 'omeka',
             'body' => [
@@ -121,7 +124,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                             'size' => $size,
                             'fuzzy' =>
                                 [
-                                    'fuzziness' => $fuzziness
+                                    'fuzziness' => $fuzziness ? 1 : 0
                                 ]
                         ]
                     ]
