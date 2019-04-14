@@ -37,7 +37,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             }
 
             // Limit the number of words in the suggestions to just enough to be really useful.
-            $maxWordsInSuggestion = 10;
+            $maxWordsInSuggestion = 20;
             $last = min(count($words), $maxWordsInSuggestion);
 
             // Create the suggestions.
