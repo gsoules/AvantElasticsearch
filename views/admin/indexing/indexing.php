@@ -50,18 +50,18 @@ if (isset($_REQUEST['suggest']))
         'index' => 'omeka',
         'body' => [
             '_source' => [
-              'title'
+              'suggestions'
             ],
             'suggest' => [
-                'suggestion-1' => [
+                'keywords-suggest' => [
                     'prefix' => $query,
                     'completion' => [
-                        'field' => 'title',
+                        'field' => 'suggestions',
                         'skip_duplicates' => true,
-                        'size' => 10,
+                        'size' => 5,
                         'fuzzy' =>
                         [
-                            'fuzziness' => 1
+                            'fuzziness' => 0
                         ]
                     ]
                 ]
@@ -71,6 +71,19 @@ if (isset($_REQUEST['suggest']))
 
     $avantElasticsearchClient = new AvantElasticsearchClient();
     $response = $avantElasticsearchClient->search($params);
+
+    $suggestions = array();
+
+    foreach ($response["suggest"]["keywords-suggest"][0]["options"] as $option)
+    {
+        $suggestions[] = $option['text'];
+    }
+
+    foreach ($suggestions as $suggestion)
+    {
+        echo "<p>$suggestion</p>";
+    }
+
     return;
 }
 

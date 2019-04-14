@@ -63,9 +63,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         }
 
         $this->addAnalyzerFieldToMappingProperties('element.description');
-        //$this->addAnalyzerFieldToMappingProperties('title');
+        $this->addAnalyzerFieldToMappingProperties('title');
 
-        $this->addCompletionFieldToMappingProperties('title');
+        $this->addCompletionFieldToMappingProperties('suggestions');
 
         $this->addBooleanFieldToMappingProperties('public');
 

@@ -70,6 +70,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $hasDateElement = false;
         $titleString = '';
+        $titleFieldTexts = null;
+        $isReferenceType = false;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
@@ -99,9 +101,16 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             if ($elementName == 'Title')
             {
                 $titleString = $fieldTextsString;
-                if (strlen($titleString) == 0) {
+                if (strlen($titleString) == 0)
+                {
                     $titleString = __('Untitled');
                 }
+                $titleFieldTexts = $fieldTexts;
+            }
+
+            if ($elementName == 'Type')
+            {
+                $isReferenceType = $fieldTextsString == 'Reference';
             }
 
             if ($elementName == 'Date')
@@ -125,6 +134,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $emptyDateFieldTexts = array(array('text' => '', 'html' => 0));
             $this->createElementFacetData('Date', 'date', $emptyDateFieldTexts, $facets);
         }
+
+        $this->CreateSuggestionsData($titleFieldTexts, $isReferenceType);
 
         $tags = $this->constructTags($item);
         $facets['tag'] = $tags;
@@ -241,6 +252,34 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
             $sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
         }
+    }
+
+    protected function CreateSuggestionsData($titleFieldTexts, $isReferenceType)
+    {
+        // Add weight for items that have non-blank descriptions (and for items with relationships?)
+
+        // Only create suggestions from firt n words.
+
+        if (!empty($titleFieldTexts))
+        {
+            $this->body['suggestions']['input'] = $this->createSuggestionInputs($titleFieldTexts);
+            if ($isReferenceType)
+            {
+                $this->body['suggestions']['weight'] = 2;
+            }
+        }
+    }
+
+    protected function createSuggestionInputs($fieldTexts)
+    {
+        $suggestions = array();
+
+        foreach ($fieldTexts as $fieldText)
+        {
+            $suggestions[] = $fieldText['text'];
+        }
+
+        return $suggestions;
     }
 
     protected function getImageUrl($item, $thumbnail)
