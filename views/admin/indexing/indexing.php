@@ -45,43 +45,41 @@ if (isset($_REQUEST['export']))
 
 if (isset($_REQUEST['suggest']))
 {
-    $query = $_REQUEST['suggest'];
-    $params = [
-        'index' => 'omeka',
-        'body' => [
-            '_source' => [
-              'suggestions', 'title'
-            ],
-            'suggest' => [
-                'keywords-suggest' => [
-                    'prefix' => $query,
-                    'completion' => [
-                        'field' => 'suggestions',
-                        'skip_duplicates' => false,
-                        'size' => 20,
-                        'fuzzy' =>
-                        [
-                            'fuzziness' => 1
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ];
+    $prefix = $_REQUEST['suggest'];
 
     $avantElasticsearchClient = new AvantElasticsearchClient();
+    $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+
+    $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, 0, 10);
     $response = $avantElasticsearchClient->search($params);
 
-    $suggestions = array();
-
-    foreach ($response["suggest"]["keywords-suggest"][0]["options"] as $option)
+    $options = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
+    if (empty($options))
     {
-        $suggestions[] = $option["_source"]["title"];
+        // Add fuzziness to see if that will get some results.
+        $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, 1, 10);
+        $response = $avantElasticsearchClient->search($params);
     }
 
-    foreach ($suggestions as $suggestion)
+    $options = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
+
+    if (empty($options))
     {
-        echo "<p>$suggestion</p>";
+        echo "<p>NO RESULTS FOR $prefix</p>";
+
+    }
+    else
+    {
+        $suggestions = array();
+        foreach ($response["suggest"]["keywords-suggest"][0]["options"] as $option)
+        {
+            $suggestions[] = $option["_source"]["title"];
+        }
+
+        foreach ($suggestions as $suggestion)
+        {
+            echo "<p>$suggestion</p>";
+        }
     }
 
     return;

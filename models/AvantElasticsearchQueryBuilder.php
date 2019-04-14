@@ -10,7 +10,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->facets = new AvantElasticsearchFacets();
     }
 
-    public function constructQuery($options)
+    public function constructSearchQueryParams($options)
     {
         if (!isset($options['query']) || !is_array($options['query']))
         {
@@ -94,13 +94,41 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $body['track_scores'] = true;
         }
 
-        $query = [
+        $params = [
             'index' => $this->getElasticsearchIndexName(),
             'from' => $offset,
             'size' => $limit,
             'body' => $body
         ];
 
-        return $query;
+        return $params;
+    }
+
+    public function constructSuggestQueryParams($prefix, $fuzziness, $size = 5)
+    {
+        $params = [
+            'index' => 'omeka',
+            'body' => [
+                '_source' => [
+                    'suggestions', 'title'
+                ],
+                'suggest' => [
+                    'keywords-suggest' => [
+                        'prefix' => $prefix,
+                        'completion' => [
+                            'field' => 'suggestions',
+                            'skip_duplicates' => false,
+                            'size' => $size,
+                            'fuzzy' =>
+                                [
+                                    'fuzziness' => $fuzziness
+                                ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        return $params;
     }
 }

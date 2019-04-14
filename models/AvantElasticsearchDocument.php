@@ -327,8 +327,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                     {
                         if (strtolower($words[$j]) == 'aka')
                         {
-                            // Ignore aka (Also Known As indicator for nicknames)
-                            continue;
+                            // Ignore aka (Also Known As) name because their use is inconsistent and won't generally
+                            // be effective for suggestion purposes.
+                            break;
                         }
                         $suggestion .= $words[$j] . ' ';
                     }
