@@ -6,7 +6,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
         $suggestionsData = array();
         $isPersonReference = $isReferenceType && $isSubjectPeople;
 
-        $suggestionsData['input'] = $this->createSuggestionInputForTitle($titleFieldTexts, $isPersonReference);
+        $suggestionsData['input'] = $this->createSuggestionInputsForTitle($titleFieldTexts, $isPersonReference);
 
         if ($isReferenceType)
         {
@@ -18,7 +18,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
         return $suggestionsData;
     }
 
-    protected function createSuggestionInputForTitle($fieldTexts, $isPersonReference)
+    protected function createSuggestionInputsForTitle($fieldTexts, $isPersonReference)
     {
         $allSuggestions = array();
 
@@ -37,17 +37,16 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             }
 
             // Limit the number of words in the suggestions to just enough to be really useful.
-            $maxWordsInSuggestion = 20;
-            $last = min(count($words), $maxWordsInSuggestion);
+            $wordsCount = count($words);
 
             // Create the suggestions.
-            if ($isPersonReference & $last >= 3)
+            if ($isPersonReference & $wordsCount >= 3)
             {
-                $suggestions = $this->createSuggestionsForPersonTitle($words, $last);
+                $suggestions = $this->createSuggestionsForPersonTitle($words, $wordsCount);
             }
             else
             {
-                $suggestions = $this->createSuggestionsForAnyTitle($words, $last);
+                $suggestions = $this->createSuggestionsForAnyTitle($words, $wordsCount);
             }
             $allSuggestions = array_merge($allSuggestions, $suggestions);
         }
@@ -56,7 +55,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
         return $allSuggestions;
     }
 
-    protected function createSuggestionsForAnyTitle($words, $last, $ignoreAfter = '')
+    protected function createSuggestionsForAnyTitle($words, $wordsCount, $ignoreAfter = '')
     {
         $suggestions = array();
 
@@ -69,23 +68,32 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
 
         if (!empty($ignoreAfter))
         {
-            for ($i = 0; $i < $last; $i++)
+            for ($i = 0; $i < $wordsCount; $i++)
             {
                 if (strtolower($words[$i]) == $ignoreAfter)
                 {
                     // The current word and all after it can be ignored.
-                    $last = $i;
+                    $wordsCount = $i;
                     break;
                 }
             }
         }
 
-        for ($i = 0; $i < $last; $i++)
+        // Use all the words to construct the suggestion, but limit the length of the input
+        // to just the number of words a person might type while using autocomplete.
+        $maxSuggestionWords = min($wordsCount, 5);
+        for ($i = 0; $i < $wordsCount; $i++)
         {
             $suggestion = '';
-            for ($j = $i; $j < $last; $j++)
+            $inputWordsCount = 0;
+            for ($j = $i; $j < $wordsCount; $j++)
             {
                 $suggestion .= $words[$j] . ' ';
+                $inputWordsCount++;
+                if ($inputWordsCount > $maxSuggestionWords)
+                {
+                    break;
+                }
             }
             $suggestions[] = trim($suggestion);
         }
@@ -93,7 +101,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
         return $suggestions;
     }
 
-    protected function createSuggestionsForPersonTitle($words, $last)
+    protected function createSuggestionsForPersonTitle($words, $wordsCount)
     {
         // Emit a set of suggestions for a person title that will be effective with the most common search which
         // is first name followed by last name. Account for the fact that installations can use either of these forms:
@@ -110,7 +118,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
         // Determine which form applies. If the first word appears later in the title, assume it's form 1.
         $lastName = $words[0];
         $startsWithLastName = false;
-        for ($index = 1; $index < $last; $index++)
+        for ($index = 1; $index < $wordsCount; $index++)
         {
             if ($words[$index] == $lastName)
             {
@@ -119,7 +127,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             }
         }
 
-        $suggestions = $this->createSuggestionsForAnyTitle($words, $last, 'aka');
+        $suggestions = $this->createSuggestionsForAnyTitle($words, $wordsCount, 'aka');
 
         // Prepend the first name onto the suggestions where it no longer appears.
         $firstName = $startsWithLastName ? $words[1] : $words[0];
@@ -137,12 +145,14 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
 
     public function stripPunctuation($rawText, $stripNumbers = false)
     {
+        // Remove apostrophes so that "Ann's" becomes "Anns".
+        $text = str_replace("'", "", $rawText);
+
+        // Replace any character that's not a letter, space, or digit (if stripping numbers) with a space.
         $pattern = $stripNumbers ? "/[^a-zA-Z ]+/" : "/[^a-zA-Z 0-9]+/";
+        $text = preg_replace($pattern, " ", $text);
 
-        // Remove punctuation.
-        $text = preg_replace($pattern, " ", $rawText);
-
-        // Remove extra white space so there's only one space between each word.
+        // Remove occurrences of two or more adjacent spaces so there's only one space between each word.
         $text = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $text)));
 
         return $text;
