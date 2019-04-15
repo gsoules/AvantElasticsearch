@@ -20,8 +20,12 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     protected function addCompletionFieldToMappingProperties($fieldName)
     {
+        // Use the Standard analyzer because by default Elasticsearch uses the Simple analyzer for completion
+        // fields. The Simple analyzer strips away numbers, but we want them e.g. for street addresses.
+        
         $this->properties[$fieldName] = [
-            'type' => 'completion'
+            'type' => 'completion',
+            'analyzer' => 'standard'
         ];
     }
 
