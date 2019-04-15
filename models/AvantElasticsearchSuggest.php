@@ -20,12 +20,26 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
 
     protected function createSuggestionInputsForTitle($fieldTexts, $isPersonReference)
     {
-        $allSuggestions = array();
+        // This method creates a set of prefix inputs for a title that will allow the Elasticsearch completion
+        // mechanism to match what a user is typing into the search box with words in the title. Each input
+        // contains the title text with zero or more leading words removed as shown below.
+        //
+        //   The Quick Brown Fox Jumped
+        //   Quick Brown Fox Jumped
+        //   Brown Fox Jumped
+        //   Fox Jumped
+        //   Jumped
+        //
+        // The inputs above allow the user to type any of the following to match the title: 'the', 'quick', 'brown',
+        // 'fox', 'jumped'. When a match occurs, the entire title is suggested to the user, not the matching input.
+        // As such, this logic is not generating suggestions, but rather allowing the suggestion feature to work well.
+
+        $allInputs = array();
 
         foreach ($fieldTexts as $fieldText)
         {
-            // Strip away punctuation leaving only letters and numbers. For people, get rid of the numbers
-            // too since they are probably birth and death dates that won't be useful for suggestions.
+            // Strip away punctuation leaving only letters and numbers. For people titles, get rid of the numbers
+            // too since they are probably birth and death dates that won't be useful for an input.
             $text = $this->stripPunctuation($fieldText['text'], $isPersonReference);
 
             // Create an array of the stripped title's words.
@@ -35,36 +49,28 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             {
                 $words[] = $part;
             }
-
-            // Limit the number of words in the suggestions to just enough to be really useful.
             $wordsCount = count($words);
 
-            // Create the suggestions.
+            // Create the inputs for the title.
             if ($isPersonReference & $wordsCount >= 3)
             {
-                $suggestions = $this->createSuggestionsForPersonTitle($words, $wordsCount);
+                $inputs = $this->createSuggestionInputsForPersonTitle($words, $wordsCount);
             }
             else
             {
-                $suggestions = $this->createSuggestionsForAnyTitle($words, $wordsCount);
+                $inputs = $this->createSuggestionInputsForAnyTitle($words, $wordsCount);
             }
-            $allSuggestions = array_merge($allSuggestions, $suggestions);
+
+            $allInputs = array_merge($allInputs, $inputs);
         }
 
-        $allSuggestions = array_unique($allSuggestions);
-        return $allSuggestions;
+        $allInputs = array_unique($allInputs);
+        return $allInputs;
     }
 
-    protected function createSuggestionsForAnyTitle($words, $wordsCount, $ignoreAfter = '')
+    protected function createSuggestionInputsForAnyTitle($words, $wordsCount, $ignoreAfter = '')
     {
-        $suggestions = array();
-
-        // Emit a set of suggestions for the title that will allow a prefix search to be effective. For example:
-        //  The Quick Brown Fox Jumped
-        //  Quick Brown Fox Jumped
-        //  Brown Fox Jumped
-        //  Fox Jumped
-        //  Jumped
+        $inputs = array();
 
         if (!empty($ignoreAfter))
         {
@@ -79,68 +85,87 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             }
         }
 
-        // Use all the words to construct the suggestion, but limit the length of the input
-        // to just the number of words a person might type while using autocomplete.
-        $maxSuggestionWords = min($wordsCount, 5);
+        // Use all the words in the title to construct the inputs, but limit the length of any input to just the
+        // number of words a person might type while using autocomplete.
+        $maxInputWords = min($wordsCount, 5);
         for ($i = 0; $i < $wordsCount; $i++)
         {
-            $suggestion = '';
+            $input = '';
             $inputWordsCount = 0;
             for ($j = $i; $j < $wordsCount; $j++)
             {
-                $suggestion .= $words[$j] . ' ';
+                $input .= $words[$j] . ' ';
                 $inputWordsCount++;
-                if ($inputWordsCount > $maxSuggestionWords)
+                if ($inputWordsCount == $maxInputWords)
                 {
                     break;
                 }
             }
-            $suggestions[] = trim($suggestion);
+            $inputs[] = trim($input);
         }
 
-        return $suggestions;
+        return $inputs;
     }
 
-    protected function createSuggestionsForPersonTitle($words, $wordsCount)
+    protected function createSuggestionInputsForPersonTitle($words, $wordsCount)
     {
-        // Emit a set of suggestions for a person title that will be effective with the most common search which
-        // is first name followed by last name. Account for the fact that installations can use either of these forms:
-        //  1. <surname> - <first> <middle> <surname> aka <other names>
-        //  2. <first> <middle> <surname> aka <other names>
+        // Emit a set of inputs for a person title that will be effective with the most common search which
+        // is first name followed by last name. That is, someone is more likely to search for just 'mary mitchel'
+        // without including her middle name(s). This logic account for the fact that installations can use either
+        // of these two forms of names:
+        //  1. Starts with last name:  <last> - <first> <middle> <last> aka <other names>
+        //  2. Starts with first name: <first> <middle> <last> aka <other names>
         //
-        // For form 1 e.g. "McCaslin Mary Louise McCaslin Mitchell aka Mae", emit:
-        //  McCaslin Mary Louise McCaslin Mitchell
-        //  Mary Louise McCaslin Mitchell
-        //  Louise McCaslin Mitchell
-        //  Mary McCaslin Mitchell
-        //  Mary Mitchell
+        // For form 1, if the original title is "McCaslin - Mary Louise McCaslin Mitchell aka Mae", emit:
+        //   McCaslin Mary Louise McCaslin Mitchell
+        //   Mary Louise McCaslin Mitchell
+        //   Mary McCaslin Mitchell
+        //   Mary Mitchell
+        //
+        // Note that aka (Also Known As) names are ignored since they appear at the end title and are not likely to
+        // be effective as a prefix. Once 'aka' is seen in the title, the rest of the text is skipped.
 
-        // Determine which form applies. If the first word appears later in the title, assume it's form 1.
-        $lastName = $words[0];
-        $startsWithLastName = false;
+        // Use the generic inputs creator to get the inputs for the title, ignoring anything after 'aka'.
+        $inputs = $this->createSuggestionInputsForAnyTitle($words, $wordsCount, 'aka');
+
+        // Determine whether the title starts with the first name or the last name.
+        $startsWithFirstName = true;
         for ($index = 1; $index < $wordsCount; $index++)
         {
-            if ($words[$index] == $lastName)
+            if ($words[$index] == $words[0])
             {
-                $startsWithLastName = true;
+                // This word appears twice. Assume it's the last name;
+                $startsWithFirstName = false;
                 break;
             }
         }
 
-        $suggestions = $this->createSuggestionsForAnyTitle($words, $wordsCount, 'aka');
+        // Get the first name.
+        $firstName = $startsWithFirstName ? $words[0] : $words[1];
+        $startsWithLastName = !$startsWithFirstName;
 
-        // Prepend the first name onto the suggestions where it no longer appears.
-        $firstName = $startsWithLastName ? $words[1] : $words[0];
-        $firstIndexThatNeedsFirstNameAdded = $startsWithLastName ? 3 : 2;
-        foreach ($suggestions as $index => $suggestion)
+        // Prepend the first name onto the inputs to create variations of first name followed by the other names in
+        // the title as shown in the example above. While this isn't perfect, it should be effective for finding people.
+        $personInputs = array();
+        foreach ($inputs as $index => $input)
         {
-            if ($index >= $firstIndexThatNeedsFirstNameAdded)
+            if ($index == 0 || $startsWithLastName && $index == 1)
             {
-                $suggestions[$index] = "$firstName $suggestion";
+                // Index 0 is the full title. For form 1, index 1 already starts with the first name.
+                $personInputs[] = $input;
+                continue;
             }
+            if (($startsWithFirstName && $index == 1) || ($startsWithLastName && $index == 2))
+            {
+                // Skip this because prepending the first name would create a duplicate of the previous input.
+                continue;
+            }
+
+            // Add the first name to the beginning of the input.
+            $personInputs[] = "$firstName $input";
         }
 
-        return $suggestions;
+        return $personInputs;
     }
 
     public function stripPunctuation($rawText, $stripNumbers = false)
