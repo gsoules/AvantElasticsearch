@@ -1,0 +1,16 @@
+.ui-autocomplete {
+    background: #ffffff;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    z-index: 500 !important;
+}
+
+.ui-autocomplete .ui-menu-item.ui-state-focus {
+    background: rgba(47, 162, 34, 0.16);
+}
+
+.ui-autocomplete-loading {
+    background: #f1f1f1;
+}
+

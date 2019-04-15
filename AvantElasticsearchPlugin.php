@@ -9,7 +9,9 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         'config',
         'config_form',
         'define_routes',
-        'install'
+        'install',
+        'public_footer',
+        'public_head'
     );
 
     protected $_filters = array(
@@ -48,5 +50,17 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     public function hookInstall()
     {
         ElasticsearchConfig::setDefaultOptionValues();
+    }
+
+    public function hookPublicFooter($args)
+    {
+        echo get_view()->partial('avantelasticsearch-script.php');
+    }
+
+    public function hookPublicHead($args)
+    {
+        // Needed to support autocomplete in the simple search textbox.
+        queue_css_file('jquery-ui');
+        queue_css_file('avantelasticsearch');
     }
 }
