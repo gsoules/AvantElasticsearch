@@ -43,53 +43,5 @@ if (isset($_REQUEST['export']))
     echo "<p>Execution time: $executionTime seconds</p>";
 }
 
-if (isset($_REQUEST['suggest']))
-{
-    $prefix = $_REQUEST['suggest'];
-
-    $maxRequests = 10;
-    $maxShown = 5;
-
-    $avantElasticsearchClient = new AvantElasticsearchClient();
-    $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
-    $avantElasticsearchSuggest = new AvantElasticsearchSuggest();
-
-    $prefix = $avantElasticsearchSuggest->stripPunctuation($prefix);
-
-    $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, $maxRequests);
-    $options = $avantElasticsearchClient->suggest($params);
-
-    if (empty($options))
-    {
-        // Add fuzziness to see if that will get some results.
-        $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, true, $maxRequests);
-        $options = $avantElasticsearchClient->suggest($params);
-    }
-
-    if (empty($options))
-    {
-        echo "<p>NO RESULTS FOR $prefix</p>";
-
-    }
-    else
-    {
-        $suggestions = array();
-        foreach ($options as $option)
-        {
-            $suggestions[] = $option["_source"]["title"];
-        }
-
-        // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.
-        $suggestions = array_unique($suggestions);
-
-        foreach ($suggestions as $suggestion)
-        {
-            echo "<p>$suggestion</p>";
-        }
-    }
-
-    return;
-}
-
 echo foot();
 ?>

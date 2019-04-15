@@ -6,4 +6,9 @@ class AvantElasticsearch_IndexingController extends Omeka_Controller_AbstractAct
     {
         return;
     }
+
+    public function suggestAction()
+    {
+        return;
+    }
 }
