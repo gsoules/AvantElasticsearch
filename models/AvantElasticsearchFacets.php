@@ -1,20 +1,29 @@
 <?php
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
-    protected $facetNames = array();
+    protected $facetDefinitions = array();
 
     public function __construct()
     {
         parent::__construct();
 
-        // The order here determines the filter order on the search results page.
-        $this->facetNames = array(
-            'type' => 'Item Types',
-            'subject' => 'Subjects',
-            'place' => 'Places',
-            'date' => 'Dates',
-            'tag' => 'Tags'
-        );
+        // The order is the order in which facet names appear in the Filters section on the search results page.
+        $this->defineFacet('type', 'Item Types', true);
+        $this->defineFacet('subject', 'Subjects', true);
+        $this->defineFacet('place', 'Places', true);
+        $this->defineFacet('date', 'Dates');
+        $this->defineFacet('tag', 'Tags', false, null, false);
+    }
+
+    protected function defineFacet($id, $name, $isHierarchy = false, $rules = null, $show = true)
+    {
+        $definition = array(
+            'name' => $name,
+            'hierarchy' => $isHierarchy,
+            'rules' => $rules,
+            'show' => $show);
+
+        $this->facetDefinitions[$id] = $definition;
     }
 
     public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
@@ -48,14 +57,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createAggregationsForElasticsearchQuery()
     {
-        $facetNames = $this->getFacetNames();
-
         // Create an array of aggregation terms.
-        foreach ($facetNames as $aggregationName => $facetName)
+        foreach ($this->facetDefinitions as $facetId => $definition)
         {
-            $terms[$aggregationName] = [
+            $terms[$facetId] = [
                 'terms' => [
-                    'field' => "facet.$aggregationName.keyword",
+                    'field' => "facet.$facetId.keyword",
                     'size' => 50,
                     'order' => ['_key' => 'asc']
                 ]
@@ -137,26 +144,25 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function getFacetFiltersForElasticsearchQuery($facets)
     {
         $filters = array();
-        $facetNames = $this->getFacetNames();
 
-        foreach ($facetNames as $aggregationName => $facetName)
+        foreach ($this->facetDefinitions as $facetId => $facetName)
         {
-            $filters = $this->createFacetFilter($filters, $facets, "facet.$aggregationName.keyword", $aggregationName);
+            $filters = $this->createFacetFilter($filters, $facets, "facet.$facetId.keyword", $facetId);
         }
 
         return $filters;
     }
 
-    public function getFacetNames()
+    public function getFacetDefinitions()
     {
-        return $this->facetNames;
+        return $this->facetDefinitions;
     }
 
     public function getFacetValuesForElement($elementName, $elasticsearchFieldName, $fieldTexts)
     {
         $values = array();
 
-        if (array_key_exists($elasticsearchFieldName, $this->facetNames))
+        if (array_key_exists($elasticsearchFieldName, $this->facetDefinitions))
         {
             foreach ($fieldTexts as $fieldText)
             {
