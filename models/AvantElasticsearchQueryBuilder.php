@@ -104,7 +104,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $params;
     }
 
-    public function constructSuggestQueryParams($prefix, $fuzziness, $size = 5)
+    public function constructSuggestQueryParams($prefix, $fuzziness, $size)
     {
         // Note that skip_duplicates is false to ensure that all the right values are returned.
         // The Elasticsearch documentation also says that performance is better when false.
