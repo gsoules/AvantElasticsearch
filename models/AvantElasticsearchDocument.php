@@ -30,7 +30,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public function constructDocumentParameters()
     {
         $params = [
-            'index' => $this->docIndex,
+            'index' => $this->documentIndexName,
             'type' => $this->type,
         ];
 

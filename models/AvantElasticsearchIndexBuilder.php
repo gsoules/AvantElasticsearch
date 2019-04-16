@@ -69,7 +69,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function deleteIndex()
     {
-        $params = ['index' => $this->docIndex];
+        $params = ['index' => $this->documentIndexName];
         $avantElasticsearchClient = new AvantElasticsearchClient();
         $response = $avantElasticsearchClient->deleteIndex($params);
         return $response;
@@ -140,7 +140,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         {
             $elementId = $result['element_id'];
 
-            if ($public && !array_key_exists($elementId, $this->elementsForIndex))
+            $elementsForIndex = $this->getElementsUsedByThisInstallation($public);
+            if ($public && !array_key_exists($elementId, $elementsForIndex))
             {
                 // Ignore private elements.
                 continue;

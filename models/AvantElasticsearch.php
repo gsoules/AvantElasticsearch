@@ -5,13 +5,15 @@ use Elasticsearch\ClientBuilder;
 
 class AvantElasticsearch
 {
-    protected $docIndex;
-    protected $elementsForIndex = array();
-    protected $ignorePrivateElements = true;
+    protected $documentIndexName;
+    protected $indexOnlyPublicElements = true;
+    
+    // Used for caching and therefore should not be accessed directly by subclasses.
+    private $elementsForIndex = array();
 
     public function __construct()
     {
-        $this->docIndex = $this->getElasticsearchIndexName();
+        $this->documentIndexName = $this->getElasticsearchIndexName();
     }
 
     protected function catentateElementTexts($fieldTexts)
@@ -84,15 +86,15 @@ class AvantElasticsearch
         return $message;
     }
 
-    public function getElementsUsedByThisInstallation($ignorePrivate = true)
+    public function getElementsUsedByThisInstallation($public = true)
     {
         // Determine if the elements are already cached. Note that they might be in cache, but don't
-        // match the private option,  in which case, they need to be fetched again per the option.
-        $getElementsFromDatabase = empty($this->elementsForIndex) || $this->ignorePrivateElements != $ignorePrivate;
+        // match the public option,  in which case, they need to be fetched again per the option.
+        $getElementsFromDatabase = empty($this->elementsForIndex) || $this->indexOnlyPublicElements != $public;
 
         if ($getElementsFromDatabase)
         {
-            $this->ignorePrivateElements = $ignorePrivate;
+            $this->indexOnlyPublicElements = $public;
 
             $db = get_db();
             $table = "{$db->prefix}elements";
@@ -113,7 +115,7 @@ class AvantElasticsearch
                 $elementId = $element['id'];
 
                 $ignoreUnused = array_key_exists($elementId, $unusedElementsData);
-                $ignore = $ignoreUnused || ($this->ignorePrivateElements && array_key_exists($elementId, $privateElementsData));
+                $ignore = $ignoreUnused || ($this->indexOnlyPublicElements && array_key_exists($elementId, $privateElementsData));
                 if ($ignore)
                 {
                     continue;
