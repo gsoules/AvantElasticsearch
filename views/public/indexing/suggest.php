@@ -21,13 +21,23 @@
 
     $suggestions = array();
 
+    $titles = array();
     foreach ($options as $option)
     {
-        $suggestions[] = $option["_source"]["title"];
+        $titles[] = $option["_source"]["title"];
     }
 
     // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.
-    $suggestions = array_unique($suggestions);
+    $titles = array_unique($titles);
 
+    // Create an array of title/link pairs so that when the user chooses a suggestion they are effectively
+    // clicking a link to search for their selection.
+    foreach ($titles as $title)
+    {
+        $value = url('find?query=' . urlencode($title));
+        $suggestions[] = (object) array('label' => $title, 'value' => $value);
+    }
+
+    // Return the suggestions as JSON in response to the autocomplete request.
     echo json_encode($suggestions);
 
