@@ -126,8 +126,7 @@ class AvantElasticsearch
                     continue;
                 }
 
-                $elementName = $element['name'];
-                $this->elementsForIndex[$elementId] = $elementName;
+                $this->elementsForIndex[$elementId] = $this->convertElementNameToElasticsearchFieldName($element['name']);
             }
         }
 

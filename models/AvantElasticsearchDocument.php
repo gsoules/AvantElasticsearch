@@ -7,6 +7,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
+    protected $avantElasticsearchFacets;
+    protected $facetDefinitions;
+
+    // Cached data.
     private $installation;
     private $itemFiles;
 
@@ -63,7 +67,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $elementData = [];
         $sortData = [];
-        $facets = [];
+        $facetData = [];
         $htmlFields = [];
 
         $avantElasticsearch = new AvantElasticsearch();
@@ -76,9 +80,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
-            // Get the element name and create the corresponding Elasticsearch field name.
-            $elementName = $this->installation['installation_elements'][$elementId];
-            $elasticsearchFieldName = $avantElasticsearch->convertElementNameToElasticsearchFieldName($elementName);
+            $elasticsearchFieldName = $this->installation['installation_elements'][$elementId];
 
             foreach ($fieldTexts as $key => $fieldText)
             {
@@ -99,7 +101,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Identify which if any of this element's text values contain HTML.
             $this->createHtmlData($elasticsearchFieldName, $fieldTexts, $htmlFields);
 
-            if ($elementName == 'Title')
+            if ($elasticsearchFieldName == 'title')
             {
                 $titleString = $fieldTextsString;
                 if (strlen($titleString) == 0)
@@ -109,17 +111,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $titleFieldTexts = $fieldTexts;
             }
 
-            if ($elementName == 'Type')
+            if ($elasticsearchFieldName == 'type')
             {
                 $isTypeReference = $fieldTextsString == 'Reference';
             }
 
-            if ($elementName == 'Subject')
+            if ($elasticsearchFieldName == 'subject')
             {
                 $isSubjectPeople = strpos($fieldTextsString, 'People') !== false;
             }
 
-            if ($elementName == 'Date')
+            if ($elasticsearchFieldName == 'date')
             {
                 $hasDateElement = true;
             }
@@ -128,17 +130,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $elementData[$elasticsearchFieldName] = $fieldTextsString;
 
             // Add information to the document about special elements.
-            $this->createIntegerElementSortData($elementName, $elasticsearchFieldName, $fieldTextsString, $sortData);
-            $this->createHierarchyElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, $sortData);
-            $this->createAddressElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, $sortData);
-            $this->createElementFacetData($elasticsearchFieldName, $fieldTexts, $facets);
+            $this->createIntegerElementSortData($elasticsearchFieldName, $fieldTextsString, $sortData);
+            $this->createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts, $sortData);
+            $this->createAddressElementSortData($elasticsearchFieldName, $fieldTexts, $sortData);
+            $this->createElementFacetData($elasticsearchFieldName, $fieldTexts, $facetData);
         }
 
         if (!$hasDateElement)
         {
             // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
             $emptyDateFieldTexts = array($this->createFieldText());
-            $this->createElementFacetData('date', $emptyDateFieldTexts, $facets);
+            $this->createElementFacetData('date', $emptyDateFieldTexts, $facetData);
         }
 
         if (!empty($titleFieldTexts))
@@ -149,11 +151,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
 
         $tags = $this->constructTags($item);
-        $facets['tag'] = $tags;
+        $facetData['tag'] = $tags;
 
         $this->setField('element', $elementData);
         $this->setField('sort', $sortData);
-        $this->setField('facet', $facets);
+        $this->setField('facet', $facetData);
         $this->setField('html', $htmlFields);
         $this->setField('tags', $tags);
 
@@ -182,9 +184,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         ]);
     }
 
-    protected function createAddressElementSortData($elementName, $elasticsearchFieldName, $fieldText, &$sortData)
+    protected function createAddressElementSortData($elasticsearchFieldName, $fieldText, &$sortData)
     {
-        if ($elementName == 'Address')
+        if ($elasticsearchFieldName == 'address')
         {
             $text = $fieldText[0]['text'];
 
@@ -204,7 +206,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function createElementFacetData($elasticsearchFieldName, $fieldTexts, &$facets)
     {
-        $facetValuesForElement = $this->installation['facets']->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts);
+        if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
+        {
+            // This element is not used as a facet.
+            return;
+        }
+
+        $facetValuesForElement = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts);
 
         foreach ($facetValuesForElement as $facetValue)
         {
@@ -212,9 +220,15 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createHierarchyElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, &$sortData)
+    protected function createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts, &$sortData)
     {
-        if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
+        if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
+        {
+            // This element is not used as facet. Only hierarchy facets need hierarchy sort data.
+            return;
+        }
+
+        if ($this->facetDefinitions[$elasticsearchFieldName]['is_hierarchy'])
         {
             // Get only the first value for this element since that's all that's used for sorting purposes.
             $text = $fieldTexts[0]['text'];
@@ -255,9 +269,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createIntegerElementSortData($elementName, $elasticsearchFieldName, $textString, &$sortData)
+    protected function createIntegerElementSortData($elasticsearchFieldName, $textString, &$sortData)
     {
-        if (in_array($elementName, $this->installation['integer_sort_elements']))
+        if (in_array($elasticsearchFieldName, $this->installation['integer_sort_fields']))
         {
             // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
             $sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
@@ -307,6 +321,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $avantElasticsearchClient = new AvantElasticsearchClient();
         $response = $avantElasticsearchClient->deleteDocument($documentParmas);
         return $response;
+    }
+
+    public function setAvantElasticsearchFacets($avantElasticsearchFacets)
+    {
+        $this->avantElasticsearchFacets = $avantElasticsearchFacets;
+        $this->facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
     }
 
     public function setElementsUsedByThisInstallation($elements)

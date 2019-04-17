@@ -18,12 +18,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Instead, whenever possible, make the calls just once here so that they get cached. By caching this data,
         // the time to create 10,000 documents was reduced by 75%.
 
-        $this->installation['integer_sort_elements'] = SearchConfig::getOptionDataForIntegerSorting();
+        $this->installation['integer_sort_fields'] = array_map('strtolower', SearchConfig::getOptionDataForIntegerSorting());
         $this->installation['installation_elements'] = $this->getElementsUsedByThisInstallation();
         $this->installation['owner'] = ElasticsearchConfig::getOptionValueForOwner();
         $this->installation['ownerid'] = ElasticsearchConfig::getOptionValueForOwnerId();
         $this->installation['item_path'] = public_url('items/show/');
-        $this->installation['facets'] = new AvantElasticsearchFacets();
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
@@ -54,8 +53,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $documentId = $this->getDocumentIdForItem($item);
         $document = new AvantElasticsearchDocument($documentId);
 
-        // Provide data that has been cached here by the index builder to improve performance.
+        // Provide the document with data that has been cached here by the index builder to improve performance.
         $document->setInstallationParameters($this->installation);
+
+        // Provide the document with access to facet definitions.
+        $avantElasticsearchFacets = new AvantElasticsearchFacets();
+        $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
         $document->copyItemElementValuesToDocument($item, $itemFieldTexts, $files);
@@ -258,7 +261,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $fieldTexts = array();
 
         // Loop over the elements and for each one, find its text value(s).
-        foreach ($this->installation['installation_elements'] as $elementId => $elementName)
+        foreach ($this->installation['installation_elements'] as $elementId => $elasticsearchFieldName)
         {
             foreach ($allElementTexts as $elementText)
             {
