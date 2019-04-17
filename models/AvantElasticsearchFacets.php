@@ -60,7 +60,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $terms[$facetId] = [
                 'terms' => [
                     'field' => "facet.$facetId.keyword",
-                    'size' => 50,
+                    'size' => 100,
                     'order' => ['_key' => 'asc']
                 ]
             ];
@@ -211,23 +211,45 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             {
                 $text = $fieldText['text'];
 
-                if ($this->facetDefinitions[$elasticsearchFieldName]['is_hierarchy'])
+                $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
+
+                if ($facetDefinition['is_hierarchy'])
                 {
                     // For hierarchy facets, get the root and leaf values.
                     $value = $this->getFacetValueForHierarchy($elasticsearchFieldName, $text);
                     $root = $value['root'];
+                    $level2 = $value['level2'];
                     $leaf = $value['leaf'];
 
-                    // Form the facet value using the root and the leaft, ignoring anything in the middle.
+                    // Form the facet value using the root and the leaf, ignoring anything in the middle.
                     $separator = empty($root) || empty($leaf) ? '' : ', ';
-                    $values[] = $root . $separator . $leaf;
+
+                    if ($facetDefinition['show_root'])
+                    {
+                        if (empty($level2))
+                        {
+                            $values[] = $root . $separator . $leaf;
+                        }
+                        else if ($level2 == $leaf)
+                        {
+                            $values[] = $leaf;
+                        }
+                        else
+                        {
+                            $values[] = $level2 . $separator . $leaf;
+                        }
+                    }
+                    else
+                    {
+                        $values[] = $root . $separator . $leaf;
+                    }
 
                     if ($this->facetDefinitions[$elasticsearchFieldName]['show_root'])
                     {
                         if (!empty($root) && !empty($leaf))
                         {
                             // Emit just the root as the top of the hierarchy.
-                            $values[] = $root;
+                            $values[] = '_' . $root;
                         }
                     }
                 }
@@ -244,6 +266,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function getFacetValueForHierarchy($elasticsearchFieldName, $text)
     {
         $root = '';
+        $level2 = '';
 
         if ($this->facetDefinitions[$elasticsearchFieldName]['show_root'])
         {
@@ -269,8 +292,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
         else
         {
-            // Filter out the ancestry to leave just the leaf text.
             $leaf = trim(substr($text, $index + 1));
+
+            // Look for level 2 text (one level down from the root).
+            $index = strpos($text, ', ');
+            if ($index !== false)
+            {
+                // Get the rest of the text following the root.
+                $tail = substr($text, $index + 2);
+                $index = strpos($tail, ', ');
+                if ($index === false)
+                {
+                    $level2 = $tail;
+                }
+                else
+                {
+                    $level2 = trim(substr($tail, 0, $index));
+                }
+            }
         }
 
         if ($root == $leaf)
@@ -279,6 +318,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $leaf = '';
         }
 
-        return array('root' => $root, 'leaf' => $leaf);
+        return array('root' => $root, 'level2' => $level2, 'leaf' => $leaf);
     }
 }
