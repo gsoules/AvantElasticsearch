@@ -131,14 +131,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->createIntegerElementSortData($elementName, $elasticsearchFieldName, $fieldTextsString, $sortData);
             $this->createHierarchyElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, $sortData);
             $this->createAddressElementSortData($elementName, $elasticsearchFieldName, $fieldTexts, $sortData);
-            $this->createElementFacetData($elementName, $elasticsearchFieldName, $fieldTexts, $facets);
+            $this->createElementFacetData($elasticsearchFieldName, $fieldTexts, $facets);
         }
 
         if (!$hasDateElement)
         {
             // Create an empty field to represent date unknown.
             $emptyDateFieldTexts = array(array('text' => '', 'html' => 0));
-            $this->createElementFacetData('Date', 'date', $emptyDateFieldTexts, $facets);
+            $this->createElementFacetData('date', $emptyDateFieldTexts, $facets);
         }
 
         if (!empty($titleFieldTexts))
@@ -202,12 +202,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createElementFacetData($elementName, $elasticsearchFieldName, $fieldTexts, &$facets)
+    protected function createElementFacetData($elasticsearchFieldName, $fieldTexts, &$facets)
     {
-        $avantElasticsearchFacets = new AvantElasticsearchFacets();
-        $facetValues = $avantElasticsearchFacets->getFacetValuesForElement($elementName, $elasticsearchFieldName, $fieldTexts);
+        $facetValuesForElement = $this->installation['facets']->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts);
 
-        foreach ($facetValues as $facetValue)
+        foreach ($facetValuesForElement as $facetValue)
         {
             $facets[$elasticsearchFieldName][] = $facetValue;
         }

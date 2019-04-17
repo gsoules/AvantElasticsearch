@@ -1,4 +1,5 @@
 <?php
+
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
     protected $facetDefinitions = array();
@@ -6,22 +7,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function __construct()
     {
         parent::__construct();
-
-        // The order is the order in which facet names appear in the Filters section on the search results page.
-        $this->defineFacet('type', 'Item Types', true);
-        $this->defineFacet('subject', 'Subjects', true);
-        $this->defineFacet('place', 'Places', true);
-        $this->defineFacet('date', 'Dates');
-        $this->defineFacet('tag', 'Tags', false, null, false);
+        $this->defineFacets();
     }
 
-    protected function defineFacet($id, $name, $isHierarchy = false, $rules = null, $show = true)
+    protected function createFacet($id, $name, $isHierarchy = false)
     {
         $definition = array(
             'name' => $name,
-            'hierarchy' => $isHierarchy,
-            'rules' => $rules,
-            'show' => $show);
+            'is_date' => false,
+            'is_hierarchy' => $isHierarchy,
+            'show_root' => true,
+            'multi_value' => false,
+            'hidden' => false);
 
         $this->facetDefinitions[$id] = $definition;
     }
@@ -153,12 +150,33 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filters;
     }
 
+    protected function defineFacets()
+    {
+        // The order is the order in which facet names appear in the Filters section on the search results page.
+        $this->createFacet('type', 'Item Types', true);
+
+        $this->createFacet('subject', 'Subjects', true);
+        $this->facetDefinitions['subject']['multi_value'] = true;
+
+        $this->createFacet('place', 'Places', true);
+        $this->facetDefinitions['place']['show_root'] = false;
+
+        $this->createFacet('date', 'Dates');
+        $this->facetDefinitions['date']['is_date'] = true;
+
+        // Tags are fully supported, but for now don't show this facet.
+        $this->createFacet('tag', 'Tags');
+        $this->facetDefinitions['tag']['hidden'] = true;
+
+        $this->createFacet('owner', 'Owner');
+    }
+
     public function getFacetDefinitions()
     {
         return $this->facetDefinitions;
     }
 
-    public function getFacetValuesForElement($elementName, $elasticsearchFieldName, $fieldTexts)
+    public function getFacetValuesForElement($elasticsearchFieldName, $fieldTexts)
     {
         $values = array();
 
@@ -168,17 +186,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             {
                 $text = $fieldText['text'];
 
-                if ($elementName == 'Place' || $elementName == 'Type' || $elementName == 'Subject')
+                if ($this->facetDefinitions[$elasticsearchFieldName]['is_hierarchy'])
                 {
-                    $value = $this->getFacetValueForHierarchy($elementName, $text);
+                    // For hierarchy facets, get the root and leaf values.
+                    $value = $this->getFacetValueForHierarchy($elasticsearchFieldName, $text);
                     $root = $value['root'];
                     $leaf = $value['leaf'];
 
-                    // Form the facet value using the root and the leave (ignoring anything in the middle).
+                    // Form the facet value using the root and the leaft, ignoring anything in the middle.
                     $separator = empty($root) || empty($leaf) ? '' : ', ';
                     $values[] = $root . $separator . $leaf;
 
-                    if ($elementName == 'Type' || $elementName == 'Subject')
+                    if ($this->facetDefinitions[$elasticsearchFieldName]['show_root'])
                     {
                         if (!empty($root) && !empty($leaf))
                         {
@@ -187,7 +206,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         }
                     }
                 }
-                else if ($elementName == 'Date')
+                else if ($this->facetDefinitions[$elasticsearchFieldName]['is_date'])
                 {
                     $values[] = $this->getFacetValueForDate($text);
                 }
@@ -222,11 +241,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $value;
     }
 
-    protected function getFacetValueForHierarchy($elementName, $text)
+    protected function getFacetValueForHierarchy($elasticsearchFieldName, $text)
     {
         $root = '';
 
-        if ($elementName == 'Type' || $elementName == 'Subject')
+        if ($this->facetDefinitions[$elasticsearchFieldName]['show_root'])
         {
             // Find the first comma, the one that follows the root value.
             $index = strpos($text, ', ');

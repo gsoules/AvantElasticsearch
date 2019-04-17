@@ -1,13 +1,13 @@
 <?php
 class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 {
-    protected $facets;
+    protected $avantElasticsearchFacets;
 
     public function __construct()
     {
         parent::__construct();
 
-        $this->facets = new AvantElasticsearchFacets();
+        $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
     public function constructSearchQueryParams($options)
@@ -23,7 +23,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $facets = isset($options['query']['facet']) ? $options['query']['facet'] : [];
         $sort = isset($options['sort']) ? $options['sort'] : null;
 
-        $aggregations = $this->facets->createAggregationsForElasticsearchQuery();
+        $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery();
 
         // Fields that the query will return.
         $source = [
@@ -81,7 +81,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $body['query']['bool']['must'] = $mustQuery;
         $body['query']['bool']['should'] = $shouldQuery;
 
-        $filters = $this->facets->getFacetFiltersForElasticsearchQuery($facets);
+        $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($facets);
         if (count($filters) > 0)
         {
             $body['query']['bool']['filter'] = $filters;
@@ -133,5 +133,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         ];
 
         return $params;
+    }
+
+    public function getFacetDefinitions()
+    {
+        return $this->avantElasticsearchFacets->getFacetDefinitions();
     }
 }

@@ -23,6 +23,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->installation['owner'] = ElasticsearchConfig::getOptionValueForOwner();
         $this->installation['ownerid'] = ElasticsearchConfig::getOptionValueForOwnerId();
         $this->installation['item_path'] = public_url('items/show/');
+        $this->installation['facets'] = new AvantElasticsearchFacets();
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
