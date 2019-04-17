@@ -54,7 +54,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createAggregationsForElasticsearchQuery()
     {
-        // Create an array of aggregation terms.
+        // Create an array of aggregation terms. Return the results in ascending order instead of the
+        // default which is descending by bucket quantity.
         foreach ($this->facetDefinitions as $facetId => $definition)
         {
             $terms[$facetId] = [
