@@ -63,11 +63,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $document;
     }
 
-    protected function createFieldText($text, $html)
-    {
-        return array('text' => $text, 'html' => $html);
-    }
-
     public function deleteIndex()
     {
         $params = ['index' => $this->documentIndexName];
@@ -82,6 +77,62 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document = new AvantElasticsearchDocument($documentId);
         $response = $document->deleteDocumentFromIndex();
         return $response;
+    }
+
+    protected function fetchAllFiles($public = true)
+    {
+        try
+        {
+            $db = get_db();
+            $table = $db->getTable('File');
+            $select = $table->getSelect();
+            $select->order('files.item_id ASC');
+
+            if ($public)
+            {
+                // Note that a get of the Files table automatically joins with the Items table and so the
+                // WHERE clause below works even though this code does not explicitly join the two tables.
+                $select->where('items.public = 1');
+            }
+            $files = $table->fetchObjects($select);
+
+            // Create an array indexed by item Id where each element contains an array of that
+            // item's files. This will make it possible to very quickly find an item's files.
+            $itemFiles = array();
+            foreach ($files as $file)
+            {
+                $itemFiles[$file->item_id][] = $file;
+            }
+            return $itemFiles;
+        }
+        catch (Exception $e)
+        {
+            $files = array();
+        }
+        return $files;
+    }
+
+    protected function fetchAllItems($public = true)
+    {
+        try
+        {
+            $db = get_db();
+            $table = $db->getTable('Item');
+            $select = $table->getSelect();
+            $select->order('items.id ASC');
+
+            if ($public)
+            {
+                $select->where('items.public = 1');
+            }
+
+            $items = $table->fetchObjects($select);
+        }
+        catch (Exception $e)
+        {
+            $items = array();
+        }
+        return $items;
     }
 
     protected function fetchFieldTextsForAllItems($public = true)
@@ -155,62 +206,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $itemFieldTexts;
-    }
-
-    protected function fetchAllFiles($public = true)
-    {
-        try
-        {
-            $db = get_db();
-            $table = $db->getTable('File');
-            $select = $table->getSelect();
-            $select->order('files.item_id ASC');
-
-            if ($public)
-            {
-                // Note that a get of the Files table automatically joins with the Items table and so the
-                // WHERE clause below works even though this code does not explicitly join the two tables.
-                $select->where('items.public = 1');
-            }
-            $files = $table->fetchObjects($select);
-
-            // Create an array indexed by item Id where each element contains an array of that
-            // item's files. This will make it possible to very quickly find an item's files.
-            $itemFiles = array();
-            foreach ($files as $file)
-            {
-                $itemFiles[$file->item_id][] = $file;
-            }
-            return $itemFiles;
-        }
-        catch (Exception $e)
-        {
-            $files = array();
-        }
-        return $files;
-    }
-
-    protected function fetchAllItems($public = true)
-    {
-        try
-        {
-            $db = get_db();
-            $table = $db->getTable('Item');
-            $select = $table->getSelect();
-            $select->order('items.id ASC');
-
-            if ($public)
-            {
-                $select->where('items.public = 1');
-            }
-
-            $items = $table->fetchObjects($select);
-        }
-        catch (Exception $e)
-        {
-            $items = array();
-        }
-        return $items;
     }
 
     public function getBulkParams(array $documents, $offset, $length)

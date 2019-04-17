@@ -72,21 +72,17 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $aggregations;
     }
 
-    protected function createFacetFilter($filters, $facets, $facetName, $aggregationName)
+    protected function createFacetFilter($filters, $facets, $facetFieldName, $facetId)
     {
-        if (isset($facets[$aggregationName]))
+        if (isset($facets[$facetId]))
         {
-            $values = $facets[$aggregationName];
-            if (!is_array($values))
-            {
-                $values = array($values);
-            }
+            $values = $facets[$facetId];
 
             // Create a separate term filter for each value so that the filters are ANDed
-            // as opposed to using a single terms filter with multiple values that are ORed.
+            // as opposed to using a single 'terms' filter with multiple values that are ORed.
             foreach ($values as $value)
             {
-                $filters[] = ['term' => [$facetName => $value]];
+                $filters[] = ['term' => [$facetFieldName => $value]];
             }
         }
         return $filters;
@@ -176,6 +172,35 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $this->facetDefinitions;
     }
 
+    protected function getFacetValueForDate($text)
+    {
+        if ($text == '')
+        {
+            $value = __('Unknown');
+        }
+        else
+        {
+            $year = '';
+            if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
+            {
+                $year = $matches[1];
+            }
+
+            if (empty($year))
+            {
+                // Malformed date so just return the original value.
+                $value = $text;
+            }
+            else
+            {
+                $decade = $year - ($year % 10);
+                $value = $decade . "'s";
+            }
+        }
+
+        return $value;
+    }
+
     public function getFacetValuesForElement($elasticsearchFieldName, $fieldTexts)
     {
         $values = array();
@@ -214,31 +239,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $values;
-    }
-
-    protected function getFacetValueForDate($text)
-    {
-        $value = array();
-
-        if ($text == '')
-        {
-            $value[] = __('Unknown');
-        }
-        else
-        {
-            $year = '';
-            if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
-            {
-                $year = $matches[1];
-            }
-
-            if (!empty($year)) {
-                $decade = $year - ($year % 10);
-                $value[] = $decade . "'s";
-            }
-        }
-
-        return $value;
     }
 
     protected function getFacetValueForHierarchy($elasticsearchFieldName, $text)

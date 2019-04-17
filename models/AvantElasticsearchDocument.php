@@ -136,8 +136,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (!$hasDateElement)
         {
-            // Create an empty field to represent date unknown.
-            $emptyDateFieldTexts = array(array('text' => '', 'html' => 0));
+            // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
+            $emptyDateFieldTexts = array($this->createFieldText());
             $this->createElementFacetData('date', $emptyDateFieldTexts, $facets);
         }
 

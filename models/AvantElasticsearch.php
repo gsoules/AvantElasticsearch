@@ -37,6 +37,11 @@ class AvantElasticsearch
         return strtolower(preg_replace('/[^a-zA-Z0-9-_]/', '', $elementName));
     }
 
+    protected function createFieldText($text = '', $html = 0)
+    {
+        return array('text' => $text, 'html' => $html);
+    }
+
     public function getDocumentMappingType()
     {
         return '_doc';
