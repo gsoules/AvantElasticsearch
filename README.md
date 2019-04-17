@@ -5,6 +5,14 @@ Provides the [AvantSeach](https://github.com/gsoules/AvantSearch) plugin with ac
 ## Dependencies
 The AvantElasticsearch plugin requires that the [AvantCommon](https://github.com/gsoules/AvantCommon) plugin be installed and activated.
 
+This plugin was developed specifically for [Digital Archive](http://thedigitalarchive.net/) installations. It has special
+knowledge of the following Omeka elements and how they are used in these installations.
+* Type
+* Subject
+* Place
+* Address
+* Date
+
 ## Installation
 
 To install the AvantElasticsearch plugin, follow these steps:

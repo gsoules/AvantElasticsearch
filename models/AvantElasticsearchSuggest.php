@@ -1,24 +1,24 @@
 <?php
 class AvantElasticsearchSuggest extends AvantElasticsearch
 {
-    public function CreateSuggestionsDataForTitle($titleFieldTexts, $isReferenceType, $isSubjectPeople)
+    public function CreateSuggestionsDataForTitle($titleFieldTexts, $itemTypeIsReference, $itemTitleIsPerson)
     {
         $suggestionsData = array();
-        $isPersonReference = $isReferenceType && $isSubjectPeople;
+        $titleIsPerson = $itemTypeIsReference && $itemTitleIsPerson;
 
-        $suggestionsData['input'] = $this->createSuggestionInputsForTitle($titleFieldTexts, $isPersonReference);
+        $suggestionsData['input'] = $this->createSuggestionInputsForTitle($titleFieldTexts, $titleIsPerson);
 
-        if ($isReferenceType)
+        if ($itemTypeIsReference)
         {
             // Give extra weight to references and even more weight to references for people
             // so that these items appear higher in the suggestions list.
-            $suggestionsData['weight'] = $isSubjectPeople ? 5 : 2;
+            $suggestionsData['weight'] = $itemTitleIsPerson ? 5 : 2;
         }
 
         return $suggestionsData;
     }
 
-    protected function createSuggestionInputsForTitle($fieldTexts, $isPersonReference)
+    protected function createSuggestionInputsForTitle($fieldTexts, $titleIsPerson)
     {
         // This method creates a set of prefix inputs for a title that will allow the Elasticsearch completion
         // mechanism to match what a user is typing into the search box with words in the title. Each input
@@ -40,7 +40,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
         {
             // Strip away punctuation leaving only letters and numbers. For people titles, get rid of the numbers
             // too since they are probably birth and death dates that won't be useful for an input.
-            $text = $this->stripPunctuation($fieldText['text'], $isPersonReference);
+            $text = $this->stripPunctuation($fieldText['text'], $titleIsPerson);
 
             // Create an array of the stripped title's words.
             $parts = explode(' ', $text);
@@ -52,7 +52,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             $wordsCount = count($words);
 
             // Create the inputs for the title.
-            if ($isPersonReference & $wordsCount >= 3)
+            if ($titleIsPerson & $wordsCount >= 3)
             {
                 $inputs = $this->createSuggestionInputsForPersonTitle($words, $wordsCount);
             }

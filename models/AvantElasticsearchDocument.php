@@ -72,11 +72,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $avantElasticsearch = new AvantElasticsearch();
 
-        $hasDateElement = false;
+        $itemHasDate = false;
         $titleString = '';
         $titleFieldTexts = null;
-        $isTypeReference = false;
-        $isSubjectPeople = false;
+        $itemTypeIsReference = false;
+        $itemTitleIsPerson = false;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
@@ -111,19 +111,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $titleFieldTexts = $fieldTexts;
             }
 
-            if ($elasticsearchFieldName == 'type')
-            {
-                $isTypeReference = $fieldTextsString == 'Reference';
-            }
-
-            if ($elasticsearchFieldName == 'subject')
-            {
-                $isSubjectPeople = strpos($fieldTextsString, 'People') !== false;
-            }
-
             if ($elasticsearchFieldName == 'date')
             {
-                $hasDateElement = true;
+                $itemHasDate = true;
+            }
+
+            if ($elasticsearchFieldName == 'type')
+            {
+                // TO-DO: Make this logic generic so it doesn't depend on knowledge of specific type and subject values.
+                $itemTypeIsReference = $fieldTextsString == 'Reference';
+                if ($elasticsearchFieldName == 'subject')
+                {
+                    $itemTitleIsPerson = strpos($fieldTextsString, 'People') !== false;
+                }
             }
 
             // Save the element's text.
@@ -136,7 +136,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->createElementFacetData($elasticsearchFieldName, $fieldTexts, $facetData);
         }
 
-        if (!$hasDateElement)
+        if (!$itemHasDate)
         {
             // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
             $emptyDateFieldTexts = array($this->createFieldText());
@@ -146,7 +146,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($titleFieldTexts))
         {
             $avantLogicSuggest = new AvantElasticsearchSuggest();
-            $suggestionData = $avantLogicSuggest->CreateSuggestionsDataForTitle($titleFieldTexts, $isTypeReference, $isSubjectPeople);
+            $suggestionData = $avantLogicSuggest->CreateSuggestionsDataForTitle($titleFieldTexts, $itemTypeIsReference, $itemTitleIsPerson);
             $this->body['suggestions'] = $suggestionData;
         }
 
