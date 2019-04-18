@@ -204,121 +204,83 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function getFacetValuesForElement($elasticsearchFieldName, $fieldTexts)
     {
+        if (!array_key_exists($elasticsearchFieldName, $this->facetDefinitions))
+        {
+            // This element does not have a facet associated with it.
+            return array();
+        }
+
         $values = array();
 
-        if (array_key_exists($elasticsearchFieldName, $this->facetDefinitions))
+        // Get the value for each of the element's texts.
+        foreach ($fieldTexts as $fieldText)
         {
-            foreach ($fieldTexts as $fieldText)
+            $text = $fieldText['text'];
+
+            $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
+
+            if ($facetDefinition['is_hierarchy'])
             {
-                $text = $fieldText['text'];
+                $getRoot = $this->facetDefinitions[$elasticsearchFieldName]['show_root'];
+                $hierarchy = $this->getFacetHierarchyParts($text, $getRoot);
 
-                $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
-
-                if ($facetDefinition['is_hierarchy'])
+                if ($getRoot)
                 {
-                    // For hierarchy facets, get the root and leaf values.
-                    $value = $this->getFacetValueForHierarchy($elasticsearchFieldName, $text);
-                    $root = $value['root'];
-                    $level2 = $value['level2'];
-                    $leaf = $value['leaf'];
-
-                    // Form the facet value using the root and the leaf, ignoring anything in the middle.
-                    $separator = empty($root) || empty($leaf) ? '' : ', ';
-
-                    if ($facetDefinition['show_root'])
-                    {
-                        if (empty($level2))
-                        {
-                            $values[] = $root . $separator . $leaf;
-                        }
-                        else if ($level2 == $leaf)
-                        {
-                            $values[] = $leaf;
-                        }
-                        else
-                        {
-                            $values[] = $level2 . $separator . $leaf;
-                        }
-                    }
-                    else
-                    {
-                        $values[] = $root . $separator . $leaf;
-                    }
-
-                    if ($this->facetDefinitions[$elasticsearchFieldName]['show_root'])
-                    {
-                        if (!empty($root) && !empty($leaf))
-                        {
-                            // Emit just the root as the top of the hierarchy.
-                            $values[] = '_' . $root;
-                        }
-                    }
+                    // Prepend an underscore onto the root to distinguish it from a leaf value.
+                    $values[] = '_' . $hierarchy['root'];
                 }
-                else if ($this->facetDefinitions[$elasticsearchFieldName]['is_date'])
-                {
-                    $values[] = $this->getFacetValueForDate($text);
-                }
+
+                $values[] = $hierarchy['leaf'];
+            }
+            else if ($this->facetDefinitions[$elasticsearchFieldName]['is_date'])
+            {
+                $values[] = $this->getFacetValueForDate($text);
             }
         }
 
         return $values;
     }
 
-    protected function getFacetValueForHierarchy($elasticsearchFieldName, $text)
+    protected function getFacetHierarchyParts($text, $getRoot)
     {
-        $root = '';
-        $level2 = '';
+        // Normalize the text so that hierarchy parts are separated by commas with no spaces.
+        // This regex replaces a comma followed by one or more spaces with just a comma.
+        $text = trim(preg_replace('/,\s+/', ',', $text));
+        $parts = explode(',', $text);
+        $partsCount = count($parts);
 
-        if ($this->facetDefinitions[$elasticsearchFieldName]['show_root'])
-        {
-            // Find the first comma, the one that follows the root value.
-            $index = strpos($text, ', ');
-            if ($index === false)
-            {
-                // The root is the entire string.
-                $root = $text;
-            }
-            else
-            {
-                $root = trim(substr($text, 0, $index));
-            }
-        }
+        // Extract the root and leaf values. In this case, the leaf is the entire string minus any
+        // any values in between the root and the actual leaf. See examples below.
+        $root = $parts[0];
 
-        // Find the last comma, the one that precedes the leaf value.
-        $index = strrpos($text, ',', -1);
-        if ($index === false)
+        $last = $partsCount - 1;
+        $lastPart = $parts[$last];
+
+        if ($getRoot)
         {
-            // The leaf is the entire string.
-            $leaf = $text;
+            $leaf = $root;
+
+            if ($partsCount == 2)
+            {
+                // Example: 'Image,Photograph' => 'Image, Photograph'
+                $leaf .= ", $parts[1]";
+            }
+            else if ($partsCount == 3)
+            {
+                // Example: 'Image,Photograph,Print' => 'Image, Photograph, Print'
+                $leaf .= ", $parts[1], $parts[2]";
+            }
+            else if ($partsCount > 3)
+            {
+                // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image, Photograph, Glass Plate'
+                $leaf .= ", $parts[1], $lastPart";
+            }
         }
         else
         {
-            $leaf = trim(substr($text, $index + 1));
-
-            // Look for level 2 text (one level down from the root).
-            $index = strpos($text, ', ');
-            if ($index !== false)
-            {
-                // Get the rest of the text following the root.
-                $tail = substr($text, $index + 2);
-                $index = strpos($tail, ', ');
-                if ($index === false)
-                {
-                    $level2 = $tail;
-                }
-                else
-                {
-                    $level2 = trim(substr($tail, 0, $index));
-                }
-            }
+            $leaf = $lastPart;
         }
 
-        if ($root == $leaf)
-        {
-            // The leaf and root are the same so get rid of the leaf value.
-            $leaf = '';
-        }
-
-        return array('root' => $root, 'level2' => $level2, 'leaf' => $leaf);
+        return array('root' => $root, 'leaf' => $leaf);
     }
 }

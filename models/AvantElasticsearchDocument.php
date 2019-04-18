@@ -7,6 +7,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
+    /* @var $avantElasticsearchFacets AvantElasticsearchFacets */
     protected $avantElasticsearchFacets;
     protected $facetDefinitions;
 
