@@ -13,6 +13,9 @@ knowledge of the following Omeka elements and how they are used in these install
 * Address
 * Date
 
+This AvantElaticsearch plugin works only with Elasticsearch on AWS, but could be adapted by someone
+else for another application.
+
 ## Installation
 
 To install the AvantElasticsearch plugin, follow these steps:
@@ -54,11 +57,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 
 ## Credits
-This plugin is an adaptation/simplification/specialization of the [Elasticsearch](https://github.com/Harvard-ATG/omeka-plugin-Elasticsearch)
-v1.1.1 plugin developed by the Harvard Academic Technology Group at Harvard University. This plugin has also been updated to work
-with Elasticsearch 6.0 This AvantElaticsearch plugin is provided solely for the purpose of allowing the
-[AvantSeach](https://github.com/gsoules/AvantSearch) plugin to use Elasticsearch on AWS, but could be adapted by someone
-else for another application.
+The author wishes to thank the Harvard Academic Technology Group at Harvard University, developers of the
+[Elasticsearch](https://github.com/Harvard-ATG/omeka-plugin-Elasticsearch) v1.1.1 plugin for Omeka Classic.
+It provided helpful insight in how integrate Elasticsearch with Omeka.
+
 
 
 

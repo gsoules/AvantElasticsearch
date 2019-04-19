@@ -13,6 +13,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function createFacet($id, $name, $isHierarchy = false)
     {
         $definition = array(
+            'id' => $id,
             'name' => $name,
             'is_date' => false,
             'is_hierarchy' => $isHierarchy,
@@ -23,7 +24,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions[$id] = $definition;
     }
 
-    public function createAddFacetLink($queryString, $facetToAdd, $facetValue)
+    public function createAddFacetLink($queryString, $facetToAdd, $facetValue, $isRoot)
     {
         $args = explode('&', $queryString);
         $addFacet = true;
@@ -32,7 +33,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             // Decode any %## encoding in the arg and change '+' to a space character.
             $arg = urldecode($rawArg);
-            $facetArg = "facet_{$facetToAdd}[]";
+            $kind = $isRoot ? 'root' : 'facet';
+            $facetArg = "{$kind}_{$facetToAdd}[]";
 
             $target = "$facetArg=$facetValue";
             $argContainsTarget = $target == $arg;
@@ -54,12 +56,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createAggregationsForElasticsearchQuery()
     {
-        // Create an array of aggregation terms. Return the results in ascending order instead of the
-        // default which is descending by bucket quantity.
         foreach ($this->facetDefinitions as $facetId => $definition)
         {
             if ($definition['is_hierarchy'] && $definition['show_root'])
             {
+                // Build a sub-aggregation to get buckets of root values, each containing buckets of leaf values.
                 $terms[$facetId] = [
                     'terms' => [
                         'field' => "facet.$facetId.root",
@@ -79,6 +80,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
             else
             {
+                // Build a simple aggregation to return buckets of values.
                 $terms[$facetId] = [
                     'terms' => [
                         'field' => "facet.$facetId",
@@ -95,19 +97,40 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $aggregations;
     }
 
-    protected function createFacetFilter($filters, $facets, $facetFieldName, $facetId)
+    protected function createFacetFilter($filters, $roots, $facets, $facetDefinition)
     {
-        if (isset($facets[$facetId]))
-        {
-            $values = $facets[$facetId];
+        // Create a separate term filter for each value so that the filters are ANDed
+        // as opposed to using a single 'terms' filter with multiple values that are ORed.
 
-            // Create a separate term filter for each value so that the filters are ANDed
-            // as opposed to using a single 'terms' filter with multiple values that are ORed.
+        $facetId = $facetDefinition['id'];
+
+        if (isset($roots[$facetId]))
+        {
+            $term = "facet.$facetId.root";
+
+            $values = $roots[$facetId];
             foreach ($values as $value)
             {
-                $filters[] = ['term' => [$facetFieldName => $value]];
+                $filters[] = ['term' => [$term => $value]];
             }
         }
+
+        if (isset($facets[$facetId]))
+        {
+            $term = "facet.$facetId";
+
+            if ($facetDefinition['is_hierarchy'] && $facetDefinition['show_root'])
+            {
+                $term .= ".root";
+            }
+
+            $values = $facets[$facetId];
+            foreach ($values as $value)
+            {
+                $filters[] = ['term' => [$term => $value]];
+            }
+        }
+
         return $filters;
     }
 
@@ -157,25 +180,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return implode('&', $afterArgs);
     }
 
-    public function getFacetFiltersForElasticsearchQuery($facets)
-    {
-        $filters = array();
-
-        foreach ($this->facetDefinitions as $facetId => $facetName)
-        {
-            $filters = $this->createFacetFilter($filters, $facets, "facet.$facetId.keyword", $facetId);
-        }
-
-        return $filters;
-    }
-
     protected function defineFacets()
     {
         // The order is the order in which facet names appear in the Filters section on the search results page.
-        $this->createFacet('type', 'Item Type', true);
-
         $this->createFacet('subject', 'Subjects', true);
         $this->facetDefinitions['subject']['multi_value'] = true;
+
+        $this->createFacet('type', 'Item Type', true);
 
         $this->createFacet('place', 'Places', true);
         $this->facetDefinitions['place']['show_root'] = false;
@@ -193,6 +204,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function emitHtmlForAppliedFilters($query, $findUrl)
     {
         $appliedFilters = '';
+        return $appliedFilters;
 
         $queryString = $this->createQueryStringWithFacets($query);
         $queryStringFacets = $query['facet'];
@@ -255,14 +267,167 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $appliedFilters;
     }
 
-    public function emitHtmlForFilters()
+    public function emitHtmlForFilters($aggregations, $appliedFacets, $query, $findUrl)
     {
+        $queryString = $this->createQueryStringWithFacets($query);
 
+        foreach ($this->facetDefinitions as $facetId => $facetDefinition)
+        {
+            $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
+
+            $buckets = $aggregations[$facetId]['buckets'];
+
+            if (count($buckets) == 0 || $facetDefinition['hidden'])
+            {
+                // Don't display empty buckets or hidden facets.
+                continue;
+            }
+
+            $filters = '';
+            $buckets = $aggregations[$facetId]['buckets'];
+
+            foreach ($buckets as $bucket)
+            {
+                $bucketValue = $bucket['key'];
+
+                // Create a link that the user can click to apply this facet.
+                $count = ' (' . $bucket['doc_count'] . ')';
+                $filterLink = $this->createAddFacetLink($queryString, $facetId, $bucketValue, $isRoot);
+                $facetUrl = $findUrl . '?' . $filterLink;
+                $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
+
+                // Indent the filter link text
+                $class = " class='elasticsearch-facet-level2'";
+                $filters .= "<li$class>$filter</li>";
+            }
+
+            // Indent the filter link text
+/*            $class = " class='elasticsearch-facet-level2'";
+            $filters .= "<li$class>$filter</li>";
+
+            $class = '';
+
+                if ($facetDefinition['is_hierarchy'] && $facetDefinition['show_root'])
+                {
+                    if (isset($appliedFacets[$facetId]))
+                    {
+                        // This facet has been applied. Show it's leaf values indented.
+                        if ($facetDefinition['show_root'])
+                        {
+                            if ($facetDefinition['multi_value'])
+                            {
+                                // Determine if this value is part of the same sub-hierarchy as the applied root facet.
+                                $rootValue = $appliedFacets[$facetId]['root'];
+
+                                if (strpos($bucketValue, $rootValue) === 0)
+                                {
+                                    // Remove the root from the leaf unless the root and leaf are the same.
+                                    // That can happen when the the value has no leaf part.
+                                    if (strcmp($rootValue, $filterLinkText) != 0)
+                                    {
+                                        $prefixLen = strlen($rootValue) + strlen(', ');
+                                        $filterLinkText = substr($filterLinkText, $prefixLen);
+                                    }
+                                }
+                                else
+                                {
+                                    // Not part of same sub-hierarchy.
+                                    continue;
+                                }
+                            }
+
+                            // Add some styling when leafs appear under roots.
+                            $level = $isRoot ? '1' : '2';
+                            $class = " class='elasticsearch-facet-level$level'";
+                        }
+                    }
+                }
+
+                // Determine if this bucket value has already been applied. If the bucket value is a
+                // root, strip off the leading underscore before comparing to applied values.
+                $applied = false;
+                if (isset($appliedFacets[$facetId]))
+                {
+                    $values = $appliedFacets[$facetId];
+                    if ($facetDefinition['is_hierarchy'])
+                    {
+                        if ($isRoot)
+                        {
+                            $value = $rootValue;
+                        }
+                        else
+                        {
+                            $rootValue = substr($rootValue, 1);
+                            if ($bucketValue == $rootValue)
+                            {
+                                $value = $bucketValue;
+                            }
+                            else
+                            {
+                                $value = $appliedFacets[$facetId]['facet_value'];
+                            }
+                        }
+                    }
+                    else
+                    {
+                        $value = $bucketValue;
+                    }
+                    $applied = in_array($value, $values);
+                }
+
+                if ($applied)
+                {
+                    // Don't display a facet value that has already been applied.
+                    continue;
+                }
+                else
+                {
+                    // Create a link that the user can click to apply this facet.
+                    $count = ' (' . $bucket['doc_count'] . ')';
+                    $filterLink = $this->createAddFacetLink($queryString, $facetId, $bucketValue);
+                    $facetUrl = $findUrl . '?' . $filterLink;
+                    $filter = '<a href="' . $facetUrl . '">' . $filterLinkText . '</a>' . $count;
+                }
+
+                // Indent the filter link text
+                $class = " class='elasticsearch-facet-level2'";
+                $filters .= "<li$class>$filter</li>";
+            }*/
+
+            if (!empty($filters))
+            {
+                // Determine the section name. When no facets are applied, it's the facet name, other wise the
+                // root name of the applied facet.
+                if (isset($appliedFacets[$facetId]))
+                {
+                    $sectionName = $appliedFacets[$facetId]['root'];
+                }
+                else
+                {
+                    $sectionName = $facetDefinition['name'];
+                }
+
+                echo '<div class="elasticsearch-facet-name">' . $sectionName . '</div>';
+                echo "<ul>$filters</ul>";
+            }
+        }
     }
 
     public function getFacetDefinitions()
     {
         return $this->facetDefinitions;
+    }
+
+    public function getFacetFiltersForElasticsearchQuery($roots, $facets)
+    {
+        $filters = array();
+
+        foreach ($this->facetDefinitions as $facetId => $facetDefinition)
+        {
+            $filters = $this->createFacetFilter($filters, $roots, $facets, $facetDefinition);
+        }
+
+        return $filters;
     }
 
     protected function getFacetValueForDate($text)

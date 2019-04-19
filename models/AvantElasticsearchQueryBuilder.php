@@ -21,9 +21,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $limit = isset($options['limit']) ? $options['limit'] : 20;
         $terms = isset($options['query']['query']) ? $options['query']['query'] : '';
         $facets = isset($options['query']['facet']) ? $options['query']['facet'] : [];
+        $roots = isset($options['query']['root']) ? $options['query']['root'] : [];
         $sort = isset($options['sort']) ? $options['sort'] : null;
-
-        $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery();
 
         // Fields that the query will return.
         $source = [
@@ -77,11 +76,17 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         $body['_source'] = $source;
         $body['highlight'] = $highlight;
-        $body['aggregations'] = $aggregations;
         $body['query']['bool']['must'] = $mustQuery;
         $body['query']['bool']['should'] = $shouldQuery;
 
-        $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($facets);
+        // Create the aggregations portion of the query to indicate which facet values to return.
+        // All requested facet values are returned for the entire set of results.
+        $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery();
+        $body['aggregations'] = $aggregations;
+
+        // Create the filter portion of the query to limit the reults to specific facet values.
+        // The results only contain results that satisfy the filters.
+        $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($roots, $facets);
         if (count($filters) > 0)
         {
             $body['query']['bool']['filter'] = $filters;
