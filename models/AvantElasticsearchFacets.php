@@ -58,13 +58,35 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // default which is descending by bucket quantity.
         foreach ($this->facetDefinitions as $facetId => $definition)
         {
-            $terms[$facetId] = [
-                'terms' => [
-                    'field' => "facet.$facetId",
-                    'size' => 1000,
-                    'order' => ['_key' => 'asc']
-                ]
-            ];
+            if ($definition['is_hierarchy'] && $definition['show_root'])
+            {
+                $terms[$facetId] = [
+                    'terms' => [
+                        'field' => "facet.$facetId.root",
+                        'size' => 10,
+                        'order' => ['_key' => 'asc']
+                    ],
+                    'aggregations' => [
+                        'leafs' => [
+                            'terms' => [
+                                'field' => "facet.$facetId.root",
+                                'size' => 1000,
+                                'order' => ['_key' => 'asc']
+                            ]
+                        ]
+                    ]
+                ];
+            }
+            else
+            {
+                $terms[$facetId] = [
+                    'terms' => [
+                        'field' => "facet.$facetId",
+                        'size' => 1000,
+                        'order' => ['_key' => 'asc']
+                    ]
+                ];
+            }
         }
 
         // Convert the array into a nested object for the aggregation as required by Elasticsearch.
@@ -286,25 +308,29 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         foreach ($fieldTexts as $fieldText)
         {
             $text = $fieldText['text'];
-
             $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
 
             if ($facetDefinition['is_hierarchy'])
             {
-                $getRoot = $this->facetDefinitions[$elasticsearchFieldName]['show_root'];
-                $hierarchy = $this->getFacetHierarchyParts($text, $getRoot);
+                // Get the root and leaf for hierarchy values.
+                $showRoot = $this->facetDefinitions[$elasticsearchFieldName]['show_root'];
+                $hierarchy = $this->getFacetHierarchyParts($text, $showRoot);
 
-                if ($getRoot)
+                if ($showRoot)
                 {
-                    // Prepend an underscore onto the root to distinguish it from a leaf value.
-                    $values[] = '_' . $hierarchy['root'];
+                    $values[] = array('root' => $hierarchy['root'], 'leaf' => $hierarchy['leaf']);
                 }
-
-                $values[] = $hierarchy['leaf'];
+                else
+                {
+                    $values[] = $hierarchy['leaf'];
+                }
             }
-            else if ($this->facetDefinitions[$elasticsearchFieldName]['is_date'])
+            else
             {
-                $values[] = $this->getFacetValueForDate($text);
+                if ($this->facetDefinitions[$elasticsearchFieldName]['is_date'])
+                {
+                    $values[] = $this->getFacetValueForDate($text);
+                }
             }
         }
 
