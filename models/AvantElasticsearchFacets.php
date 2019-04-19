@@ -10,21 +10,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    protected function createFacet($id, $name, $isHierarchy = false)
-    {
-        $definition = array(
-            'id' => $id,
-            'name' => $name,
-            'is_date' => false,
-            'is_hierarchy' => $isHierarchy,
-            'show_root' => true,
-            'multi_value' => false,
-            'hidden' => false);
-
-        $this->facetDefinitions[$id] = $definition;
-    }
-
-    public function createAddFacetLink($queryString, $facetToAdd, $facetValue, $isRoot)
+    public function addFacetArgToQueryString($queryString, $facetToAdd, $facetValue, $isRoot)
     {
         $args = explode('&', $queryString);
         $addFacet = true;
@@ -52,6 +38,20 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $queryString;
+    }
+
+    protected function createFacet($id, $name, $isHierarchy = false)
+    {
+        $definition = array(
+            'id' => $id,
+            'name' => $name,
+            'is_date' => false,
+            'is_hierarchy' => $isHierarchy,
+            'show_root' => true,
+            'multi_value' => false,
+            'hidden' => false);
+
+        $this->facetDefinitions[$id] = $definition;
     }
 
     public function createAggregationsForElasticsearchQuery()
@@ -204,8 +204,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function emitHtmlForFilters($aggregations, $query, $findUrl)
     {
         $appliedFacets = $this->getAppliedFacetsFromQueryString($query);
-
         $queryString = $this->createQueryStringWithFacets($query);
+        $html = '';
 
         foreach ($this->facetDefinitions as $facetId => $facetDefinition)
         {
@@ -215,7 +215,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             if (count($buckets) == 0 || $facetDefinition['hidden'])
             {
                 // Don't display empty buckets or hidden facets.
-                continue;
+                // TO-DO: Hide empty buckes and hidden facets by uncommenting continue
+                //continue;
             }
 
             $filters = '';
@@ -223,51 +224,50 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             foreach ($buckets as $bucket)
             {
-                $bucketValue = $bucket['key'];
-
-                $updatedQueryString = $queryString;
-
-                // Create a link that the user can click to apply this facet.
-                foreach ($appliedFacets as $kind => $appliedFacet)
-                {
-                    $appliedFacetIsRoot = $kind == 'root';
-                    foreach ($appliedFacet as $appliedFacetId => $appliedFacetValues)
-                    {
-                        foreach ($appliedFacetValues as $appliedFacetValue)
-                        {
-                            $updatedQueryString = $this->createAddFacetLink($updatedQueryString, $appliedFacetId, $appliedFacetValue, $appliedFacetIsRoot);
-                        }
-                    }
-                }
-
-                $filterLink = $this->createAddFacetLink($updatedQueryString, $facetId, $bucketValue, $isRoot);
-
-                $facetUrl = $findUrl . '?' . $filterLink;
-                $count = ' (' . $bucket['doc_count'] . ')';
-                $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
-
-                // Indent the filter link text
+                $filter = $this->emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetId, $isRoot);
                 $class = " class='elasticsearch-facet-level2'";
                 $filters .= "<li$class>$filter</li>";
             }
 
-            if (!empty($filters))
-            {
-                // Determine the section name. When no facets are applied, it's the facet name, other wise the
-                // root name of the applied facet.
-                if (isset($appliedFacets[$facetId]))
-                {
-                    $sectionName = $appliedFacets[$facetId]['root'];
-                }
-                else
-                {
-                    $sectionName = $facetDefinition['name'];
-                }
+            $sectionName = $facetDefinition['name'];
+            $html .= '<div class="elasticsearch-facet-name">' . $sectionName . '</div>';
+            $html .= "<ul>$filters</ul>";
+        }
 
-                echo '<div class="elasticsearch-facet-name">' . $sectionName . '</div>';
-                echo "<ul>$filters</ul>";
+        return $html;
+    }
+
+    protected function emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetToAdd, $isRoot)
+    {
+        // Create a link that the user can click to apply this facet. The applied facets are structured as follows.
+        $bucketValue = $bucket['key'];
+        $updatedQueryString = $queryString;
+
+        // The nested loops below add an argument to the query string for each facet that is already applied.
+        // - At the top level there are two facet kinds: 'root' and 'facet'
+        // - For each kind, there can be zero or more facet types e.g. subject, place.
+        // - For each type, there can be one or more values.
+        // Note that the user interface might not allow, for example, two root level facets of the same
+        // type to be selected as filters, but this logic handles any combination of applied facets.
+        foreach ($appliedFacets as $kind => $appliedFacet)
+        {
+            foreach ($appliedFacet as $appliedFacetId => $appliedFacetValues)
+            {
+                foreach ($appliedFacetValues as $appliedFacetValue)
+                {
+                    $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $appliedFacetId, $appliedFacetValue, $kind == 'root');
+                }
             }
         }
+
+        // Add an argument to the query string for the facet being added. The resulting link, when clicked,
+        // will filter on all the previously applied facets plus the one now being added.
+        $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $facetToAdd, $bucketValue, $isRoot);
+
+        $facetUrl = $findUrl . '?' . $updatedQueryString;
+        $count = ' (' . $bucket['doc_count'] . ')';
+        $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
+        return $filter;
     }
 
     public function getAppliedFacetsFromQueryString($query)
