@@ -29,6 +29,13 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
+    protected function addFacetFieldToMappingProperties($fieldName)
+    {
+        $this->properties[$fieldName] = [
+            'type' => 'keyword'
+        ];
+    }
+
     protected function addNumericFieldToMappingProperties($fieldName)
     {
         $this->properties[$fieldName] = [
@@ -84,11 +91,13 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addTextFieldToMappingProperties('thumb');
         $this->addTextFieldToMappingProperties('url');
 
-        $this->addTextFieldToMappingProperties('facet.date');
-        $this->addTextFieldToMappingProperties('facet.place');
-        $this->addTextFieldToMappingProperties('facet.subject');
-        $this->addTextFieldToMappingProperties('facet.tag');
-        $this->addTextFieldToMappingProperties('facet.type');
+        $this->addFacetFieldToMappingProperties('facet.date');
+        $this->addFacetFieldToMappingProperties('facet.tag');
+        $this->addFacetFieldToMappingProperties('facet.place');
+        $this->addFacetFieldToMappingProperties('facet.type.root');
+        $this->addFacetFieldToMappingProperties('facet.type.leaf');
+        $this->addFacetFieldToMappingProperties('facet.subject.root');
+        $this->addFacetFieldToMappingProperties('facet.subject.leaf');
 
         $this->addTextFieldToMappingProperties('sort.address-number');
         $this->addTextFieldToMappingProperties('sort.address-street');

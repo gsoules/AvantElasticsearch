@@ -60,8 +60,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             $terms[$facetId] = [
                 'terms' => [
-                    'field' => "facet.$facetId.keyword",
-                    'size' => 100,
+                    'field' => "facet.$facetId",
+                    'size' => 1000,
                     'order' => ['_key' => 'asc']
                 ]
             ];
@@ -150,7 +150,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function defineFacets()
     {
         // The order is the order in which facet names appear in the Filters section on the search results page.
-        $this->createFacet('type', 'Item Types', true);
+        $this->createFacet('type', 'Item Type', true);
 
         $this->createFacet('subject', 'Subjects', true);
         $this->facetDefinitions['subject']['multi_value'] = true;
@@ -166,6 +166,76 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions['tag']['hidden'] = true;
 
         $this->createFacet('owner', 'Owner');
+    }
+
+    public function emitHtmlForAppliedFilters($query, $findUrl)
+    {
+        $appliedFilters = '';
+
+        $queryString = $this->createQueryStringWithFacets($query);
+        $queryStringFacets = $query['facet'];
+
+        foreach ($queryStringFacets as $facetId => $facetValues)
+        {
+            if (!isset($this->facetDefinitions[$facetId])) {
+                // This should only happen if the query string syntax is invalid because someone edited or mistyped it.
+                break;
+            }
+
+            $facetDefinition = $this->facetDefinitions[$facetId];
+            $facetName = htmlspecialchars($this->facetDefinitions[$facetId]['name']);
+            $appliedFilters .= '<div class="elasticsearch-facet-name">' . $facetName . '</div>';
+            $appliedFilters .= '<ul>';
+            $rootValue = '';
+            $class = '';
+
+            foreach ($facetValues as $index => $facetValue)
+            {
+                $level = $index == 0 ? 'root' : 'leaf';
+
+                $emitLink = true;
+                $linkText = $facetValue;
+
+                if ($facetDefinition['is_hierarchy'] && $facetDefinition['show_root']) {
+                    $isLeaf = $level == 'leaf';
+
+                    // Only emit the [x] link for a removable facet. That's either a root by itself or a leaf.
+                    $emitLink = count($facetValues) == 1 || $isLeaf;
+                    if ($isLeaf) {
+                        $class = " class='elasticsearch-facet-level2'";
+
+                        // Remove the root value from the leaf text.
+                        $prefixLen = strlen($rootValue) + strlen(', ') - strlen('_');
+                        $linkText = substr($facetValue, $prefixLen);
+                    } else {
+                        $rootValue = $facetValue;
+
+                        // Remove the leading underscore that appears as the first character of a root facet value.
+                        $linkText = substr($linkText, 1);
+                    }
+                }
+
+                $appliedFacets[$facetId][$level] = $linkText;
+                $appliedFacets[$facetId]['facet_value'] = $facetValue;
+                $resetLink = $this->createRemoveFacetLink($queryString, $facetId, $facetValue);
+                $appliedFilters .= '<li>';
+                $appliedFilters .= "<i$class>$linkText</i>";
+                if ($emitLink)
+                {
+                    $appliedFilters .= '<a href="' . $findUrl . '?' . $resetLink . '"> [&#10006;]</a>';
+                }
+                $appliedFilters .= '</li>';
+            }
+
+            $appliedFilters .= '</ul>';
+        }
+
+        return $appliedFilters;
+    }
+
+    public function emitHtmlForFilters()
+    {
+
     }
 
     public function getFacetDefinitions()

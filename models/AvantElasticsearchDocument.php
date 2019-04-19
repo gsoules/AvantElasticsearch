@@ -215,9 +215,23 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $facetValuesForElement = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts);
 
+        $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
+        $isHierarchy = $facetDefinition['is_hierarchy'];
+        $hasRootAndLeaf = $isHierarchy && $facetDefinition['show_root'];
+
         foreach ($facetValuesForElement as $facetValue)
         {
-            $facets[$elasticsearchFieldName][] = $facetValue;
+            if ($hasRootAndLeaf)
+            {
+                $level = strpos($facetValue, '_') === 0 ? 'root' : 'leaf';
+                $field = "$elasticsearchFieldName.$level";
+                $facets[$field][] = $facetValue;
+            }
+            else
+            {
+                $facets[$elasticsearchFieldName][] = $facetValue;
+
+            }
         }
     }
 
