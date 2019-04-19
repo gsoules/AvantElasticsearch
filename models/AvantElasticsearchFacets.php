@@ -203,18 +203,44 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function emitHtmlForAppliedFilters($query, $findUrl)
     {
-        $appliedFilters = '';
-        return $appliedFilters;
+        $appliedFacets = array('root' => array(), 'facet' => array());
 
-        $queryString = $this->createQueryStringWithFacets($query);
-        $queryStringFacets = $query['facet'];
+        $queryStringRoots = isset($query['root']) ? $query['root'] : array();
+        $queryStringFacets = isset($query['facet']) ? $query['facet'] : array();
 
-        foreach ($queryStringFacets as $facetId => $facetValues)
+        foreach ($queryStringRoots as $facetId => $facetValues)
         {
-            if (!isset($this->facetDefinitions[$facetId])) {
+            if (!isset($this->facetDefinitions[$facetId]))
+            {
                 // This should only happen if the query string syntax is invalid because someone edited or mistyped it.
                 break;
             }
+
+            foreach ($facetValues as $facetValue)
+            {
+                $appliedFacets['root'][$facetId] = $facetValue;
+            }
+        }
+
+        foreach ($queryStringFacets as $facetId => $facetValues)
+        {
+            if (!isset($this->facetDefinitions[$facetId]))
+            {
+                // This should only happen if the query string syntax is invalid because someone edited or mistyped it.
+                break;
+            }
+
+            foreach ($facetValues as $facetValue)
+            {
+                $appliedFacets['facet'][$facetId] = $facetValue;
+            }
+        }
+
+        return $appliedFacets;
+
+/*
+            $appliedFilters = '';
+            $queryString = $this->createQueryStringWithFacets($query);
 
             $facetDefinition = $this->facetDefinitions[$facetId];
             $facetName = htmlspecialchars($this->facetDefinitions[$facetId]['name']);
@@ -264,7 +290,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $appliedFilters .= '</ul>';
         }
 
-        return $appliedFilters;
+        return $appliedFilters;*/
     }
 
     public function emitHtmlForFilters($aggregations, $appliedFacets, $query, $findUrl)
@@ -274,7 +300,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         foreach ($this->facetDefinitions as $facetId => $facetDefinition)
         {
             $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
-
             $buckets = $aggregations[$facetId]['buckets'];
 
             if (count($buckets) == 0 || $facetDefinition['hidden'])
@@ -290,10 +315,22 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             {
                 $bucketValue = $bucket['key'];
 
+                $updatedQueryString = $queryString;
+
                 // Create a link that the user can click to apply this facet.
-                $count = ' (' . $bucket['doc_count'] . ')';
-                $filterLink = $this->createAddFacetLink($queryString, $facetId, $bucketValue, $isRoot);
+                foreach ($appliedFacets as $kind => $appliedFacetValues)
+                {
+                    foreach ($appliedFacetValues as $appliedFacetId => $appliedFacetValue)
+                    {
+                        $appliedFacetIsRoot = $kind == 'root';
+                        $updatedQueryString = $this->createAddFacetLink($updatedQueryString, $appliedFacetId, $appliedFacetValue, $appliedFacetIsRoot);
+                    }
+                }
+
+                $filterLink = $this->createAddFacetLink($updatedQueryString, $facetId, $bucketValue, $isRoot);
+
                 $facetUrl = $findUrl . '?' . $filterLink;
+                $count = ' (' . $bucket['doc_count'] . ')';
                 $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
 
                 // Indent the filter link text
