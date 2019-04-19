@@ -10,7 +10,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    public function addFacetArgToQueryString($queryString, $facetToAdd, $facetValue, $isRoot)
+    public function addFacetArgToQueryString($queryString, $facetToAddId, $facetToAddValue, $isRoot)
     {
         $args = explode('&', $queryString);
         $addFacet = true;
@@ -20,9 +20,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             // Decode any %## encoding in the arg and change '+' to a space character.
             $arg = urldecode($rawArg);
             $kind = $isRoot ? 'root' : 'facet';
-            $facetArg = "{$kind}_{$facetToAdd}[]";
+            $facetArg = "{$kind}_{$facetToAddId}[]";
 
-            $target = "$facetArg=$facetValue";
+            $target = "$facetArg=$facetToAddValue";
             $argContainsTarget = $target == $arg;
 
             if ($argContainsTarget)
@@ -38,6 +38,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $queryString;
+    }
+
+    protected function checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue)
+    {
+        foreach ($appliedFacets[$kind] as $appliedFacetId => $appliedFacetValues)
+        {
+            if ($facetToAddId == $appliedFacetId)
+            {
+                foreach ($appliedFacetValues as $appliedFacetValue)
+                {
+                    if ($appliedFacetValue == $bucketValue)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     protected function createFacet($id, $name, $isHierarchy = false)
@@ -237,7 +255,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $html;
     }
 
-    protected function emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetToAdd, $isRoot)
+    protected function emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetToAddId, $isRoot)
     {
         // Create a link that the user can click to apply this facet. The applied facets are structured as follows.
         $bucketValue = $bucket['key'];
@@ -262,11 +280,23 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Add an argument to the query string for the facet being added. The resulting link, when clicked,
         // will filter on all the previously applied facets plus the one now being added.
-        $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $facetToAdd, $bucketValue, $isRoot);
+        $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $facetToAddId, $bucketValue, $isRoot);
 
         $facetUrl = $findUrl . '?' . $updatedQueryString;
         $count = ' (' . $bucket['doc_count'] . ')';
-        $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
+
+        $kind = $isRoot ? 'root' : 'facet';
+
+        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
+        if ($applied)
+        {
+            $filter = $bucketValue . ' X';
+        }
+        else
+        {
+            $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
+        }
+
         return $filter;
     }
 
