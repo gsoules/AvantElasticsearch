@@ -17,19 +17,21 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function checkIfFacetAlreadyApplied($appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue)
     {
-        $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_ROOT, $appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue);
-
-        if ($applied)
+        if ($facetToCheckKind == FACET_KIND_ROOT)
         {
-            return true;
+            $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_ROOT, $appliedFacets, $facetToCheckId, $facetToCheckValue);
+            if ($applied)
+            {
+                return true;
+            }
         }
 
-        $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_LEAF, $appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue);
+        $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_LEAF, $appliedFacets, $facetToCheckId, $facetToCheckValue);
 
         return $applied;
     }
 
-    protected function checkIfFacetKindAlreadyApplied($appliedFacetsToCheckKind, $appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue)
+    protected function checkIfFacetKindAlreadyApplied($appliedFacetsToCheckKind, $appliedFacets, $facetToCheckId, $facetToCheckValue)
     {
         $appliedFacetsToCheck = $appliedFacets[$appliedFacetsToCheckKind];
         if (empty($appliedFacetsToCheck))
@@ -51,17 +53,14 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     return true;
                 }
 
-                if ($facetToCheckKind == FACET_KIND_ROOT && $appliedFacetsToCheckKind == FACET_KIND_LEAF)
+                // This code is reached when a root facet value to check does not match an applied root facet value.
+                // Check now to see if the root facet value to check is the root of an applied leaf facet value.
+                // For example, if the root facet value to check is 'Image', see if it's the root of an applied leaf
+                // facet value of the same type like 'Image,Art,Drawing'. If yes, the root facet is implicitly applied.
+                $facetToCheckValueIsRootOfAppliedFacetValue = strpos($appliedFacetValue, $facetToCheckValue . ',') === 0;
+                if ($facetToCheckValueIsRootOfAppliedFacetValue)
                 {
-                    // This code is reached when a root facet value to check does not match an applied root facet value.
-                    // Check now to see if the root facet value to check is the root of an applied leaf facet value.
-                    // For example, if the root facet value to check is 'Image', see if it's the root of an applied leaf
-                    // facet value of the same type like 'Image,Art,Drawing'. If yes, the root facet is implicitly applied.
-                    $facetToCheckValueIsRootOfAppliedFacetValue = strpos($appliedFacetValue, $facetToCheckValue . ',') === 0;
-                    if ($facetToCheckValueIsRootOfAppliedFacetValue)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
         }
@@ -313,7 +312,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function checkIfRootLeafAlreadyApplied($appliedFacets, $facetToCheckId, $facetToCheckValue)
     {
-        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, FACET_KIND_ROOT, $facetToCheckId, $facetToCheckValue);
+        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, FACET_KIND_LEAF, $facetToCheckId, $facetToCheckValue);
         return $applied;
     }
 
