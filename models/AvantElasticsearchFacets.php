@@ -257,16 +257,25 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetToAddId, $isRoot)
     {
-        // Create a link that the user can click to apply this facet. The applied facets are structured as follows.
         $bucketValue = $bucket['key'];
-        $updatedQueryString = $queryString;
+        $kind = $isRoot ? 'root' : 'facet';
+        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
+        if ($applied)
+        {
+            $filter = $bucketValue . ' X';
+            return $filter;
+        }
 
-        // The nested loops below add an argument to the query string for each facet that is already applied.
+        // Add an argument to the query string for each facet that is already applied.
+        // The applied facets are structured as follows:
         // - At the top level there are two facet kinds: 'root' and 'facet'
-        // - For each kind, there can be zero or more facet types e.g. subject, place.
-        // - For each type, there can be one or more values.
+        // - For each kind, there can be zero or more facet Ids e.g. 'subject', 'type', 'place'.
+        // - For each Id, there can be one or more values e.g. two subjects.
+        //
         // Note that the user interface might not allow, for example, two root level facets of the same
         // type to be selected as filters, but this logic handles any combination of applied facets.
+        //
+        $updatedQueryString = $queryString;
         foreach ($appliedFacets as $kind => $appliedFacet)
         {
             foreach ($appliedFacet as $appliedFacetId => $appliedFacetValues)
@@ -278,25 +287,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
         }
 
-        // Add an argument to the query string for the facet being added. The resulting link, when clicked,
-        // will filter on all the previously applied facets plus the one now being added.
+        // Add an argument to the query string for the facet now being added.
         $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $facetToAddId, $bucketValue, $isRoot);
 
+        // Create the link that the user can click to apply this facet plus all the already applied facets.
         $facetUrl = $findUrl . '?' . $updatedQueryString;
         $count = ' (' . $bucket['doc_count'] . ')';
-
-        $kind = $isRoot ? 'root' : 'facet';
-
-        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
-        if ($applied)
-        {
-            $filter = $bucketValue . ' X';
-        }
-        else
-        {
-            $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
-        }
-
+        $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
         return $filter;
     }
 
