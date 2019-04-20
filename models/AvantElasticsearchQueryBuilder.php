@@ -20,8 +20,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $offset = isset($options['offset']) ? $options['offset'] : 0;
         $limit = isset($options['limit']) ? $options['limit'] : 20;
         $terms = isset($options['query']['query']) ? $options['query']['query'] : '';
-        $facets = isset($options['query'][FACET_KIND_LEAF]) ? $options['query'][FACET_KIND_LEAF] : [];
         $roots = isset($options['query'][FACET_KIND_ROOT]) ? $options['query'][FACET_KIND_ROOT] : [];
+        $leafs = isset($options['query'][FACET_KIND_LEAF]) ? $options['query'][FACET_KIND_LEAF] : [];
         $sort = isset($options['sort']) ? $options['sort'] : null;
 
         // Fields that the query will return.
@@ -86,7 +86,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         // Create the filter portion of the query to limit the reults to specific facet values.
         // The results only contain results that satisfy the filters.
-        $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($roots, $facets);
+        $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($roots, $leafs);
         if (count($filters) > 0)
         {
             $body['query']['bool']['filter'] = $filters;

@@ -63,7 +63,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     'aggregations' => [
                         'leafs' => [
                             'terms' => [
-                                'field' => "facet.$facetId.root",
+                                'field' => "facet.$facetId.leaf",
                                 'size' => 1000,
                                 'order' => ['_key' => 'asc']
                             ]
@@ -90,7 +90,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $aggregations;
     }
 
-    protected function createFacetFilter($filters, $roots, $facets, $facetDefinition)
+    protected function createFacetFilter($filters, $roots, $leafs, $facetDefinition)
     {
         // Create a separate term filter for each value so that the filters are ANDed
         // as opposed to using a single 'terms' filter with multiple values that are ORed.
@@ -108,16 +108,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
         }
 
-        if (isset($facets[$facetId]))
+        if (isset($leafs[$facetId]))
         {
             $term = "facet.$facetId";
 
             if ($facetDefinition['is_hierarchy'] && $facetDefinition['show_root'])
             {
-                $term .= ".root";
+                $term .= ".leaf";
             }
 
-            $values = $facets[$facetId];
+            $values = $leafs[$facetId];
             foreach ($values as $value)
             {
                 $filters[] = ['term' => [$term => $value]];
@@ -261,7 +261,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
             foreach ($buckets as $bucket)
             {
-                $filter = $this->emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetId, $isRoot);
+                $filter = $this->emitHtmlLinkForFacetFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot);
                 $class = " class='elasticsearch-facet-level2'";
                 $filters .= "<li$class>$filter</li>";
             }
@@ -275,21 +275,35 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $html;
     }
 
-    protected function emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetToAddId, $isRoot)
+    protected function emitHtmlLinkForFacetFilter($bucket, $queryString, $appliedFacets, $facetToAddId, $findUrl, $isRoot)
     {
         $bucketValue = $bucket['key'];
         $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+
+        // Determine whether this facet has already been applied.
         $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
+
         if ($applied)
         {
-            $facetToRemoveId  = $facetToAddId;
-            $facetToRemoveValue = $bucketValue;
-            $updatedQueryString = $this->editQueryStringToRemoveFacetArg($queryString, $facetToRemoveId, $facetToRemoveValue, $isRoot);
+            // Create the link that allows the user to remove this filter.
+            $filter = $this->emitHtmlLinkForRemoveFilter($queryString, $facetToAddId, $bucketValue, $findUrl, $isRoot);
+            $filters = $filter;
 
-            // Create the link that the user can click to remove this facet, but leave all the other applied facets.
-            $facetUrl = $findUrl . '?' . $updatedQueryString;
-            $filter = $facetToRemoveValue .' <a href="' . $facetUrl . '">' . '&#10006;' . '</a>';
-            return $filter;
+            if ($isRoot)
+            {
+                // Emit this facet's leafs by calling this method recursively.
+                foreach ($bucket['leafs']['buckets'] as $leafBucket)
+                {
+//                    $leafValue = $leafBucket['key'];
+//                    $leafValueWithoutRoot = substr($leafValue, strlen($bucketValue) + strlen(', '));
+//                    $leafBucket['key'] = $leafValueWithoutRoot;
+                    $filter = $this->emitHtmlLinkForFacetFilter($leafBucket, $queryString, $appliedFacets, $facetToAddId, $findUrl, false);
+                    $class = " class='elasticsearch-facet-level3'";
+                    $filters .= "<li$class>$filter</li>";
+                }
+            }
+
+            return $filters;
         }
 
         // Add an argument to the query string for each facet that is already applied.
@@ -320,6 +334,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetUrl = $findUrl . '?' . $updatedQueryString;
         $count = ' (' . $bucket['doc_count'] . ')';
         $filter = '<a href="' . $facetUrl . '">' . $bucketValue . '</a>' . $count;
+        return $filter;
+    }
+
+    protected function emitHtmlLinkForRemoveFilter($queryString, $facetToRemoveId, $facetToRemoveValue, $findUrl, $isRoot)
+    {
+        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($queryString, $facetToRemoveId, $facetToRemoveValue, $isRoot);
+
+        // Create the link that the user can click to remove this facet, but leave all the other applied facets.
+        $facetUrl = $findUrl . '?' . $updatedQueryString;
+        $filter = $facetToRemoveValue . ' <a href="' . $facetUrl . '">' . '&#10006;' . '</a>';
         return $filter;
     }
 
@@ -354,13 +378,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $this->facetDefinitions;
     }
 
-    public function getFacetFiltersForElasticsearchQuery($roots, $facets)
+    public function getFacetFiltersForElasticsearchQuery($roots, $leafs)
     {
         $filters = array();
 
         foreach ($this->facetDefinitions as $facetId => $facetDefinition)
         {
-            $filters = $this->createFacetFilter($filters, $roots, $facets, $facetDefinition);
+            $filters = $this->createFacetFilter($filters, $roots, $leafs, $facetDefinition);
         }
 
         return $filters;
@@ -459,18 +483,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             if ($partsCount == 2)
             {
-                // Example: 'Image,Photograph' => 'Image, Photograph'
-                $leaf .= ", $parts[1]";
+                // Example: 'Image,Photograph' => 'Image,Photograph'
+                $leaf .= ",$parts[1]";
             }
             else if ($partsCount == 3)
             {
-                // Example: 'Image,Photograph,Print' => 'Image, Photograph, Print'
-                $leaf .= ", $parts[1], $parts[2]";
+                // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
+                $leaf .= ",$parts[1],$parts[2]";
             }
             else if ($partsCount > 3)
             {
-                // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image, Photograph, Glass Plate'
-                $leaf .= ", $parts[1], $lastPart";
+                // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Glass Plate'
+                $leaf .= ",$parts[1],$lastPart";
             }
         }
         else
