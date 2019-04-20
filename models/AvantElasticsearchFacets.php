@@ -124,38 +124,35 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createQueryStringWithFacets($query)
     {
+        // Get the search terms plus the root and leaf facets specified in the query.
         $terms = isset($query['query']) ? $query['query'] : '';
         $facets = isset($query['facet']) ? $query['facet'] : array();
         $roots = isset($query['root']) ? $query['root'] : array();
 
+        // Create a query string that contains the terms and args.
         $queryString = "query=".urlencode($terms);
         $updatedQueryString = $queryString;
-        $updatedQueryString .= $this->createUpdatedQueryStringWithFacets($roots, true);
-        $updatedQueryString .= $this->createUpdatedQueryStringWithFacets($facets, false);
+        $updatedQueryString .= $this->createQueryStringArgsForFacets($roots, true);
+        $updatedQueryString .= $this->createQueryStringArgsForFacets($facets, false);
 
         return $updatedQueryString;
     }
 
-    protected function createUpdatedQueryStringWithFacets($facets, $isRoot)
+    protected function createQueryStringArgsForFacets($facets, $isRoot)
     {
-        $updatedQueryString = '';
+        $queryStringArgs = '';
 
+        // Create a query string arg for each facet.
         foreach ($facets as $facetName => $facetValues)
         {
-            if (!is_array($facetValues))
-            {
-                // This should only happen if the query string syntax in invalid because someone edited or mistyped it.
-                break;
-            }
-
             foreach ($facetValues as $facetValue)
             {
                 $prefix = $isRoot ? 'root' : 'facet';
-                $updatedQueryString .= '&'.urlencode("{$prefix}_{$facetName}[]") . '=' . urlencode($facetValue);
+                $queryStringArgs .= '&'.urlencode("{$prefix}_{$facetName}[]") . '=' . urlencode($facetValue);
             }
         }
 
-        return $updatedQueryString;
+        return $queryStringArgs;
     }
 
     protected function defineFacets()
