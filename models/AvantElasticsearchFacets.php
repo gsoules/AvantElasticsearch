@@ -15,41 +15,55 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    protected function checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $facetValue, $requireExactMatch = true)
+    protected function checkIfFacetAlreadyApplied($appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue)
     {
-        foreach ($appliedFacets[$kind] as $appliedFacetId => $appliedFacetValues)
+        $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_ROOT, $appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue);
+
+        if ($applied)
         {
-            if ($facetToAddId == $appliedFacetId)
+            return true;
+        }
+
+        $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_LEAF, $appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue);
+
+        return $applied;
+    }
+
+    protected function checkIfFacetKindAlreadyApplied($appliedFacetsToCheckKind, $appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue)
+    {
+        $appliedFacetsToCheck = $appliedFacets[$appliedFacetsToCheckKind];
+        if (empty($appliedFacetsToCheck))
+        {
+            return false;
+        }
+
+        foreach ($appliedFacetsToCheck as $appliedFacetId => $appliedFacetValues)
+        {
+            if ($facetToCheckId != $appliedFacetId)
             {
-                foreach ($appliedFacetValues as $appliedFacetValue)
+                continue;
+            }
+
+            foreach ($appliedFacetValues as $appliedFacetValue)
+            {
+                if ($appliedFacetValue == $facetToCheckValue)
                 {
-                    if ($requireExactMatch)
+                    return true;
+                }
+
+                if ($facetToCheckKind == FACET_KIND_ROOT && $appliedFacetsToCheckKind == FACET_KIND_LEAF)
+                {
+                    // This code is reached when a root facet value to check does not match an applied root facet value.
+                    // Check now to see if the root facet value to check is the root of an applied leaf facet value.
+                    // For example, if the root facet value to check is 'Image', see if it's the root of an applied leaf
+                    // facet value of the same type like 'Image,Art,Drawing'. If yes, the root facet is implicitly applied.
+                    $facetToCheckValueIsRootOfAppliedFacetValue = strpos($appliedFacetValue, $facetToCheckValue . ',') === 0;
+                    if ($facetToCheckValueIsRootOfAppliedFacetValue)
                     {
-                        if ($appliedFacetValue == $facetValue)
-                        {
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        // This code is reached when the facet value does not exactly match an applied facet value.
-                        // Check now to see if the facet value is the root of an applied facet. For example, if the
-                        // facet value is 'Image', see if it's the root of an applied leaf fact like 'Image,Art,Drawing'.
-                        // If yes, then the root facet is implicitly applied.
-                        $bucketValueIsRootOfAppliedFacetValue = strpos($appliedFacetValue, $facetValue . ',') === 0;
-                        if ($bucketValueIsRootOfAppliedFacetValue)
-                        {
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }
-        }
-
-        if ($requireExactMatch && $kind == FACET_KIND_ROOT)
-        {
-            $requireExactMatch = false;
-            return $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, FACET_KIND_LEAF, $facetValue, $requireExactMatch);
         }
 
         return false;
@@ -297,19 +311,37 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $html;
     }
 
-    protected function emitHtmlLinksForFacetFilter($bucket, $queryString, $appliedFacets, $facetToAddId, $findUrl, $isRoot)
+    protected function checkIfRootLeafAlreadyApplied($appliedFacets, $facetToCheckId, $facetToCheckValue)
     {
-        $bucketValue = $bucket['key'];
+        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, FACET_KIND_ROOT, $facetToCheckId, $facetToCheckValue);
+        return $applied;
+    }
+
+    protected function emitHtmlLinksForFacetFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot)
+    {
+        $facetValue = $bucket['key'];
         $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
 
         // Determine whether this facet has already been applied.
-        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
+        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $kind, $facetId, $facetValue);
 
         if ($applied)
         {
-            // Create the link that allows the user to remove this filter.
-            $filter = $this->emitHtmlLinkForRemoveFilter($queryString, $facetToAddId, $bucketValue, $findUrl, $isRoot);
-            $filters = $filter;
+            if ($isRoot && $this->checkIfRootLeafAlreadyApplied($appliedFacets, $facetId, $facetValue))
+            {
+                // Only show the root value without a remove 'X'. This way a user can't remove the root
+                // filter without first removing the root's leaf filter.
+                $class = " class='elasticsearch-facet-level2'";
+                $filter = $facetValue;
+            }
+            else
+            {
+                // Create the link that allows the user to remove this filter.
+                $class = " class='elasticsearch-facet-level3'";
+                $filter = $this->emitHtmlLinkForRemoveFilter($queryString, $facetId, $facetValue, $findUrl, $isRoot);
+            }
+
+            $filters = "<li$class>$filter</li>";
 
             if ($isRoot)
             {
@@ -319,9 +351,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 //                    $leafValue = $leafBucket['key'];
 //                    $leafValueWithoutRoot = substr($leafValue, strlen($bucketValue) + strlen(','));
 //                    $leafBucket['key'] = $leafValueWithoutRoot;
-                    $filter = $this->emitHtmlLinksForFacetFilter($leafBucket, $queryString, $appliedFacets, $facetToAddId, $findUrl, false);
-                    $class = " class='elasticsearch-facet-level3'";
-                    $filters .= "<li$class>$filter</li>";
+                    $filters .= $this->emitHtmlLinksForFacetFilter($leafBucket, $queryString, $appliedFacets, $facetId, $findUrl, false);
                 }
             }
 
@@ -350,13 +380,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         // Add an argument to the query string for the facet now being added.
-        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddId, $bucketValue, $isRoot);
+        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetId, $facetValue, $isRoot);
 
         // Create the link that the user can click to apply this facet plus all the already applied facets.
         // In the link text, add a space after each comma for readability.
         $facetUrl = $findUrl . '?' . $updatedQueryString;
         $count = ' (' . $bucket['doc_count'] . ')';
-        $linkText = str_replace(',', ', ', $bucketValue);
+        $linkText = str_replace(',', ', ', $facetValue);
         $filter = '<a href="' . $facetUrl . '">' . $linkText . '</a>' . $count;
         return $filter;
     }
