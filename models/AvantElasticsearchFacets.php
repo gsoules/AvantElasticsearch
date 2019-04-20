@@ -1,5 +1,10 @@
 <?php
 
+// Root refers to the top value in a hierarchy facet.
+// Leaf refers to either the elided leaf value in a hierarchy facet or simply the value in a non-hierarchy facet.
+define('FACET_KIND_ROOT', 'root');
+define('FACET_KIND_LEAF', 'leaf');
+
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
     protected $facetDefinitions = array();
@@ -126,8 +131,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         // Get the search terms plus the root and leaf facets specified in the query.
         $terms = isset($query['query']) ? $query['query'] : '';
-        $facets = isset($query['facet']) ? $query['facet'] : array();
-        $roots = isset($query['root']) ? $query['root'] : array();
+        $facets = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : array();
+        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : array();
 
         // Create a query string that contains the terms and args.
         $queryString = "query=".urlencode($terms);
@@ -147,8 +152,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             foreach ($facetValues as $facetValue)
             {
-                $prefix = $isRoot ? 'root' : 'facet';
-                $queryStringArgs .= '&'.urlencode("{$prefix}_{$facetName}[]") . '=' . urlencode($facetValue);
+                $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+                $queryStringArgs .= '&'.urlencode("{$kind}_{$facetName}[]") . '=' . urlencode($facetValue);
             }
         }
 
@@ -185,7 +190,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             // Decode any %## encoding in the arg and change '+' to a space character.
             $arg = urldecode($rawArg);
-            $kind = $isRoot ? 'root' : 'facet';
+            $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
             $facetArg = "{$kind}_{$facetToAddId}[]";
 
             $target = "$facetArg=$facetToAddValue";
@@ -215,8 +220,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             // Decode any %## encoding in the arg and change '+' to a space character.
             $arg = urldecode($rawArg);
-            $prefix = $isRoot ? 'root' : 'facet';
-            $facetArg = "{$prefix}_{$facetToRemoveId}[]";
+            $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+            $facetArg = "{$kind}_{$facetToRemoveId}[]";
 
             $target = "$facetArg=$facetToRemoveValue";
             $argContainsTarget = $target == $arg;
@@ -273,7 +278,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetToAddId, $isRoot)
     {
         $bucketValue = $bucket['key'];
-        $kind = $isRoot ? 'root' : 'facet';
+        $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
         $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
         if ($applied)
         {
@@ -289,7 +294,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Add an argument to the query string for each facet that is already applied.
         // The applied facets are structured as follows:
-        // - At the top level there are two facet kinds: 'root' and 'facet'
+        // - At the top level there are two facet kinds: FACET_KIND_ROOT and FACET_KIND_LEAF
         // - For each kind, there can be zero or more facet Ids e.g. 'subject', 'type', 'place'.
         // - For each Id, there can be one or more values e.g. two subjects.
         //
@@ -303,7 +308,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             {
                 foreach ($appliedFacetValues as $appliedFacetValue)
                 {
-                    $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $appliedFacetId, $appliedFacetValue, $kind == 'root');
+                    $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $appliedFacetId, $appliedFacetValue, $kind == FACET_KIND_ROOT);
                 }
             }
         }
@@ -320,16 +325,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function getAppliedFacetsFromQueryString($query)
     {
-        $appliedFacets = array('root' => array(), 'facet' => array());
+        $appliedFacets = array(FACET_KIND_ROOT => array(), FACET_KIND_LEAF => array());
 
-        $queryStringRoots = isset($query['root']) ? $query['root'] : array();
-        $queryStringFacets = isset($query['facet']) ? $query['facet'] : array();
+        $queryStringRoots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : array();
+        $queryStringFacets = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : array();
 
         foreach ($queryStringRoots as $facetId => $facetValues)
         {
             foreach ($facetValues as $facetValue)
             {
-                $appliedFacets['root'][$facetId][] = $facetValue;
+                $appliedFacets[FACET_KIND_ROOT][$facetId][] = $facetValue;
             }
         }
 
@@ -337,7 +342,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             foreach ($facetValues as $facetValue)
             {
-                $appliedFacets['facet'][$facetId][] = $facetValue;
+                $appliedFacets[FACET_KIND_LEAF][$facetId][] = $facetValue;
             }
         }
 
@@ -414,11 +419,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                 if ($showRoot)
                 {
-                    $values[] = array('root' => $hierarchy['root'], 'leaf' => $hierarchy['leaf']);
+                    $values[] = array(FACET_KIND_ROOT => $hierarchy[FACET_KIND_ROOT], FACET_KIND_LEAF => $hierarchy[FACET_KIND_LEAF]);
                 }
                 else
                 {
-                    $values[] = $hierarchy['leaf'];
+                    $values[] = $hierarchy[FACET_KIND_LEAF];
                 }
             }
             else
@@ -473,6 +478,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $leaf = $lastPart;
         }
 
-        return array('root' => $root, 'leaf' => $leaf);
+        return array(FACET_KIND_ROOT => $root, FACET_KIND_LEAF => $leaf);
     }
 }

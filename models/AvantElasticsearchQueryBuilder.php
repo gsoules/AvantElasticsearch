@@ -20,8 +20,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $offset = isset($options['offset']) ? $options['offset'] : 0;
         $limit = isset($options['limit']) ? $options['limit'] : 20;
         $terms = isset($options['query']['query']) ? $options['query']['query'] : '';
-        $facets = isset($options['query']['facet']) ? $options['query']['facet'] : [];
-        $roots = isset($options['query']['root']) ? $options['query']['root'] : [];
+        $facets = isset($options['query'][FACET_KIND_LEAF]) ? $options['query'][FACET_KIND_LEAF] : [];
+        $roots = isset($options['query'][FACET_KIND_ROOT]) ? $options['query'][FACET_KIND_ROOT] : [];
         $sort = isset($options['sort']) ? $options['sort'] : null;
 
         // Fields that the query will return.
