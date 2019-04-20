@@ -327,37 +327,48 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         if ($applied)
         {
-            if ($isRoot && $this->checkIfRootLeafAlreadyApplied($appliedFacets, $facetId, $facetValue))
-            {
-                // Only show the root value without a remove 'X'. This way a user can't remove the root
-                // filter without first removing the root's leaf filter.
-                $class = " class='elasticsearch-facet-level2'";
-                $filter = $facetValue;
-            }
-            else
-            {
-                // Create the link that allows the user to remove this filter.
-                $class = " class='elasticsearch-facet-level3'";
-                $filter = $this->emitHtmlLinkForRemoveFilter($queryString, $facetId, $facetValue, $findUrl, $isRoot);
-            }
-
-            $filters = "<li$class>$filter</li>";
-
-            if ($isRoot)
-            {
-                // Emit this facet's leafs by calling this method recursively.
-                foreach ($bucket['leafs']['buckets'] as $leafBucket)
-                {
-//                    $leafValue = $leafBucket['key'];
-//                    $leafValueWithoutRoot = substr($leafValue, strlen($bucketValue) + strlen(','));
-//                    $leafBucket['key'] = $leafValueWithoutRoot;
-                    $filters .= $this->emitHtmlLinksForFacetFilter($leafBucket, $queryString, $appliedFacets, $facetId, $findUrl, false);
-                }
-            }
-
-            return $filters;
+            $filters = $this->emitHtmlLinksForFacetFilterApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue);
+        }
+        else
+        {
+            $filters = $this->emitHtmlLinkForFacetFilterNotApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue);
         }
 
+        return $filters;
+    }
+
+    protected function emitHtmlLinksForFacetFilterApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue)
+    {
+        if ($isRoot && $this->checkIfRootLeafAlreadyApplied($appliedFacets, $facetId, $facetValue))
+        {
+            // Only show the root value without a remove 'X'. This way a user can't remove the root
+            // filter without first removing the root's leaf filter.
+            $class = " class='elasticsearch-facet-level2'";
+            $filter = $facetValue;
+        }
+        else
+        {
+            // Create the link that allows the user to remove this filter.
+            $class = " class='elasticsearch-facet-level3'";
+            $filter = $this->emitHtmlLinkForRemoveFilter($queryString, $facetId, $facetValue, $findUrl, $isRoot);
+        }
+
+        $filters = "<li$class>$filter</li>";
+
+        if ($isRoot)
+        {
+            // Emit this facet's leafs by calling this method recursively.
+            foreach ($bucket['leafs']['buckets'] as $leafBucket)
+            {
+                $filters .= $this->emitHtmlLinksForFacetFilter($leafBucket, $queryString, $appliedFacets, $facetId, $findUrl, false);
+            }
+        }
+
+        return $filters;
+    }
+
+    protected function emitHtmlLinkForFacetFilterNotApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue)
+    {
         // Add an argument to the query string for each facet that is already applied.
         // The applied facets are structured as follows:
         // - At the top level there are two facet kinds: FACET_KIND_ROOT and FACET_KIND_LEAF
@@ -387,8 +398,20 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetUrl = $findUrl . '?' . $updatedQueryString;
         $count = ' (' . $bucket['doc_count'] . ')';
         $linkText = str_replace(',', ', ', $facetValue);
+
+        if (!$isRoot)
+        {
+            $index = strpos($linkText, ',');
+            if ($index !== false)
+            {
+                // Remove the leaf's root text.
+                $linkText = substr($linkText, $index + strlen(', '));
+            }
+        }
+
         $filter = '<a href="' . $facetUrl . '">' . $linkText . '</a>' . $count;
-        return $filter;
+        $class = $isRoot ? " class='elasticsearch-facet-level2'" : " class='elasticsearch-facet-level3'";
+        return "<li$class>$filter</li>";
     }
 
     protected function emitHtmlLinkForRemoveFilter($queryString, $facetToRemoveId, $facetToRemoveValue, $findUrl, $isRoot)
