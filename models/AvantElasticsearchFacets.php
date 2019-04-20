@@ -10,36 +10,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    public function addFacetArgToQueryString($queryString, $facetToAddId, $facetToAddValue, $isRoot)
-    {
-        $args = explode('&', $queryString);
-        $addFacet = true;
-
-        foreach ($args as $rawArg)
-        {
-            // Decode any %## encoding in the arg and change '+' to a space character.
-            $arg = urldecode($rawArg);
-            $kind = $isRoot ? 'root' : 'facet';
-            $facetArg = "{$kind}_{$facetToAddId}[]";
-
-            $target = "$facetArg=$facetToAddValue";
-            $argContainsTarget = $target == $arg;
-
-            if ($argContainsTarget)
-            {
-                $addFacet = false;
-                break;
-            }
-        }
-
-        if ($addFacet)
-        {
-            $queryString = "$queryString&$target";
-        }
-
-        return $queryString;
-    }
-
     protected function checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue)
     {
         foreach ($appliedFacets[$kind] as $appliedFacetId => $appliedFacetValues)
@@ -156,7 +126,19 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         $terms = isset($query['query']) ? $query['query'] : '';
         $facets = isset($query['facet']) ? $query['facet'] : array();
+        $roots = isset($query['root']) ? $query['root'] : array();
+
         $queryString = "query=".urlencode($terms);
+        $updatedQueryString = $queryString;
+        $updatedQueryString .= $this->createUpdatedQueryStringWithFacets($roots, true);
+        $updatedQueryString .= $this->createUpdatedQueryStringWithFacets($facets, false);
+
+        return $updatedQueryString;
+    }
+
+    protected function createUpdatedQueryStringWithFacets($facets, $isRoot)
+    {
+        $updatedQueryString = '';
 
         foreach ($facets as $facetName => $facetValues)
         {
@@ -168,34 +150,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             foreach ($facetValues as $facetValue)
             {
-                $queryString .= '&'.urlencode("facet_{$facetName}[]") . '=' . urlencode($facetValue);
+                $prefix = $isRoot ? 'root' : 'facet';
+                $updatedQueryString .= '&'.urlencode("{$prefix}_{$facetName}[]") . '=' . urlencode($facetValue);
             }
         }
 
-        return $queryString;
-    }
-
-    public function createRemoveFacetLink($queryString, $facetToRemove, $facetValue)
-    {
-        $beforeArgs = explode('&', $queryString);
-        $afterArgs = array();
-
-        foreach ($beforeArgs as $rawArg)
-        {
-            // Decode any %## encoding in the arg and change '+' to a space character.
-            $arg = urldecode($rawArg);
-            $facetArg = "facet_{$facetToRemove}[]";
-
-            $target = "$facetArg=$facetValue";
-            $argContainsTarget = $target == $arg;
-
-            if (!$argContainsTarget)
-            {
-                // Keep this arg since it not the one to be removed.
-                $afterArgs[] = $arg;
-            }
-        }
-        return implode('&', $afterArgs);
+        return $updatedQueryString;
     }
 
     protected function defineFacets()
@@ -219,17 +179,74 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->createFacet('owner', 'Owner');
     }
 
+    public function editQueryStringToAddFacetArg($queryString, $facetToAddId, $facetToAddValue, $isRoot)
+    {
+        $args = explode('&', $queryString);
+        $addFacet = true;
+
+        foreach ($args as $rawArg)
+        {
+            // Decode any %## encoding in the arg and change '+' to a space character.
+            $arg = urldecode($rawArg);
+            $kind = $isRoot ? 'root' : 'facet';
+            $facetArg = "{$kind}_{$facetToAddId}[]";
+
+            $target = "$facetArg=$facetToAddValue";
+            $argContainsTarget = $target == $arg;
+
+            if ($argContainsTarget)
+            {
+                $addFacet = false;
+                break;
+            }
+        }
+
+        if ($addFacet)
+        {
+            $queryString = "$queryString&$target";
+        }
+
+        return $queryString;
+    }
+
+    public function editQueryStringToRemoveFacetArg($queryString, $facetToRemoveId, $facetToRemoveValue, $isRoot)
+    {
+        $beforeArgs = explode('&', $queryString);
+        $afterArgs = array();
+
+        foreach ($beforeArgs as $rawArg)
+        {
+            // Decode any %## encoding in the arg and change '+' to a space character.
+            $arg = urldecode($rawArg);
+            $prefix = $isRoot ? 'root' : 'facet';
+            $facetArg = "{$prefix}_{$facetToRemoveId}[]";
+
+            $target = "$facetArg=$facetToRemoveValue";
+            $argContainsTarget = $target == $arg;
+
+            if (!$argContainsTarget)
+            {
+                // Keep this arg since it not the one to be removed.
+                $afterArgs[] = $arg;
+            }
+        }
+        return implode('&', $afterArgs);
+    }
+
     public function emitHtmlForFilters($aggregations, $query, $findUrl)
     {
+        // Create a list of all the filters that a user can add by clicking its link or remove by clicking its 'X'.
+
+        // Start by creating a query string containing the search terms plus all facets that are already applied.
         $appliedFacets = $this->getAppliedFacetsFromQueryString($query);
         $queryString = $this->createQueryStringWithFacets($query);
         $html = '';
 
+        // Loop over all facet kinds and emit add/remove links for facet values that exist for the current search results.
         foreach ($this->facetDefinitions as $facetId => $facetDefinition)
         {
-            $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
+            // Get all the values for this facet Id.
             $buckets = $aggregations[$facetId]['buckets'];
-
             if (count($buckets) == 0 || $facetDefinition['hidden'])
             {
                 // Don't display empty buckets or hidden facets.
@@ -237,9 +254,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 //continue;
             }
 
+            // For each value, emit the add or remove link.
             $filters = '';
-            $buckets = $aggregations[$facetId]['buckets'];
-
+            $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
             foreach ($buckets as $bucket)
             {
                 $filter = $this->emitHtmlLinkForFacetFilter($findUrl, $bucket, $queryString, $appliedFacets, $facetId, $isRoot);
@@ -247,6 +264,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $filters .= "<li$class>$filter</li>";
             }
 
+            // Emit the section name for this facet Id.
             $sectionName = $facetDefinition['name'];
             $html .= '<div class="elasticsearch-facet-name">' . $sectionName . '</div>';
             $html .= "<ul>$filters</ul>";
@@ -262,7 +280,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $facetToAddId, $kind, $bucketValue);
         if ($applied)
         {
-            $filter = $bucketValue . ' X';
+            $facetToRemoveId  = $facetToAddId;
+            $facetToRemoveValue = $bucketValue;
+            $updatedQueryString = $this->editQueryStringToRemoveFacetArg($queryString, $facetToRemoveId, $facetToRemoveValue, $isRoot);
+
+            // Create the link that the user can click to remove this facet, but leave all the other applied facets.
+            $facetUrl = $findUrl . '?' . $updatedQueryString;
+            $filter = $facetToRemoveValue .' <a href="' . $facetUrl . '">' . '&#10006;' . '</a>';
             return $filter;
         }
 
@@ -282,13 +306,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             {
                 foreach ($appliedFacetValues as $appliedFacetValue)
                 {
-                    $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $appliedFacetId, $appliedFacetValue, $kind == 'root');
+                    $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $appliedFacetId, $appliedFacetValue, $kind == 'root');
                 }
             }
         }
 
         // Add an argument to the query string for the facet now being added.
-        $updatedQueryString = $this->addFacetArgToQueryString($updatedQueryString, $facetToAddId, $bucketValue, $isRoot);
+        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddId, $bucketValue, $isRoot);
 
         // Create the link that the user can click to apply this facet plus all the already applied facets.
         $facetUrl = $findUrl . '?' . $updatedQueryString;
