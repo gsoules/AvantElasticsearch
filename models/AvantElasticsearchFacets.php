@@ -8,6 +8,8 @@ define('FACET_KIND_LEAF', 'leaf');
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
     protected $facetDefinitions = array();
+    protected $facetsTable = array();
+    protected $appliedFacets = array();
 
     public function __construct()
     {
@@ -276,23 +278,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return implode('&', $afterArgs);
     }
 
-    protected function createAppliedFacetsTable()
-    {
-        $appliedFacetsTable = array();
-        return $appliedFacetsTable;
-    }
-
-    protected function stripRootFromLeafName($leafName)
-    {
-        $index = strpos($leafName, ',');
-        if ($index !== false)
-        {
-            $leafName = substr($leafName, $index + 1);
-        }
-        return $leafName;
-    }
-
-    protected function createResultFacetsTable($aggregations)
+    protected function createFacetsTable($aggregations)
     {
         $table = array();
 
@@ -323,13 +309,81 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 }
             }
         }
-        return $table;
+        $this->facetsTable = $table;
     }
 
-    public function emitHtmlForFacets($aggregations, $query, $findUrl)
+    protected function setFacetsTableActions()
     {
-        $appliedFacetsTable = $this->createResultFacetsTable($aggregations);
-        $resultFacetsTable = $this->createAppliedFacetsTable();
+        $appliedRootFacets = $this->appliedFacets['root'];
+        $appliedLeafFacets = $this->appliedFacets['leaf'];
+
+        foreach ($appliedRootFacets as $appliedRootFacet)
+        {
+            continue;
+        }
+    }
+
+    protected function emitHtmlForFacetSectionEntries($facetId, $facetDefinition)
+    {
+        // Emit the section header for this facet.
+        $sectionHtml = '<div class="facet-section">' . $facetDefinition['name'] . '</div>';
+
+        // Emit the entries for this facet.
+        $entries = $this->facetsTable[$facetId];
+        foreach ($entries as $entry)
+        {
+            $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
+            $sectionHtml .= $this->emitHtmlForListEntry($entry['name'], 1, $isRoot);
+
+            // Emit the leaf entries for this facet entry.
+            if (isset($entry['leafs']))
+            {
+                $leafEntries = $entry['leafs'];
+                foreach ($leafEntries as $leafEntry)
+                {
+                    if ($leafEntry['action'] == 'hide')
+                        continue;
+                    $sectionHtml .= $this->emitHtmlForListEntry($leafEntry['name'], 2);
+                }
+            }
+        }
+
+        return "<ul>$sectionHtml</ul>";
+    }
+
+    protected function emitHtmlForFacetSections()
+    {
+        $html = '';
+
+        foreach ($this->facetDefinitions as $facetId => $facetDefinition)
+        {
+            if (!isset($this->facetsTable[$facetId]))
+            {
+                // The search results contain no values for this facet.
+                continue;
+            }
+
+            if ($facetDefinition['hidden'])
+            {
+                // This facet is for future use and not currently being displayed.
+                continue;
+            }
+            $html .= $this->emitHtmlForFacetSectionEntries($facetId, $facetDefinition);
+        }
+
+        return $html;
+    }
+
+    public function emitHtmlForFacetsSidebar($aggregations, $query, $findUrl)
+    {
+        $this->createFacetsTable($aggregations);
+        $this->extractAppliedFacetsFromQueryString($query);
+
+        $this->setFacetsTableActions();
+
+        $html = $this->emitHtmlForFacetSections();
+
+        return $html;
 
         // Create a list of all the facet names that a user can add or remove. A user adds a facet by clicking the
         // add-link for its name. They remove a facet by clicking the remove-X that appears to the right of the name.
@@ -338,7 +392,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Start by creating a query string containing the query's search terms e.g. 'Bar Harbor' plus all facets
         // that are already applied e.g. type:images and date:1900's. An add-link is this same query string with and
         // argument added. A remove remove-X is the query string with an argument removed.
-        $appliedFacets = $this->getAppliedFacetsFromQueryString($query);
         $queryString = $this->createQueryStringWithFacets($query);
         $html = '';
 
@@ -376,7 +429,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             // Emit the section name for this facet.
             $sectionName = $facetDefinition['name'];
-            $html .= '<div class="elasticsearch-facet-name">' . $sectionName . '</div>';
             $html .= '<div class="facet-section">' . $sectionName . '</div>';
             $html .= "<ul>$listEntries</ul>";
         }
@@ -384,10 +436,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $html;
     }
 
-    protected function emitHtmlForListEntry($entry, $indent)
+    protected function emitHtmlForListEntry($entry, $level, $isRoot = false)
     {
-        $class = " class='elasticsearch-facet-level2'";
-        $class = " class='facet-entry-$indent'";
+        $className = "facet-entry-$level";
+        if ($level == 1)
+        {
+            $className .= $isRoot ? '-root' : '-leaf';
+        }
+        $class = " class='$className'";
+        $entry = str_replace(',', ', ', $entry);
         return "<li$class>$entry</li>";
     }
 
@@ -500,7 +557,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filter;
     }
 
-    public function getAppliedFacetsFromQueryString($query)
+    public function extractAppliedFacetsFromQueryString($query)
     {
         $appliedFacets = array(FACET_KIND_ROOT => array(), FACET_KIND_LEAF => array());
 
@@ -523,7 +580,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
         }
 
-        return $appliedFacets;
+        $this->appliedFacets = $appliedFacets;
     }
 
     public function getFacetDefinitions()
@@ -656,5 +713,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return array(FACET_KIND_ROOT => $root, FACET_KIND_LEAF => $leaf);
+    }
+
+    protected function stripRootFromLeafName($leafName)
+    {
+        $index = strpos($leafName, ',');
+        if ($index !== false)
+        {
+            $leafName = substr($leafName, $index + 1);
+        }
+        return $leafName;
     }
 }
