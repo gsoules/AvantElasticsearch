@@ -9,7 +9,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 {
     protected $facetDefinitions = array();
     protected $facetsTable = array();
+    protected $findUrl;
     protected $appliedFacets = array();
+    protected $queryStringWithApplieFacets;
 
     public function __construct()
     {
@@ -183,6 +185,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $updatedQueryString .= $this->createQueryStringArgsForFacets($roots, true);
         $updatedQueryString .= $this->createQueryStringArgsForFacets($facets, false);
 
+        $this->queryStringWithApplieFacets = $updatedQueryString;
         return $updatedQueryString;
     }
 
@@ -280,6 +283,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function createFacetsTable($aggregations)
     {
+        // Create a table containing the aggregation data returned from Elasticsearch for the search results.
+        // Each aggregate contains any array of buckets with each bucket containing a unique value and a count to
+        // indicate how many of the search results have that value. If the facet is a hierarchy, the bucket's value
+        // is the hierarchy's root name plus an array of sub-aggregate data for that root's leaf values. Each
+        // sub-aggregate contains its own array of buckets with each bucket containing a leaf value and count to
+        // indicate how many of the search results contain the leaf value for that root. For non-hierarchy facets
+        // like 'date' there are no sub-aggregates. In this code, both the leaf values for hierarchy facets and the
+        // top level values for non-hierarchy facets are referred to as leafs. Only the root value of hierarchy
+        // facets are referred to as roots.
+
         $table = array();
 
         foreach ($aggregations as $facetId=> $aggregation)
@@ -291,6 +304,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($buckets as $i => $bucket)
             {
                 $facetName = $bucket['key'];
+                $table[$facetId][$i]['id'] = $facetId;
                 $table[$facetId][$i]['name'] = $facetName;
                 $table[$facetId][$i]['count'] = $bucket['doc_count'];
                 $table[$facetId][$i]['action'] = 'add';
@@ -323,17 +337,51 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
     }
 
+    protected function emitHtmlForFacetEntry($entry, $level, $isRoot = false)
+    {
+        $className = "facet-entry-$level";
+        if ($level == 1)
+        {
+            $className .= $isRoot ? '-root' : '-leaf';
+        }
+        $class = " class='$className'";
+        $entry = str_replace(',', ', ', $entry);
+        return "<li$class>$entry</li>";
+    }
+
+    protected function emitFacetEntryActionHtml($facetTableEntry, $isRoot)
+    {
+        $action = $facetTableEntry['action'];
+        $facetName = $facetTableEntry['name'];
+
+        if ($action == 'add')
+        {
+            $actionHtml = $this->emitHtmlLinkForAddFilter($facetTableEntry['id'], $facetName, $isRoot);
+        }
+        else if ($action == 'remove')
+        {
+            $actionHtml = $facetName . ' [-]';
+        }
+        else
+        {
+            $actionHtml = $facetName;
+        }
+
+        return $actionHtml;
+    }
+
     protected function emitHtmlForFacetSectionEntries($facetId, $facetDefinition)
     {
-        // Emit the section header for this facet.
-        $sectionHtml = '<div class="facet-section">' . $facetDefinition['name'] . '</div>';
+        $html = '';
+        $sectionHasAppliedFacet = false;
 
         // Emit the entries for this facet.
         $entries = $this->facetsTable[$facetId];
         foreach ($entries as $entry)
         {
             $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
-            $sectionHtml .= $this->emitHtmlForListEntry($entry['name'], 1, $isRoot);
+            $action = $this->emitFacetEntryActionHtml($entry, $isRoot);
+            $html .= $this->emitHtmlForFacetEntry($action, 1, $isRoot);
 
             // Emit the leaf entries for this facet entry.
             if (isset($entry['leafs']))
@@ -343,12 +391,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 {
                     if ($leafEntry['action'] == 'hide')
                         continue;
-                    $sectionHtml .= $this->emitHtmlForListEntry($leafEntry['name'], 2);
+                    $leafAction = $this->emitFacetEntryActionHtml($leafEntry);
+                    $html .= $this->emitHtmlForFacetEntry($leafAction, 2);
                 }
             }
         }
 
-        return "<ul>$sectionHtml</ul>";
+        // Emit the section header for this facet.
+        $className = 'facet-section' . ($sectionHasAppliedFacet ? '-applied' : '');
+        $sectionHeader = "<div class='$className'>{$facetDefinition['name']}</div>";
+        return "$sectionHeader<ul>$html</ul>";
     }
 
     protected function emitHtmlForFacetSections()
@@ -368,6 +420,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 // This facet is for future use and not currently being displayed.
                 continue;
             }
+
             $html .= $this->emitHtmlForFacetSectionEntries($facetId, $facetDefinition);
         }
 
@@ -376,76 +429,27 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function emitHtmlForFacetsSidebar($aggregations, $query, $findUrl)
     {
-        $this->createFacetsTable($aggregations);
-        $this->extractAppliedFacetsFromQueryString($query);
+        $this->findUrl = $findUrl;
 
+        // Get the facets that were applied to the search request.
+        $this->extractAppliedFacetsFromSearchRequest($query);
+
+        // Create a table of all the facet values that Elasticsearch returned in the search results.
+        $this->createFacetsTable($aggregations);
+
+        // Create a query string containing the query's search terms e.g. 'Bar Harbor' plus all facets that are
+        // already applied e.g. type:images and date:1900's. An add-link is this same query string with an addition
+        // argument for the facet to be added. A remove-X link is the query string minus the argument for the
+        // facet to be removed.
+        $this->createQueryStringWithFacets($query);
+
+        // Indicate how each facet should appear in the sidebar: add-link, remove-X, disabled, hidden.
         $this->setFacetsTableActions();
 
+        // Display all the facet entries.
         $html = $this->emitHtmlForFacetSections();
 
         return $html;
-
-        // Create a list of all the facet names that a user can add or remove. A user adds a facet by clicking the
-        // add-link for its name. They remove a facet by clicking the remove-X that appears to the right of the name.
-        // In this code each list item is referred to as an entry which is a facet name wrapped in <li></li> tags.
-
-        // Start by creating a query string containing the query's search terms e.g. 'Bar Harbor' plus all facets
-        // that are already applied e.g. type:images and date:1900's. An add-link is this same query string with and
-        // argument added. A remove remove-X is the query string with an argument removed.
-        $queryString = $this->createQueryStringWithFacets($query);
-        $html = '';
-
-        foreach ($this->facetDefinitions as $facetId => $facetDefinition)
-        {
-            // Get the array of aggregation data returned from Elasticsearch for this definition.
-            // Each aggregate contains any array of buckets with each bucket containing a unique value and a count to
-            // indicate how many of the search results have that value. If the facet is a hierarchy, the bucket's value
-            // is the hierarchy's root name plus an array of sub-aggregate data for that root's leaf values. Each
-            // sub-aggregate contains its own array of buckets with each bucket containing a leaf value and count to
-            // indicate how many of the search results contain the leaf value for that root. For non-hierarchy facets
-            // like 'date' there are no sub-aggregates. In this code, both the leaf values for hierarchy facets and the
-            // top level values for non-hierarchy facets are referred to as leafs. Only the root value of hierarchy
-            // facets are referred to as roots.
-
-            $buckets = $aggregations[$facetId]['buckets'];
-            if (count($buckets) == 0 || $facetDefinition['hidden'])
-            {
-                // Ignore empty or hidden facets. There will be no buckets if none of the search results contain
-                // a value for this facet definition. Hidden facets are ones we are choosing not to show for now.
-                continue;
-            }
-
-            // Determine if this definition of for a hierarchy so that subsequent logic knows whether it needs
-            // to process sub-aggregates for hierarchy leaf values.
-            $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
-
-            // Create either an add-link entry or a remove-X entry for each bucket value and add it to the list.
-            $listEntries = '';
-            foreach ($buckets as $bucket)
-            {
-                $entry = $this->emitHtmlLinksForFacetFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot);
-                $listEntries .= $this->emitHtmlForListEntry($entry, 2);
-            }
-
-            // Emit the section name for this facet.
-            $sectionName = $facetDefinition['name'];
-            $html .= '<div class="facet-section">' . $sectionName . '</div>';
-            $html .= "<ul>$listEntries</ul>";
-        }
-
-        return $html;
-    }
-
-    protected function emitHtmlForListEntry($entry, $level, $isRoot = false)
-    {
-        $className = "facet-entry-$level";
-        if ($level == 1)
-        {
-            $className .= $isRoot ? '-root' : '-leaf';
-        }
-        $class = " class='$className'";
-        $entry = str_replace(',', ', ', $entry);
-        return "<li$class>$entry</li>";
     }
 
     protected function emitHtmlLinksForFacetFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot)
@@ -462,7 +466,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
         else
         {
-            $filters = $this->emitHtmlLinkForFacetFilterNotApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue);
+            $filters = '';//$this->emitHtmlLinkForAddFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue);
         }
 
         return $filters;
@@ -498,7 +502,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filters;
     }
 
-    protected function emitHtmlLinkForFacetFilterNotApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue)
+    protected function emitHtmlLinkForAddFilter($facetId, $facetName, $isRoot)
     {
         // Add an argument to the query string for each facet that is already applied.
         // The applied facets are structured as follows:
@@ -509,8 +513,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Note that the user interface might not allow, for example, two root level facets of the same
         // type to be selected as filters, but this logic handles any combination of applied facets.
         //
-        $updatedQueryString = $queryString;
-        foreach ($appliedFacets as $kind => $appliedFacet)
+        $updatedQueryString = $this->queryStringWithApplieFacets;
+        foreach ($this->appliedFacets as $kind => $appliedFacet)
         {
             foreach ($appliedFacet as $appliedFacetId => $appliedFacetValues)
             {
@@ -522,27 +526,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         // Add an argument to the query string for the facet now being added.
-        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetId, $facetValue, $isRoot);
+        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetId, $facetName, $isRoot);
 
         // Create the link that the user can click to apply this facet plus all the already applied facets.
         // In the link text, add a space after each comma for readability.
-        $facetUrl = $findUrl . '?' . $updatedQueryString;
-        $count = ' (' . $bucket['doc_count'] . ')';
-        $linkText = str_replace(',', ', ', $facetValue);
+        $facetUrl = $this->findUrl . '?' . $updatedQueryString;
+        $linkText = str_replace(',', ', ', $facetName);
 
-        if (!$isRoot)
-        {
-            $index = strpos($linkText, ',');
-            if ($index !== false)
-            {
-                // Remove the leaf's root text.
-                $linkText = substr($linkText, $index + strlen(', '));
-            }
-        }
-
-        $filter = '<a href="' . $facetUrl . '">' . $linkText . '</a>' . $count;
-        $class = $isRoot ? " class='elasticsearch-facet-level2'" : " class='elasticsearch-facet-level3'";
-        return "<li$class>$filter</li>";
+        $link = '<a href="' . $facetUrl . '">' . $linkText . '</a>';
+        return $link;
     }
 
     protected function emitHtmlLinkForRemoveFilter($queryString, $facetToRemoveId, $facetToRemoveValue, $findUrl, $isRoot)
@@ -557,7 +549,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filter;
     }
 
-    public function extractAppliedFacetsFromQueryString($query)
+    public function extractAppliedFacetsFromSearchRequest($query)
     {
         $appliedFacets = array(FACET_KIND_ROOT => array(), FACET_KIND_LEAF => array());
 
