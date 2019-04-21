@@ -19,79 +19,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    protected function checkIfFacetAlreadyApplied($appliedFacets, $facetToCheckKind, $facetToCheckId, $facetToCheckValue)
-    {
-        if ($facetToCheckKind == FACET_KIND_ROOT)
-        {
-            $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_ROOT, $appliedFacets, $facetToCheckId, $facetToCheckValue);
-            if ($applied)
-            {
-                return true;
-            }
-        }
-
-        $applied = $this->checkIfFacetKindAlreadyApplied(FACET_KIND_LEAF, $appliedFacets, $facetToCheckId, $facetToCheckValue);
-
-        return $applied;
-    }
-
-    protected function checkIfFacetKindAlreadyApplied($appliedFacetsToCheckKind, $appliedFacets, $facetToCheckId, $facetToCheckValue)
-    {
-        $appliedFacetsToCheck = $appliedFacets[$appliedFacetsToCheckKind];
-        if (empty($appliedFacetsToCheck))
-        {
-            return false;
-        }
-
-        foreach ($appliedFacetsToCheck as $appliedFacetId => $appliedFacetValues)
-        {
-            if ($facetToCheckId != $appliedFacetId)
-            {
-                continue;
-            }
-
-            foreach ($appliedFacetValues as $appliedFacetValue)
-            {
-                if ($appliedFacetValue == $facetToCheckValue)
-                {
-                    return true;
-                }
-
-                // This code is reached when a root facet value to check does not match an applied root facet value.
-                // Check now to see if the root facet value to check is the root of an applied leaf facet value.
-                // For example, if the root facet value to check is 'Image', see if it's the root of an applied leaf
-                // facet value of the same type like 'Image,Art,Drawing'. If yes, the root facet is implicitly applied.
-                $facetToCheckValueIsRootOfAppliedFacetValue = strpos($appliedFacetValue, $facetToCheckValue . ',') === 0;
-                if ($facetToCheckValueIsRootOfAppliedFacetValue)
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    protected function checkIfRootLeafAlreadyApplied($appliedFacets, $facetToCheckId, $facetToCheckValue)
-    {
-        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, FACET_KIND_LEAF, $facetToCheckId, $facetToCheckValue);
-        return $applied;
-    }
-
-    protected function createFacet($id, $name, $isHierarchy = false)
-    {
-        $definition = array(
-            'id' => $id,
-            'name' => $name,
-            'is_date' => false,
-            'is_hierarchy' => $isHierarchy,
-            'show_root' => true,
-            'multi_value' => false,
-            'hidden' => false);
-
-        $this->facetDefinitions[$id] = $definition;
-    }
-
     public function createAggregationsForElasticsearchQuery()
     {
         foreach ($this->facetDefinitions as $facetId => $definition)
@@ -135,6 +62,44 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $aggregations;
     }
 
+    protected function createFacet($id, $name, $isHierarchy = false)
+    {
+        $definition = array(
+            'id' => $id,
+            'name' => $name,
+            'is_date' => false,
+            'is_hierarchy' => $isHierarchy,
+            'show_root' => true,
+            'multi_value' => false,
+            'hidden' => false);
+
+        $this->facetDefinitions[$id] = $definition;
+    }
+
+    protected function createFacetEntryActionHtml($facetTableEntry, $isRoot)
+    {
+        $action = $facetTableEntry['action'];
+        $facetArg = $facetTableEntry['arg'];
+        $facetName = $facetTableEntry['name'];
+        $html = 'NO ACTION SET';
+
+        if ($action == 'add')
+        {
+            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
+            $html .= " ({$facetTableEntry['count']})";
+        }
+        else if ($action == 'remove')
+        {
+            $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
+        }
+        else if ($action == 'disable')
+        {
+            $html = $facetName;
+        }
+
+        return array('action' => $action, 'html' => $html);
+    }
+
     protected function createFacetFilter($filters, $roots, $leafs, $facetDefinition)
     {
         // Create a separate term filter for each value so that the filters are ANDed
@@ -172,21 +137,52 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filters;
     }
 
-    public function createQueryStringWithFacets($query)
+    protected function createFacetsTable($aggregations)
     {
-        // Get the search terms plus the root and leaf facets specified in the query.
-        $terms = isset($query['query']) ? $query['query'] : '';
-        $facets = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : array();
-        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : array();
+        // Create a table containing the aggregation data returned from Elasticsearch for the search results.
+        // Each aggregate contains any array of buckets with each bucket containing a unique value and a count to
+        // indicate how many of the search results have that value. If the facet is a hierarchy, the bucket's value
+        // is the hierarchy's root name plus an array of sub-aggregate data for that root's leaf values. Each
+        // sub-aggregate contains its own array of buckets with each bucket containing a leaf value and count to
+        // indicate how many of the search results contain the leaf value for that root. For non-hierarchy facets
+        // like 'date' there are no sub-aggregates. In this code, both the leaf values for hierarchy facets and the
+        // top level values for non-hierarchy facets are referred to as leafs. Only the root value of hierarchy
+        // facets are referred to as roots.
 
-        // Create a query string that contains the terms and args.
-        $queryString = "query=".urlencode($terms);
-        $updatedQueryString = $queryString;
-        $updatedQueryString .= $this->createQueryStringArgsForFacets($roots, true);
-        $updatedQueryString .= $this->createQueryStringArgsForFacets($facets, false);
+        $table = array();
 
-        $this->queryStringWithApplieFacets = $updatedQueryString;
-        return $updatedQueryString;
+        foreach ($aggregations as $facetId=> $aggregation)
+        {
+            $buckets = $aggregation['buckets'];
+            if (empty($buckets))
+                continue;
+
+            foreach ($buckets as $i => $bucket)
+            {
+                $facetName = $bucket['key'];
+                $table[$facetId][$i]['id'] = $facetId;
+                $table[$facetId][$i]['name'] = $facetName;
+                $table[$facetId][$i]['arg'] = $facetName;
+                $table[$facetId][$i]['count'] = $bucket['doc_count'];
+                $table[$facetId][$i]['action'] = 'add';
+
+                $leafBuckets = isset($bucket['leafs']['buckets']) ? $bucket['leafs']['buckets'] : array();
+
+                if (empty($leafBuckets))
+                    continue;
+
+                foreach ($leafBuckets as $j => $leafBucket)
+                {
+                    $leafFacetName = $leafBucket['key'];
+                    $table[$facetId][$i]['leafs'][$j]['id'] = $facetId;
+                    $table[$facetId][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
+                    $table[$facetId][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
+                    $table[$facetId][$i]['leafs'][$j]['count'] = $leafBucket['doc_count'];
+                    $table[$facetId][$i]['leafs'][$j]['action'] = 'hide';
+                }
+            }
+        }
+        $this->facetsTable = $table;
     }
 
     protected function createQueryStringArgsForFacets($facets, $isRoot)
@@ -204,6 +200,23 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $queryStringArgs;
+    }
+
+    public function createQueryStringWithFacets($query)
+    {
+        // Get the search terms plus the root and leaf facets specified in the query.
+        $terms = isset($query['query']) ? $query['query'] : '';
+        $facets = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : array();
+        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : array();
+
+        // Create a query string that contains the terms and args.
+        $queryString = "query=".urlencode($terms);
+        $updatedQueryString = $queryString;
+        $updatedQueryString .= $this->createQueryStringArgsForFacets($roots, true);
+        $updatedQueryString .= $this->createQueryStringArgsForFacets($facets, false);
+
+        $this->queryStringWithApplieFacets = $updatedQueryString;
+        return $updatedQueryString;
     }
 
     protected function defineFacets()
@@ -281,92 +294,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return implode('&', $afterArgs);
     }
 
-    protected function createFacetsTable($aggregations)
-    {
-        // Create a table containing the aggregation data returned from Elasticsearch for the search results.
-        // Each aggregate contains any array of buckets with each bucket containing a unique value and a count to
-        // indicate how many of the search results have that value. If the facet is a hierarchy, the bucket's value
-        // is the hierarchy's root name plus an array of sub-aggregate data for that root's leaf values. Each
-        // sub-aggregate contains its own array of buckets with each bucket containing a leaf value and count to
-        // indicate how many of the search results contain the leaf value for that root. For non-hierarchy facets
-        // like 'date' there are no sub-aggregates. In this code, both the leaf values for hierarchy facets and the
-        // top level values for non-hierarchy facets are referred to as leafs. Only the root value of hierarchy
-        // facets are referred to as roots.
-
-        $table = array();
-
-        foreach ($aggregations as $facetId=> $aggregation)
-        {
-            $buckets = $aggregation['buckets'];
-            if (empty($buckets))
-                continue;
-
-            foreach ($buckets as $i => $bucket)
-            {
-                $facetName = $bucket['key'];
-                $table[$facetId][$i]['id'] = $facetId;
-                $table[$facetId][$i]['name'] = $facetName;
-                $table[$facetId][$i]['arg'] = $facetName;
-                $table[$facetId][$i]['count'] = $bucket['doc_count'];
-                $table[$facetId][$i]['action'] = 'add';
-
-                $leafBuckets = isset($bucket['leafs']['buckets']) ? $bucket['leafs']['buckets'] : array();
-
-                if (empty($leafBuckets))
-                    continue;
-
-                foreach ($leafBuckets as $j => $leafBucket)
-                {
-                    $leafFacetName = $leafBucket['key'];
-                    $table[$facetId][$i]['leafs'][$j]['id'] = $facetId;
-                    $table[$facetId][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
-                    $table[$facetId][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
-                    $table[$facetId][$i]['leafs'][$j]['count'] = $leafBucket['doc_count'];
-                    $table[$facetId][$i]['leafs'][$j]['action'] = 'hide';
-                }
-            }
-        }
-        $this->facetsTable = $table;
-    }
-
-    protected function setFacetsTableActions()
-    {
-        $appliedRootFacets = $this->appliedFacets['root'];
-        $appliedLeafFacets = $this->appliedFacets['leaf'];
-
-        foreach ($appliedRootFacets as $rootFaceId => $rootFacetName)
-        {
-            $facetIndex = 0;
-
-            // Set this applied facet's action to remove
-            $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'remove';
-
-            if (isset($this->facetsTable[$rootFaceId][$facetIndex]['leafs']))
-            {
-                // See the action for each of the root's leafs.
-                foreach ($this->facetsTable[$rootFaceId][$facetIndex]['leafs'] as $index => $leaf)
-                {
-                    $leafIsApplied = isset($appliedLeafFacets[$rootFaceId]) && $appliedLeafFacets[$rootFaceId][0] == $leaf['arg'];
-                    if ($leafIsApplied)
-                    {
-                        // Since this leaf facet is applied, disable removal of its root facet. This is to avoid the
-                        // confusion of removing the root facet while the search results are still limited by the
-                        // leaf facet. By disabling the root, the user must first remove the leaf facet which will then
-                        // enable removal of the root facet.
-                        $actionKind = 'remove';
-                        $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'disable';
-                    }
-                    else
-                    {
-                        // Make the leaf visible by changing its action from 'hide' to 'add'.
-                        $actionKind = 'add';
-                    }
-                    $this->facetsTable[$rootFaceId][$facetIndex]['leafs'][$index]['action'] = $actionKind;
-                }
-            }
-        }
-    }
-
     protected function emitHtmlForFacetEntry($action, $level, $isRoot = false)
     {
         $html = $action['html'];
@@ -385,30 +312,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $class = " class='$className'";
 
         return "<li$class>$html</li>";
-    }
-
-    protected function createFacetEntryActionHtml($facetTableEntry, $isRoot)
-    {
-        $action = $facetTableEntry['action'];
-        $facetArg = $facetTableEntry['arg'];
-        $facetName = $facetTableEntry['name'];
-        $html = 'NO ACTION SET';
-
-        if ($action == 'add')
-        {
-            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
-            $html .= " ({$facetTableEntry['count']})";
-        }
-        else if ($action == 'remove')
-        {
-            $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
-        }
-        else if ($action == 'disable')
-        {
-            $html = $facetName;
-        }
-
-        return array('action' => $action, 'html' => $html);
     }
 
     protected function emitHtmlForFacetSection($facetId, $facetDefinition)
@@ -493,56 +396,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $html = $this->emitHtmlForFacetSections();
 
         return $html;
-    }
-
-    protected function emitHtmlLinksForFacetFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot)
-    {
-        $facetValue = $bucket['key'];
-        $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
-
-        // Determine whether this facet has already been applied.
-        $applied = $this->checkIfFacetAlreadyApplied($appliedFacets, $kind, $facetId, $facetValue);
-
-        if ($applied)
-        {
-            $filters = $this->emitHtmlLinksForFacetFilterApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue);
-        }
-        else
-        {
-            $filters = '';//$this->emitHtmlLinkForAddFilter($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue);
-        }
-
-        return $filters;
-    }
-
-    protected function emitHtmlLinksForFacetFilterApplied($bucket, $queryString, $appliedFacets, $facetId, $findUrl, $isRoot, $facetValue)
-    {
-        if ($isRoot && $this->checkIfRootLeafAlreadyApplied($appliedFacets, $facetId, $facetValue))
-        {
-            // Only show the root value without a remove 'X'. This way a user can't remove the root
-            // filter without first removing the root's leaf filter.
-            $class = " class='elasticsearch-facet-level2'";
-            $filter = $facetValue;
-        }
-        else
-        {
-            // Create the link that allows the user to remove this filter.
-            $class = " class='elasticsearch-facet-level3'";
-            $filter = '';//$this->emitHtmlLinkForRemoveFilter($queryString, $facetId, $facetValue, $findUrl, $isRoot);
-        }
-
-        $filters = "<li$class>$filter</li>";
-
-        if ($isRoot)
-        {
-            // Emit this facet's leafs by calling this method recursively.
-            foreach ($bucket['leafs']['buckets'] as $leafBucket)
-            {
-                $filters .= $this->emitHtmlLinksForFacetFilter($leafBucket, $queryString, $appliedFacets, $facetId, $findUrl, false);
-            }
-        }
-
-        return $filters;
     }
 
     protected function emitHtmlLinkForAddFilter($facetToAddId, $facetToAddName, $facetToAddArg, $isRoot)
@@ -635,6 +488,49 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filters;
     }
 
+    protected function getFacetHierarchyParts($text, $getRoot)
+    {
+        // Normalize the text so that hierarchy parts are separated by commas with no spaces.
+        // This regex replaces a comma followed by one or more spaces with just a comma.
+        $text = trim(preg_replace('/,\s+/', ',', $text));
+        $parts = explode(',', $text);
+        $partsCount = count($parts);
+
+        // Extract the root and leaf values. In this case, the leaf is the entire string minus any
+        // any values in between the root and the actual leaf. See examples below.
+        $root = $parts[0];
+
+        $last = $partsCount - 1;
+        $lastPart = $parts[$last];
+
+        if ($getRoot)
+        {
+            $leaf = $root;
+
+            if ($partsCount == 2)
+            {
+                // Example: 'Image,Photograph' => 'Image,Photograph'
+                $leaf .= ",$parts[1]";
+            }
+            else if ($partsCount == 3)
+            {
+                // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
+                $leaf .= ",$parts[1],$parts[2]";
+            }
+            else if ($partsCount > 3)
+            {
+                // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Glass Plate'
+                $leaf .= ",$parts[1],$lastPart";
+            }
+        }
+        else
+        {
+            $leaf = $lastPart;
+        }
+
+        return array(FACET_KIND_ROOT => $root, FACET_KIND_LEAF => $leaf);
+    }
+
     protected function getFacetValueForDate($text)
     {
         if ($text == '')
@@ -707,47 +603,42 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $values;
     }
 
-    protected function getFacetHierarchyParts($text, $getRoot)
+    protected function setFacetsTableActions()
     {
-        // Normalize the text so that hierarchy parts are separated by commas with no spaces.
-        // This regex replaces a comma followed by one or more spaces with just a comma.
-        $text = trim(preg_replace('/,\s+/', ',', $text));
-        $parts = explode(',', $text);
-        $partsCount = count($parts);
+        $appliedRootFacets = $this->appliedFacets['root'];
+        $appliedLeafFacets = $this->appliedFacets['leaf'];
 
-        // Extract the root and leaf values. In this case, the leaf is the entire string minus any
-        // any values in between the root and the actual leaf. See examples below.
-        $root = $parts[0];
-
-        $last = $partsCount - 1;
-        $lastPart = $parts[$last];
-
-        if ($getRoot)
+        foreach ($appliedRootFacets as $rootFaceId => $rootFacetName)
         {
-            $leaf = $root;
+            $facetIndex = 0;
 
-            if ($partsCount == 2)
+            // Set this applied facet's action to remove
+            $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'remove';
+
+            if (isset($this->facetsTable[$rootFaceId][$facetIndex]['leafs']))
             {
-                // Example: 'Image,Photograph' => 'Image,Photograph'
-                $leaf .= ",$parts[1]";
-            }
-            else if ($partsCount == 3)
-            {
-                // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
-                $leaf .= ",$parts[1],$parts[2]";
-            }
-            else if ($partsCount > 3)
-            {
-                // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Glass Plate'
-                $leaf .= ",$parts[1],$lastPart";
+                // See the action for each of the root's leafs.
+                foreach ($this->facetsTable[$rootFaceId][$facetIndex]['leafs'] as $index => $leaf)
+                {
+                    $leafIsApplied = isset($appliedLeafFacets[$rootFaceId]) && $appliedLeafFacets[$rootFaceId][0] == $leaf['arg'];
+                    if ($leafIsApplied)
+                    {
+                        // Since this leaf facet is applied, disable removal of its root facet. This is to avoid the
+                        // confusion of removing the root facet while the search results are still limited by the
+                        // leaf facet. By disabling the root, the user must first remove the leaf facet which will then
+                        // enable removal of the root facet.
+                        $actionKind = 'remove';
+                        $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'disable';
+                    }
+                    else
+                    {
+                        // Make the leaf visible by changing its action from 'hide' to 'add'.
+                        $actionKind = 'add';
+                    }
+                    $this->facetsTable[$rootFaceId][$facetIndex]['leafs'][$index]['action'] = $actionKind;
+                }
             }
         }
-        else
-        {
-            $leaf = $lastPart;
-        }
-
-        return array(FACET_KIND_ROOT => $root, FACET_KIND_LEAF => $leaf);
     }
 
     protected function stripRootFromLeafName($leafName)
