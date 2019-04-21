@@ -306,6 +306,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $facetName = $bucket['key'];
                 $table[$facetId][$i]['id'] = $facetId;
                 $table[$facetId][$i]['name'] = $facetName;
+                $table[$facetId][$i]['arg'] = $facetName;
                 $table[$facetId][$i]['count'] = $bucket['doc_count'];
                 $table[$facetId][$i]['action'] = 'add';
 
@@ -316,8 +317,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                 foreach ($leafBuckets as $j => $leafBucket)
                 {
-                    $leafFacetName = $this->stripRootFromLeafName($leafBucket['key']);
-                    $table[$facetId][$i]['leafs'][$j]['name'] = $leafFacetName;
+                    $leafFacetName = $leafBucket['key'];
+                    $table[$facetId][$i]['leafs'][$j]['id'] = $facetId;
+                    $table[$facetId][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
+                    $table[$facetId][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
                     $table[$facetId][$i]['leafs'][$j]['count'] = $leafBucket['doc_count'];
                     $table[$facetId][$i]['leafs'][$j]['action'] = 'hide';
                 }
@@ -333,12 +336,34 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($appliedRootFacets as $rootFaceId => $rootFacetName)
         {
-            $this->facetsTable[$rootFaceId][0]['action'] = 'remove';
-        }
+            $facetIndex = 0;
 
-        foreach ($appliedLeafFacets as $leafFacetId => $leafFacetName)
-        {
-            $this->facetsTable[$leafFacetId][0]['action'] = 'remove';
+            // Set this applied facet's action to remove
+            $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'remove';
+
+            if (isset($this->facetsTable[$rootFaceId][$facetIndex]['leafs']))
+            {
+                // See the action for each of the root's leafs.
+                foreach ($this->facetsTable[$rootFaceId][$facetIndex]['leafs'] as $index => $leaf)
+                {
+                    $leafIsApplied = isset($appliedLeafFacets[$rootFaceId]) && $appliedLeafFacets[$rootFaceId][0] == $leaf['arg'];
+                    if ($leafIsApplied)
+                    {
+                        // Since this leaf facet is applied, disable removal of its root facet. This is to avoid the
+                        // confusion of removing the root facet while the search results are still limited by the
+                        // leaf facet. By disabling the root, the user must first remove the leaf facet which will then
+                        // enable removal of the root facet.
+                        $actionKind = 'remove';
+                        $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'disable';
+                    }
+                    else
+                    {
+                        // Make the leaf visible by changing its action from 'hide' to 'add'.
+                        $actionKind = 'add';
+                    }
+                    $this->facetsTable[$rootFaceId][$facetIndex]['leafs'][$index]['action'] = $actionKind;
+                }
+            }
         }
     }
 
@@ -346,33 +371,39 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         $html = $action['html'];
         $className = "facet-entry-$level";
+
         if ($level == 1)
         {
             $className .= $isRoot ? '-root' : '-leaf';
         }
+
         if ($action['action'] == 'remove')
         {
             $className .= ' facet-entry-applied';
         }
+
         $class = " class='$className'";
-        $html = str_replace(',', ', ', $html);
+
         return "<li$class>$html</li>";
     }
 
     protected function createFacetEntryActionHtml($facetTableEntry, $isRoot)
     {
         $action = $facetTableEntry['action'];
+        $facetArg = $facetTableEntry['arg'];
         $facetName = $facetTableEntry['name'];
+        $html = 'NO ACTION SET';
 
         if ($action == 'add')
         {
-            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['id'], $facetName, $isRoot);
+            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
+            $html .= " ({$facetTableEntry['count']})";
         }
         else if ($action == 'remove')
         {
-            $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['id'], $facetName, $isRoot);
+            $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
         }
-        else
+        else if ($action == 'disable')
         {
             $html = $facetName;
         }
@@ -514,7 +545,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $filters;
     }
 
-    protected function emitHtmlLinkForAddFilter($facetToAddId, $facetToAddName, $isRoot)
+    protected function emitHtmlLinkForAddFilter($facetToAddId, $facetToAddName, $facetToAddArg, $isRoot)
     {
         // Add an argument to the query string for each facet that is already applied.
         // The applied facets are structured as follows:
@@ -538,7 +569,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         // Add an argument to the query string for the facet now being added.
-        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddId, $facetToAddName, $isRoot);
+        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddId, $facetToAddArg, $isRoot);
 
         // Create the link that the user can click to apply this facet plus all the already applied facets.
         // In the link text, add a space after each comma for readability.
@@ -549,9 +580,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $link;
     }
 
-    protected function emitHtmlLinkForRemoveFilter($facetToRemoveId, $facetToRemoveName, $isRoot)
+    protected function emitHtmlLinkForRemoveFilter($facetToRemoveId, $facetToRemoveName, $facetToRemoveArg, $isRoot)
     {
-        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($this->queryStringWithApplieFacets, $facetToRemoveId, $facetToRemoveName, $isRoot);
+        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($this->queryStringWithApplieFacets, $facetToRemoveId, $facetToRemoveArg, $isRoot);
 
         // Create the link that the user can click to remove this facet, but leave all the other applied facets.
         // In the facet text, add a space after each comma for readability.
