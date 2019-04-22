@@ -7,11 +7,12 @@ define('FACET_KIND_LEAF', 'leaf');
 
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
+    protected $appliedFacets = array();
     protected $facetDefinitions = array();
     protected $facetsTable = array();
     protected $findUrl;
-    protected $appliedFacets = array();
     protected $queryStringWithApplieFacets;
+    protected $totalResults;
 
     public function __construct()
     {
@@ -342,12 +343,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $entries = $this->facetsTable[$facetId];
         foreach ($entries as $entry)
         {
+            // Emit the root and non-hierarchy leaf entries for this section.
             $isRoot = $facetDefinition['is_root_hierarchy'];
             $action = $this->createFacetEntryActionHtml($entry, $isRoot);
             $facetApplied = $action['action'] == 'remove' ? true : $facetApplied;
             $html .= $this->emitHtmlForFacetEntry($action, 1, $isRoot);
 
-            // Emit the leaf entries for this facet entry.
+            // Emit hierarchy  leaf entries for this facet entry.
             if (isset($entry['leafs']))
             {
                 $leafEntries = $entry['leafs'];
@@ -394,9 +396,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $html;
     }
 
-    public function emitHtmlForFacetsSidebar($aggregations, $query, $findUrl)
+    public function emitHtmlForFacetsSidebar($aggregations, $query, $totalResults, $findUrl)
     {
         $this->findUrl = $findUrl;
+        $this->totalResults = $totalResults;
 
         // Get the facets that were applied to the search request.
         $this->extractAppliedFacetsFromSearchRequest($query);
