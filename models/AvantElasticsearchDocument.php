@@ -77,7 +77,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $titleString = '';
         $titleFieldTexts = null;
         $itemTypeIsReference = false;
-        $itemTitleIsPerson = false;
+        $itemSubjectIsPeople = false;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
@@ -121,10 +121,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             {
                 // TO-DO: Make this logic generic so it doesn't depend on knowledge of specific type and subject values.
                 $itemTypeIsReference = $fieldTextsString == 'Reference';
-                if ($elasticsearchFieldName == 'subject')
-                {
-                    $itemTitleIsPerson = strpos($fieldTextsString, 'People') !== false;
-                }
+            }
+
+            if ($elasticsearchFieldName == 'subject')
+            {
+                $itemSubjectIsPeople = strpos($fieldTextsString, 'People') !== false;
             }
 
             // Save the element's text.
@@ -147,6 +148,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($titleFieldTexts))
         {
             $avantLogicSuggest = new AvantElasticsearchSuggest();
+            $itemTitleIsPerson = $itemTypeIsReference && $itemSubjectIsPeople;
             $suggestionData = $avantLogicSuggest->CreateSuggestionsDataForTitle($titleFieldTexts, $itemTypeIsReference, $itemTitleIsPerson);
             $this->body['suggestions'] = $suggestionData;
         }
