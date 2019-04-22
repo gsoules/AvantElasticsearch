@@ -23,7 +23,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         foreach ($this->facetDefinitions as $facetId => $definition)
         {
-            if ($definition['is_hierarchy'] && $definition['show_root'])
+            if ($definition['is_root_hierarchy'])
             {
                 // Build a sub-aggregation to get buckets of root values, each containing buckets of leaf values.
                 $terms[$facetId] = [
@@ -62,16 +62,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $aggregations;
     }
 
-    protected function createFacet($id, $name, $isHierarchy = false)
+    protected function createFacet($id, $name, $isHierarchy = false, $isRootHierarchy = false)
     {
         $definition = array(
             'id' => $id,
             'name' => $name,
             'is_date' => false,
             'is_hierarchy' => $isHierarchy,
-            'show_root' => true,
+            'is_root_hierarchy' => $isRootHierarchy,
             'multi_value' => false,
-            'hidden' => false);
+            'not_used' => false);
 
         $this->facetDefinitions[$id] = $definition;
     }
@@ -128,7 +128,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             $term = "facet.$facetId";
 
-            if ($facetDefinition['is_hierarchy'] && $facetDefinition['show_root'])
+            if ($facetDefinition['is_root_hierarchy'])
             {
                 $term .= ".leaf";
             }
@@ -239,23 +239,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function defineFacets()
     {
-        // The order is the order in which facet names appear in the Filters section on the search results page.
-        $this->createFacet('subject', 'Subjects', true);
+        // The order below is the order in which facet names appear in the facets section on the search results page.
+
+        $this->createFacet('subject', 'Subjects', true, true);
         $this->facetDefinitions['subject']['multi_value'] = true;
 
-        $this->createFacet('type', 'Item Type', true);
+        $this->createFacet('type', 'Item Type', true, true);
 
         $this->createFacet('place', 'Places', true);
-        $this->facetDefinitions['place']['show_root'] = false;
 
         $this->createFacet('date', 'Dates');
         $this->facetDefinitions['date']['is_date'] = true;
 
         // Tags are fully supported, but for now don't show this facet.
         $this->createFacet('tag', 'Tags');
-        $this->facetDefinitions['tag']['hidden'] = true;
+        $this->facetDefinitions['tag']['not_used'] = true;
 
         $this->createFacet('owner', 'Owner');
+        $this->facetDefinitions['owner']['not_used'] = true;
     }
 
     public function editQueryStringToAddFacetArg($queryString, $facetToAddId, $facetToAddValue, $isRoot)
@@ -341,7 +342,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $entries = $this->facetsTable[$facetId];
         foreach ($entries as $entry)
         {
-            $isRoot = $facetDefinition['is_hierarchy'] && $facetDefinition['show_root'];
+            $isRoot = $facetDefinition['is_root_hierarchy'];
             $action = $this->createFacetEntryActionHtml($entry, $isRoot);
             $facetApplied = $action['action'] == 'remove' ? true : $facetApplied;
             $html .= $this->emitHtmlForFacetEntry($action, 1, $isRoot);
@@ -381,7 +382,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 continue;
             }
 
-            if ($facetDefinition['hidden'])
+            if ($facetDefinition['not_used'])
             {
                 // This facet is for future use and not currently being displayed.
                 continue;
@@ -605,7 +606,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             if ($facetDefinition['is_hierarchy'])
             {
                 // Get the root and leaf for hierarchy values.
-                $showRoot = $this->facetDefinitions[$elasticsearchFieldName]['show_root'];
+                $showRoot = $this->facetDefinitions[$elasticsearchFieldName]['is_root_hierarchy'];
                 $hierarchy = $this->getFacetHierarchyParts($text, $showRoot);
 
                 if ($showRoot)
@@ -656,7 +657,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 {
                     if ($facetTableEntry['name'] == $rootFacetName)
                     {
-                       $facetIndex = $index;
+                        $facetIndex = $index;
+                        break;
                     }
                 }
 
@@ -689,6 +691,31 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         $this->facetsTable[$rootFaceId][$facetIndex]['leafs'][$index]['action'] = $actionKind;
                     }
                 }
+            }
+        }
+
+        foreach ($appliedLeafFacets as $leafFaceId => $leafFacetNames)
+        {
+            if ($this->facetDefinitions[$leafFaceId]['is_root_hierarchy'])
+            {
+                continue;
+            }
+
+            // Find this applied facet name in the facets table.
+            foreach ($leafFacetNames as $leafFacetName)
+            {
+                // Find this applied facet name in the facets table.
+                $facetIndex = 0;
+                foreach ($this->facetsTable[$leafFaceId] as $index => $facetTableEntry)
+                {
+                    if ($facetTableEntry['name'] == $leafFacetName)
+                    {
+                        $facetIndex = $index;
+                        break;
+                    }
+                }
+                // Set this applied facet's action to remove
+                $this->facetsTable[$leafFaceId][$facetIndex]['action'] = 'remove';
             }
         }
     }
