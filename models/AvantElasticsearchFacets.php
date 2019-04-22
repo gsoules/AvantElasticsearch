@@ -341,7 +341,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                 $facetApplied = $leafEntry['action'] == 'remove' ? true : $facetApplied;
                 $leafEntryHtml = $this->createFacetEntryHtml($leafEntry, false);
-                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $entry['action'], 2);
+                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $leafEntry['action'], 2);
             }
         }
         return $html;
