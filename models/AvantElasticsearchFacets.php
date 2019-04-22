@@ -341,11 +341,17 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Emit the entries for this facet.
         $entries = $this->facetsTable[$facetId];
-        foreach ($entries as $entry)
+        foreach ($entries as $facetIndex => $entry)
         {
             // Emit the root and non-hierarchy leaf entries for this section.
             $isRoot = $facetDefinition['is_root_hierarchy'];
             $action = $this->createFacetEntryActionHtml($entry, $isRoot);
+
+            if ($entry['count'] == $this->totalResults && $action['action'] == 'add')
+            {
+               continue;
+            }
+
             $facetApplied = $action['action'] == 'remove' ? true : $facetApplied;
             $html .= $this->emitHtmlForFacetEntry($action, 1, $isRoot);
 
@@ -359,6 +365,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     {
                         continue;
                     }
+
+                    if ($leafEntry['count'] == $this->totalResults && $leafEntry['action'] == 'add')
+                    {
+                        continue;
+                    }
+
                     $leafAction = $this->createFacetEntryActionHtml($leafEntry, false);
                     $facetApplied = $leafAction['action'] == 'remove' ? true : $facetApplied;
                     $html .= $this->emitHtmlForFacetEntry($leafAction, 2);
@@ -367,9 +379,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         // Emit the section header for this facet.
-        $className = 'facet-section' . ($facetApplied ? '-applied' : '');
-        $sectionHeader = "<div class='$className'>{$facetDefinition['name']}</div>";
-        return "$sectionHeader<ul>$html</ul>";
+        if (empty($html))
+        {
+            // No entries were emitted for this section. This happens when none have a count that is
+            // less than the total number of search results.
+            return $html;
+        }
+        else
+        {
+            $className = 'facet-section' . ($facetApplied ? '-applied' : '');
+            $sectionHeader = "<div class='$className'>{$facetDefinition['name']}</div>";
+            return "$sectionHeader<ul>$html</ul>";
+        }
     }
 
     protected function emitHtmlForFacetSections()
