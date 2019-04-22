@@ -314,7 +314,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return implode('&', $afterArgs);
     }
 
-    protected function emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied)
+    protected function emitHtmlForFacetEntry($entry, $facetDefinition, &$facetApplied)
     {
         // Emit the root and non-hierarchy leaf entries for this section.
         $html = '';
@@ -369,6 +369,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function emitHtmlForFacetSection($facetId, $facetDefinition)
     {
         $html = '';
+
+        // This flag gets passed by reference to be set by emitHtmlForFacetEntry().
         $facetApplied = false;
 
         // Emit the entries for this facet.
