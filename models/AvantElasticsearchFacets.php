@@ -495,6 +495,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         // See if this entry's count is less than the total number of search results.
         // if not, the entry will have no effect since it cannot be used to further narrow the results.
+        //return false;
         return $entry['count'] >= $this->totalResults && $entry['action'] == 'add';
     }
 
@@ -708,13 +709,31 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     // See the action for each of the root's leafs.
                     foreach ($this->facetsTable[$rootFaceId][$facetIndex]['leafs'] as $index => $leaf)
                     {
-                        $leafIsApplied = isset($appliedLeafFacets[$rootFaceId]) && $appliedLeafFacets[$rootFaceId][0] == $leaf['arg'];
+                        // Determine if this leaf is already applied. First check if the applied facets array
+                        // contains any leafs for this leaf's groupt. For example, if this leaf is in the 'subject'
+                        // group, make sure there is at least one applied 'subject' leaf.
+                        $leafIsApplied = false;
+                        if (isset($appliedLeafFacets[$leaf['id']]))
+                        {
+                            // Determine if this leaf matches any of the leafs in the group.
+                            foreach ($appliedLeafFacets[$leaf['id']] as $facetArgName)
+                            {
+                                if ($facetArgName == $leaf['arg'])
+                                {
+                                    $leafIsApplied = true;
+                                    break;
+                                }
+                            }
+                        }
+
                         if ($leafIsApplied)
                         {
-                            // Since this leaf facet is applied, disable removal of its root facet. This is to avoid the
-                            // confusion of removing the root facet while the search results are still limited by the
-                            // leaf facet. By disabling the root, the user must first remove the leaf facet which will then
-                            // enable removal of the root facet.
+                            // Since this leaf facet is applied, don't show the remove-X for the root facet. This is to
+                            // avoid the confusion of allowing the user to remove the root facet while the search results
+                            // are still limited by the leaf facet which would have no effect because the leaf facet is
+                            // more restrictive than the root facet. By disabling the root's remove=X, the user must
+                            // first 'undo' the application of the leaf facet which will then restore the remove-X for
+                            // the root facet.
                             $actionKind = 'remove';
                             $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'none';
                         }
