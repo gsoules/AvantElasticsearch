@@ -63,10 +63,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $aggregations;
     }
 
-    protected function createFacet($id, $name, $isHierarchy = false, $isRootHierarchy = false)
+    protected function createFacet($group, $name, $isHierarchy = false, $isRootHierarchy = false)
     {
         $definition = array(
-            'id' => $id,
+            'id' => $group,
             'name' => $name,
             'is_date' => false,
             'is_hierarchy' => $isHierarchy,
@@ -112,29 +112,29 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Create a separate term filter for each value so that the filters are ANDed
         // as opposed to using a single 'terms' filter with multiple values that are ORed.
 
-        $facetId = $facetDefinition['id'];
+        $group = $facetDefinition['id'];
 
-        if (isset($roots[$facetId]))
+        if (isset($roots[$group]))
         {
-            $term = "facet.$facetId.root";
+            $term = "facet.$group.root";
 
-            $values = $roots[$facetId];
+            $values = $roots[$group];
             foreach ($values as $value)
             {
                 $filters[] = ['term' => [$term => $value]];
             }
         }
 
-        if (isset($leafs[$facetId]))
+        if (isset($leafs[$group]))
         {
-            $term = "facet.$facetId";
+            $term = "facet.$group";
 
             if ($facetDefinition['is_root_hierarchy'])
             {
                 $term .= ".leaf";
             }
 
-            $values = $leafs[$facetId];
+            $values = $leafs[$group];
             foreach ($values as $value)
             {
                 $filters[] = ['term' => [$term => $value]];
@@ -158,7 +158,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $table = array();
 
-        foreach ($aggregations as $facetId => $aggregation)
+        foreach ($aggregations as $group => $aggregation)
         {
             $buckets = $aggregation['buckets'];
             if (empty($buckets))
@@ -169,12 +169,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($buckets as $i => $bucket)
             {
                 $facetName = $bucket['key'];
-                $table[$facetId][$i]['id'] = $facetId;
-                $table[$facetId][$i]['root'] = '';
-                $table[$facetId][$i]['name'] = $facetName;
-                $table[$facetId][$i]['arg'] = $facetName;
-                $table[$facetId][$i]['count'] = $bucket['doc_count'];
-                $table[$facetId][$i]['action'] = 'add';
+                $table[$group][$i]['id'] = $group;
+                $table[$group][$i]['root'] = '';
+                $table[$group][$i]['name'] = $facetName;
+                $table[$group][$i]['arg'] = $facetName;
+                $table[$group][$i]['count'] = $bucket['doc_count'];
+                $table[$group][$i]['action'] = 'add';
 
                 $leafBuckets = isset($bucket['leafs']['buckets']) ? $bucket['leafs']['buckets'] : array();
 
@@ -192,12 +192,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         continue;
                     }
 
-                    $table[$facetId][$i]['leafs'][$j]['id'] = $facetId;
-                    $table[$facetId][$i]['leafs'][$j]['root'] = $facetName;
-                    $table[$facetId][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
-                    $table[$facetId][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
-                    $table[$facetId][$i]['leafs'][$j]['count'] = $leafBucket['doc_count'];
-                    $table[$facetId][$i]['leafs'][$j]['action'] = 'hide';
+                    $table[$group][$i]['leafs'][$j]['id'] = $group;
+                    $table[$group][$i]['leafs'][$j]['root'] = $facetName;
+                    $table[$group][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
+                    $table[$group][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
+                    $table[$group][$i]['leafs'][$j]['count'] = $leafBucket['doc_count'];
+                    $table[$group][$i]['leafs'][$j]['action'] = 'hide';
                 }
             }
         }
