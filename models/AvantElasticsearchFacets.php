@@ -80,20 +80,20 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function createFacetEntryHtml($facetTableEntry, $isRoot)
     {
         $action = $facetTableEntry['action'];
-        $facetArg = $facetTableEntry['arg'];
+        $rootPath = $facetTableEntry['root_path'];
         $facetName = $facetTableEntry['name'];
         $html = '';
 
         if ($action == 'add')
         {
-            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetName, $facetArg, $isRoot);
+            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetName, $rootPath, $isRoot);
             $html .= " ({$facetTableEntry['count']})";
         }
         else
         {
             if ($action == 'remove')
             {
-                $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['group'], $facetName, $facetArg, $isRoot);
+                $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['group'], $facetName, $rootPath, $isRoot);
             }
             else
             {
@@ -172,7 +172,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $table[$group][$i]['group'] = $group;
                 $table[$group][$i]['root'] = '';
                 $table[$group][$i]['name'] = $facetName;
-                $table[$group][$i]['arg'] = $facetName;
+                $table[$group][$i]['root_path'] = $facetName;
                 $table[$group][$i]['count'] = $bucket['doc_count'];
                 $table[$group][$i]['action'] = 'add';
 
@@ -185,8 +185,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                 foreach ($leafBuckets as $j => $leafBucket)
                 {
-                    $leafFacetName = $leafBucket['key'];
-                    $leafRootName = $this->getRootNameFromLeafName($leafFacetName);
+                    $leafFacetRootPath = $leafBucket['key'];
+                    $leafRootName = $this->getRootNameFromLeafName($leafFacetRootPath);
                     if ($leafRootName != $facetName)
                     {
                         continue;
@@ -194,8 +194,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                     $table[$group][$i]['leafs'][$j]['group'] = $group;
                     $table[$group][$i]['leafs'][$j]['root'] = $facetName;
-                    $table[$group][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
-                    $table[$group][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
+                    $table[$group][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetRootPath);
+                    $table[$group][$i]['leafs'][$j]['root_path'] = preg_replace('/,\s+/', ',', $leafFacetRootPath);
                     $table[$group][$i]['leafs'][$j]['count'] = $leafBucket['doc_count'];
                     $table[$group][$i]['leafs'][$j]['action'] = 'hide';
                 }
@@ -444,7 +444,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $html;
     }
 
-    protected function emitHtmlLinkForAddFilter($facetToAddId, $facetToAddName, $facetToAddArg, $isRoot)
+    protected function emitHtmlLinkForAddFilter($facetToAddId, $facetToAddName, $facetToAddRootPath, $isRoot)
     {
         // Add an argument to the query string for each facet that is already applied.
         // The applied facets are structured as follows:
@@ -468,7 +468,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         // Add an argument to the query string for the facet now being added.
-        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddId, $facetToAddArg, $isRoot);
+        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddId, $facetToAddRootPath, $isRoot);
 
         // Create the link that the user can click to apply this facet plus all the already applied facets.
         // In the link text, add a space after each comma for readability.
@@ -479,9 +479,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $link;
     }
 
-    protected function emitHtmlLinkForRemoveFilter($facetToRemoveId, $facetToRemoveName, $facetToRemoveArg, $isRoot)
+    protected function emitHtmlLinkForRemoveFilter($facetToRemoveId, $facetToRemoveName, $facetToRemoveRootPath, $isRoot)
     {
-        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($this->queryStringWithApplieFacets, $facetToRemoveId, $facetToRemoveArg, $isRoot);
+        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($this->queryStringWithApplieFacets, $facetToRemoveId, $facetToRemoveRootPath, $isRoot);
 
         // Create the link that the user can click to remove this facet, but leave all the other applied facets.
         // In the facet text, add a space after each comma for readability.
@@ -716,9 +716,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         if (isset($appliedLeafFacets[$leaf['group']]))
                         {
                             // Determine if this leaf matches any of the leafs in the group.
-                            foreach ($appliedLeafFacets[$leaf['group']] as $facetArgName)
+                            foreach ($appliedLeafFacets[$leaf['group']] as $facetRootPath)
                             {
-                                if ($facetArgName == $leaf['arg'])
+                                if ($facetRootPath == $leaf['root_path'])
                                 {
                                     $leafIsApplied = true;
                                     break;
