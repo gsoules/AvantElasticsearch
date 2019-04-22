@@ -77,7 +77,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions[$id] = $definition;
     }
 
-    protected function createFacetEntryActionHtml($facetTableEntry, $isRoot)
+    protected function createFacetEntryHtml($facetTableEntry, $isRoot)
     {
         $action = $facetTableEntry['action'];
         $facetArg = $facetTableEntry['arg'];
@@ -104,7 +104,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
         }
 
-        return array('action' => $action, 'html' => $html);
+        return $html;
     }
 
     protected function createFacetFilter($filters, $roots, $leafs, $facetDefinition)
@@ -314,19 +314,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return implode('&', $afterArgs);
     }
 
-    protected function emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied, $html)
+    protected function emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied)
     {
         // Emit the root and non-hierarchy leaf entries for this section.
-        $isRoot = $facetDefinition['is_root_hierarchy'];
-        $action = $this->createFacetEntryActionHtml($entry, $isRoot);
-
-        if ($entry['count'] == $this->totalResults && $action['action'] == 'add')
-        {
+        $html = '';
+        if ($this->entryHasNoFilteringEffect($entry))
             return $html;
-        }
 
-        $facetApplied = $action['action'] == 'remove' ? true : $facetApplied;
-        $html .= $this->emitHtmlForFacetEntryListItem($action, 1, $isRoot);
+        $isRoot = $facetDefinition['is_root_hierarchy'];
+        $facetEntryHtml = $this->createFacetEntryHtml($entry, $isRoot);
+
+        $facetApplied = $entry['action'] == 'remove' ? true : $facetApplied;
+        $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot);
 
         // Emit hierarchy  leaf entries for this facet entry.
         if (isset($entry['leafs']))
@@ -335,26 +334,21 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($leafEntries as $leafEntry)
             {
                 if ($leafEntry['action'] == 'hide')
-                {
                     return $html;
-                }
 
-                if ($leafEntry['count'] == $this->totalResults && $leafEntry['action'] == 'add')
-                {
+                if ($this->entryHasNoFilteringEffect($leafEntry))
                     return $html;
-                }
 
-                $leafAction = $this->createFacetEntryActionHtml($leafEntry, false);
-                $facetApplied = $leafAction['action'] == 'remove' ? true : $facetApplied;
-                $html .= $this->emitHtmlForFacetEntryListItem($leafAction, 2);
+                $facetApplied = $leafEntry['action'] == 'remove' ? true : $facetApplied;
+                $leafEntryHtml = $this->createFacetEntryHtml($leafEntry, false);
+                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $entry['action'], 2);
             }
         }
         return $html;
     }
 
-    protected function emitHtmlForFacetEntryListItem($action, $level, $isRoot = false)
+    protected function emitHtmlForFacetEntryListItem($html, $action, $level, $isRoot = false)
     {
-        $html = $action['html'];
         $className = "facet-entry-$level";
 
         if ($level == 1)
@@ -362,7 +356,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $className .= $isRoot ? '-root' : '-leaf';
         }
 
-        if ($action['action'] == 'remove' || $action['action'] == 'none')
+        if ($action == 'remove' || $action == 'none')
         {
             $className .= ' facet-entry-applied';
         }
@@ -382,7 +376,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         foreach ($entries as $facetIndex => $entry)
         {
             // Add the HTML for this entry to the HTML emitted so far.
-            $html = $this->emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied, $html);
+            $html .= $this->emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied);
         }
 
         // Emit the section header for this facet.
@@ -495,6 +489,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetText = str_replace(',', ', ', $facetToRemoveName);
         $link = $facetText . ' <a href="' . $facetUrl . '">' . '&#10006;' . '</a>';
         return $link;
+    }
+
+    protected function entryHasNoFilteringEffect($entry)
+    {
+        // See if this entry's count is less than the total number of search results.
+        // if not, the entry will have no effect since it cannot be used to further narrow the results.
+        return $entry['count'] >= $this->totalResults && $entry['action'] == 'add';
     }
 
     public function extractAppliedFacetsFromSearchRequest($query)
