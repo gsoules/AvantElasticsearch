@@ -314,7 +314,45 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return implode('&', $afterArgs);
     }
 
-    protected function emitHtmlForFacetEntry($action, $level, $isRoot = false)
+    protected function emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied, $html)
+    {
+        // Emit the root and non-hierarchy leaf entries for this section.
+        $isRoot = $facetDefinition['is_root_hierarchy'];
+        $action = $this->createFacetEntryActionHtml($entry, $isRoot);
+
+        if ($entry['count'] == $this->totalResults && $action['action'] == 'add')
+        {
+            return $html;
+        }
+
+        $facetApplied = $action['action'] == 'remove' ? true : $facetApplied;
+        $html .= $this->emitHtmlForFacetEntryListItem($action, 1, $isRoot);
+
+        // Emit hierarchy  leaf entries for this facet entry.
+        if (isset($entry['leafs']))
+        {
+            $leafEntries = $entry['leafs'];
+            foreach ($leafEntries as $leafEntry)
+            {
+                if ($leafEntry['action'] == 'hide')
+                {
+                    return $html;
+                }
+
+                if ($leafEntry['count'] == $this->totalResults && $leafEntry['action'] == 'add')
+                {
+                    return $html;
+                }
+
+                $leafAction = $this->createFacetEntryActionHtml($leafEntry, false);
+                $facetApplied = $leafAction['action'] == 'remove' ? true : $facetApplied;
+                $html .= $this->emitHtmlForFacetEntryListItem($leafAction, 2);
+            }
+        }
+        return $html;
+    }
+
+    protected function emitHtmlForFacetEntryListItem($action, $level, $isRoot = false)
     {
         $html = $action['html'];
         $className = "facet-entry-$level";
@@ -343,46 +381,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $entries = $this->facetsTable[$facetId];
         foreach ($entries as $facetIndex => $entry)
         {
-            // Emit the root and non-hierarchy leaf entries for this section.
-            $isRoot = $facetDefinition['is_root_hierarchy'];
-            $action = $this->createFacetEntryActionHtml($entry, $isRoot);
-
-            if ($entry['count'] == $this->totalResults && $action['action'] == 'add')
-            {
-               continue;
-            }
-
-            $facetApplied = $action['action'] == 'remove' ? true : $facetApplied;
-            $html .= $this->emitHtmlForFacetEntry($action, 1, $isRoot);
-
-            // Emit hierarchy  leaf entries for this facet entry.
-            if (isset($entry['leafs']))
-            {
-                $leafEntries = $entry['leafs'];
-                foreach ($leafEntries as $leafEntry)
-                {
-                    if ($leafEntry['action'] == 'hide')
-                    {
-                        continue;
-                    }
-
-                    if ($leafEntry['count'] == $this->totalResults && $leafEntry['action'] == 'add')
-                    {
-                        continue;
-                    }
-
-                    $leafAction = $this->createFacetEntryActionHtml($leafEntry, false);
-                    $facetApplied = $leafAction['action'] == 'remove' ? true : $facetApplied;
-                    $html .= $this->emitHtmlForFacetEntry($leafAction, 2);
-                }
-            }
+            // Add the HTML for this entry to the HTML emitted so far.
+            $html = $this->emitHtmlForFacetEntry($entry, $facetDefinition, $facetApplied, $html);
         }
 
         // Emit the section header for this facet.
         if (empty($html))
         {
-            // No entries were emitted for this section. This happens when none have a count that is
-            // less than the total number of search results.
+            // No entries were emitted for this section. This happens when none of the entries have a count that is less
+            // than the total number of search results and therefore can provide no additional filtering.
             return $html;
         }
         else
