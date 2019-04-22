@@ -81,7 +81,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $action = $facetTableEntry['action'];
         $facetArg = $facetTableEntry['arg'];
         $facetName = $facetTableEntry['name'];
-        $html = 'NO ACTION SET';
+        $html = '';
 
         if ($action == 'add')
         {
@@ -96,7 +96,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
             else
             {
-                if ($action == 'disable')
+                if ($action == 'none')
                 {
                     $html = $facetName;
                 }
@@ -323,7 +323,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $className .= $isRoot ? '-root' : '-leaf';
         }
 
-        if ($action['action'] == 'remove')
+        if ($action['action'] == 'remove' || $action['action'] == 'none')
         {
             $className .= ' facet-entry-applied';
         }
@@ -492,6 +492,20 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->appliedFacets = $appliedFacets;
     }
 
+    protected function findAppliedFacetInFacetsTable($facetId, $facetName)
+    {
+        $facetIndex = 0;
+        foreach ($this->facetsTable[$facetId] as $index => $facetTableEntry)
+        {
+            if ($facetTableEntry['name'] == $facetName)
+            {
+                $facetIndex = $index;
+                break;
+            }
+        }
+        return $facetIndex;
+    }
+
     public function getFacetDefinitions()
     {
         return $this->facetDefinitions;
@@ -652,15 +666,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($rootFacetNames as $rootFacetName)
             {
                 // Find this applied facet name in the facets table.
-                $facetIndex = 0;
-                foreach ($this->facetsTable[$rootFaceId] as $index => $facetTableEntry)
-                {
-                    if ($facetTableEntry['name'] == $rootFacetName)
-                    {
-                        $facetIndex = $index;
-                        break;
-                    }
-                }
+                $facetIndex = $this->findAppliedFacetInFacetsTable($rootFaceId, $rootFacetName);
 
                 // Set this applied facet's action to remove
                 $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'remove';
@@ -678,7 +684,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                             // leaf facet. By disabling the root, the user must first remove the leaf facet which will then
                             // enable removal of the root facet.
                             $actionKind = 'remove';
-                            $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'disable';
+                            $this->facetsTable[$rootFaceId][$facetIndex]['action'] = 'none';
                         }
                         else
                         {
@@ -696,8 +702,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($appliedLeafFacets as $leafFaceId => $leafFacetNames)
         {
+            // Set facet table actions for leaf facets that are not part of a root hierarchy
+            // (root hierarchy leafs were processed in the code above.
             if ($this->facetDefinitions[$leafFaceId]['is_root_hierarchy'])
             {
+                // Ignore root hierarchy facet leafs.
                 continue;
             }
 
@@ -705,15 +714,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($leafFacetNames as $leafFacetName)
             {
                 // Find this applied facet name in the facets table.
-                $facetIndex = 0;
-                foreach ($this->facetsTable[$leafFaceId] as $index => $facetTableEntry)
-                {
-                    if ($facetTableEntry['name'] == $leafFacetName)
-                    {
-                        $facetIndex = $index;
-                        break;
-                    }
-                }
+                $facetIndex = $this->findAppliedFacetInFacetsTable($leafFaceId, $leafFacetNames);
+
                 // Set this applied facet's action to remove
                 $this->facetsTable[$leafFaceId][$facetIndex]['action'] = 'remove';
             }
