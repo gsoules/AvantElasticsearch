@@ -66,7 +66,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function createFacet($group, $name, $isHierarchy = false, $isRootHierarchy = false)
     {
         $definition = array(
-            'id' => $group,
+            'group' => $group,
             'name' => $name,
             'is_date' => false,
             'is_hierarchy' => $isHierarchy,
@@ -74,7 +74,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'multi_value' => false,
             'not_used' => false);
 
-        $this->facetDefinitions[$id] = $definition;
+        $this->facetDefinitions[$group] = $definition;
     }
 
     protected function createFacetEntryHtml($facetTableEntry, $isRoot)
@@ -86,14 +86,14 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         if ($action == 'add')
         {
-            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
+            $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetName, $facetArg, $isRoot);
             $html .= " ({$facetTableEntry['count']})";
         }
         else
         {
             if ($action == 'remove')
             {
-                $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['id'], $facetName, $facetArg, $isRoot);
+                $html = $this->emitHtmlLinkForRemoveFilter($facetTableEntry['group'], $facetName, $facetArg, $isRoot);
             }
             else
             {
@@ -112,7 +112,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Create a separate term filter for each value so that the filters are ANDed
         // as opposed to using a single 'terms' filter with multiple values that are ORed.
 
-        $group = $facetDefinition['id'];
+        $group = $facetDefinition['group'];
 
         if (isset($roots[$group]))
         {
@@ -169,7 +169,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($buckets as $i => $bucket)
             {
                 $facetName = $bucket['key'];
-                $table[$group][$i]['id'] = $group;
+                $table[$group][$i]['group'] = $group;
                 $table[$group][$i]['root'] = '';
                 $table[$group][$i]['name'] = $facetName;
                 $table[$group][$i]['arg'] = $facetName;
@@ -192,7 +192,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         continue;
                     }
 
-                    $table[$group][$i]['leafs'][$j]['id'] = $group;
+                    $table[$group][$i]['leafs'][$j]['group'] = $group;
                     $table[$group][$i]['leafs'][$j]['root'] = $facetName;
                     $table[$group][$i]['leafs'][$j]['name'] = $this->stripRootFromLeafName($leafFacetName);
                     $table[$group][$i]['leafs'][$j]['arg'] = preg_replace('/,\s+/', ',', $leafFacetName);
@@ -713,10 +713,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         // contains any leafs for this leaf's groupt. For example, if this leaf is in the 'subject'
                         // group, make sure there is at least one applied 'subject' leaf.
                         $leafIsApplied = false;
-                        if (isset($appliedLeafFacets[$leaf['id']]))
+                        if (isset($appliedLeafFacets[$leaf['group']]))
                         {
                             // Determine if this leaf matches any of the leafs in the group.
-                            foreach ($appliedLeafFacets[$leaf['id']] as $facetArgName)
+                            foreach ($appliedLeafFacets[$leaf['group']] as $facetArgName)
                             {
                                 if ($facetArgName == $leaf['arg'])
                                 {
