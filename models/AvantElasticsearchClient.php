@@ -162,12 +162,24 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return;
     }
 
-    public function search($params)
+    public function search($params, $retry = false)
     {
         try
         {
             $response = $this->client->search($params);
             return $response;
+        }
+        catch (\Elasticsearch\Common\Exceptions\NoNodesAvailableException $e)
+        {
+            if ($retry)
+            {
+                $this->reportClientException($e);
+                return null;
+            }
+            else
+            {
+                $this->search($params, true);
+            }
         }
         catch (Exception $e)
         {
