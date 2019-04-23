@@ -506,7 +506,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $entry['count'] >= $this->totalResults && $entry['action'] == 'add';
     }
 
-    public function extractAppliedFacetsFromSearchRequest($query)
+    protected function extractAppliedFacetsFromSearchRequest($query)
     {
         $appliedFacets = array(FACET_KIND_ROOT => array(), FACET_KIND_LEAF => array());
 
@@ -682,6 +682,60 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $values;
+    }
+
+    public function getFilterBarFacets($query)
+    {
+        // Create data for applied facets that the Search Results filter bar logic can use
+        // to report to the user which facets are applied in the facets sidebar.
+
+        $this->extractAppliedFacetsFromSearchRequest($query);
+        $filterBarFacets = array();
+        $appliedRootFacets = $this->appliedFacets['root'];
+        $appliedLeafFacets = $this->appliedFacets['leaf'];
+
+        // Add all the leaf facets to the filter bar facets.
+        foreach ($appliedLeafFacets as $leafFacetGroup => $leafFacetNames)
+        {
+            foreach ($leafFacetNames as $leafFacetName)
+            {
+                $leafFacetName = str_replace(',', ', ', $leafFacetName);
+                $groupName = $this->facetDefinitions[$leafFacetGroup]['name'];
+                $filterBarFacets[$groupName][] = $leafFacetName;
+            }
+        }
+
+        // Add only those root facets that don't have one of their leafs applied.
+        foreach ($appliedRootFacets as $rootFacetGroup => $rootFacetNames)
+        {
+            foreach ($rootFacetNames as $rootFacetName)
+            {
+                $groupName = $this->facetDefinitions[$rootFacetGroup]['name'];
+                $skipThisRoot = false;
+
+                // Check to see if this root is the root of a leaf that's applied
+                if (isset($filterBarFacets[$groupName]))
+                {
+                    foreach ($filterBarFacets[$groupName] as $facetName)
+                    {
+                        if (strpos($facetName, $rootFacetName . ',') === 0)
+                        {
+                            // One of this root's leafs is applied so ignore this root.
+                            $skipThisRoot = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!$skipThisRoot)
+                {
+                    // It's okay to add this root since none of its leaf facets are applied.
+                    $filterBarFacets[$groupName][] = $rootFacetName;
+                }
+            }
+        }
+
+        return $filterBarFacets;
     }
 
     protected function getRootNameFromLeafName($leafName)
