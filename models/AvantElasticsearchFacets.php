@@ -373,6 +373,18 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return "<li$class>$html</li>";
     }
 
+    protected function emitHtmlForResetLink($query)
+    {
+        if (empty($this->appliedFacets['root']) && empty($this->appliedFacets['leaf']))
+            return '';
+
+        $terms = isset($query['query']) ? $query['query'] : '';
+        $queryString = "query=" . urlencode($terms);
+        $resetUrl = $this->findUrl . '?' . $queryString;
+        $resetLink = '&nbsp;&nbsp;<a href="' . $resetUrl . '" title="Reset">' . '&#10006;' . '</a>';
+        return $resetLink;
+    }
+
     protected function emitHtmlForFacetSection($group, $facetDefinition)
     {
         $html = '';
@@ -447,8 +459,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Indicate how each facet should appear in the sidebar: add-link, remove-X, disabled, hidden.
         $this->setFacetsTableActions();
 
+        $title = __('Refine your search');
+        $resetLink = $this->emitHtmlForResetLink($query);
+        $html = "<div class='facet-sections-title'>$title$resetLink</div>";
+
         // Display all the facet entries.
-        $html = $this->emitHtmlForFacetSections();
+        $html .= $this->emitHtmlForFacetSections();
 
         return $html;
     }
