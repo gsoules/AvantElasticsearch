@@ -69,11 +69,15 @@ class AvantElasticsearchMappings extends AvantElasticsearch
                 continue;
             }
 
+            // Create a text and keyword mapping for item elements. The text fields is needed to allow full-text
+            // search of the field. The keyword mapping is necessary for sorting.
             $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
             $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
         }
 
-        // Analyzer fields.
+        // Analyzer fields. These are text fields for full-text search, but don't need to also be keyword fields.
+        // Note that the 'title' field is a copy of the 'element.title' field. This one uses the English analyzer
+        // and the other doesn't in order to get the best possible search results on title content.
         $this->addAnalyzerFieldToMappingProperties('element.description');
         $this->addAnalyzerFieldToMappingProperties('title');
 
@@ -87,7 +91,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addNumericFieldToMappingProperties('files');
         $this->addNumericFieldToMappingProperties('itemid');
 
-        // Keyword fields.
+        // Keyword fields. None of these require full-text search.
         $this->addKeywordFieldToMappingProperties('html');
         $this->addKeywordFieldToMappingProperties('tags');
         $this->addKeywordFieldToMappingProperties('image');
