@@ -20,11 +20,20 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    public function createAggregationsForElasticsearchQuery()
+    public function createAggregationsForElasticsearchQuery($commingled)
     {
         foreach ($this->facetDefinitions as $group => $definition)
         {
-            if ($definition['is_root_hierarchy'])
+            if ($definition['not_used'])
+            {
+                continue;
+            }
+            else if ($definition['commingled'] && !$commingled)
+            {
+                // This facet is only used when searching for commingled results.
+                continue;
+            }
+            else if ($definition['is_root_hierarchy'])
             {
                 // Build a sub-aggregation to get buckets of root values, each containing buckets of leaf values.
                 $terms[$group] = [
@@ -72,6 +81,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'is_hierarchy' => $isHierarchy,
             'is_root_hierarchy' => $isRootHierarchy,
             'multi_value' => false,
+            'commingled' => false,
             'not_used' => false);
 
         $this->facetDefinitions[$group] = $definition;
@@ -254,12 +264,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->createFacet('date', 'Dates');
         $this->facetDefinitions['date']['is_date'] = true;
 
+        $this->createFacet('contributor', 'Contributor');
+        $this->facetDefinitions['contributor']['commingled'] = true;
+
         // Tags are fully supported, but for now don't show this facet.
         $this->createFacet('tag', 'Tags');
-        $this->facetDefinitions['tag']['not_used'] = false;
-
-        $this->createFacet('contributor', 'Contributor');
-        $this->facetDefinitions['contributor']['not_used'] = false;
+        $this->facetDefinitions['tag']['not_used'] = true;
     }
 
     public function editQueryStringToAddFacetArg($queryString, $facetToAddGroup, $facetToAddValue, $isRoot)

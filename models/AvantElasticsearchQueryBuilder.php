@@ -10,7 +10,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
-    public function constructSearchQueryParams($options)
+    public function constructSearchQueryParams($options, $commingled)
     {
         if (!isset($options['query']) || !is_array($options['query']))
         {
@@ -81,7 +81,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         // Create the aggregations portion of the query to indicate which facet values to return.
         // All requested facet values are returned for the entire set of results.
-        $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery();
+        $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery($commingled);
         $body['aggregations'] = $aggregations;
 
         // Create the filter portion of the query to limit the reults to specific facet values.
