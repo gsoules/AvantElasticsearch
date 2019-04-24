@@ -29,7 +29,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
-    protected function addFacetFieldToMappingProperties($fieldName)
+    protected function addKeywordFieldToMappingProperties($fieldName)
     {
         $this->properties[$fieldName] = [
             'type' => 'keyword'
@@ -91,21 +91,21 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addTextFieldToMappingProperties('thumb');
         $this->addTextFieldToMappingProperties('url');
 
-        $this->addFacetFieldToMappingProperties('facet.date');
-        $this->addFacetFieldToMappingProperties('facet.contributor');
-        $this->addFacetFieldToMappingProperties('facet.place');
-        $this->addFacetFieldToMappingProperties('facet.subject.leaf');
-        $this->addFacetFieldToMappingProperties('facet.subject.root');
-        $this->addFacetFieldToMappingProperties('facet.tag');
-        $this->addFacetFieldToMappingProperties('facet.type.leaf');
-        $this->addFacetFieldToMappingProperties('facet.type.root');
+        $this->addKeywordFieldToMappingProperties('facet.date');
+        $this->addKeywordFieldToMappingProperties('facet.contributor');
+        $this->addKeywordFieldToMappingProperties('facet.place');
+        $this->addKeywordFieldToMappingProperties('facet.subject.leaf');
+        $this->addKeywordFieldToMappingProperties('facet.subject.root');
+        $this->addKeywordFieldToMappingProperties('facet.tag');
+        $this->addKeywordFieldToMappingProperties('facet.type.leaf');
+        $this->addKeywordFieldToMappingProperties('facet.type.root');
 
-        $this->addTextFieldToMappingProperties('sort.address-number');
-        $this->addTextFieldToMappingProperties('sort.address-street');
-        $this->addTextFieldToMappingProperties('sort.identifier');
-        $this->addTextFieldToMappingProperties('sort.place');
-        $this->addTextFieldToMappingProperties('sort.subject');
-        $this->addTextFieldToMappingProperties('sort.type');
+        $this->addKeywordFieldToMappingProperties('sort.address-number');
+        $this->addKeywordFieldToMappingProperties('sort.address-street');
+        $this->addKeywordFieldToMappingProperties('sort.identifier');
+        $this->addKeywordFieldToMappingProperties('sort.place');
+        $this->addKeywordFieldToMappingProperties('sort.subject');
+        $this->addKeywordFieldToMappingProperties('sort.type');
 
         $mapping = [
             $mappingType => [
