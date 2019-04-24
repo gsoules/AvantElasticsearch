@@ -11,6 +11,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
 {
     /* @var $client Elasticsearch\Client */
     private $client;
+    private $error;
 
     public function __construct(array $options = array())
     {
@@ -99,6 +100,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
     }
 
+    public function getError()
+    {
+        return $this->error;
+    }
+
     protected function getHandler()
     {
         // Provide a signing handler for use with the official Elasticsearch-PHP client.
@@ -158,7 +164,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
     protected function reportClientException(Exception $e)
     {
         // FINISH: Need to figure out what to do in this situation. For now keep a breakpoint here.
-        $exceptionMessage = $this->getElasticsearchExceptionMessage($e);
+        $this->error = $this->getElasticsearchExceptionMessage($e);
         return;
     }
 

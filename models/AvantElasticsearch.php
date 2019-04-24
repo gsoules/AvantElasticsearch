@@ -74,17 +74,20 @@ class AvantElasticsearch
 
         if ($this->isJson($message))
         {
-            $message = json_decode($message);
-            if (is_object($message))
+            $jsonMessage = json_decode($message);
+            if (is_object($jsonMessage))
             {
-                if (isset($message->error))
+                if (isset($jsonMessage->error))
                 {
-                    $error = $message->error;
-                    $message = "Type: $error->type<br/>Reason: $error->reason";
+                    $error = $jsonMessage->error;
+                    $rootCause = $error->root_cause;
+                    $rootCauseReason = $rootCause[0]->reason;
+                    $errorReason = $error->reason;
+                    $message = "Type: $error->type<br/>Reason: $errorReason<br/>Root cause: $rootCauseReason";
                 }
-                else if (isset($message->message))
+                else if (isset($jsonMessage->message))
                 {
-                    $message = $message->message;
+                    $message = $jsonMessage->message;
                 }
                 else
                 {
