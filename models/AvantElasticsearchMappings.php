@@ -43,7 +43,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
-    protected function addTextFieldToMappingProperties($fieldName)
+    protected function addTextAndKeywordFieldToMappingProperties($fieldName)
     {
         $this->properties[$fieldName] = [
             'type' => 'text',
@@ -70,26 +70,31 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             }
 
             $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
-            $this->addTextFieldToMappingProperties("element.$fieldName");
+            $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
         }
 
+        // Analyzer fields.
         $this->addAnalyzerFieldToMappingProperties('element.description');
         $this->addAnalyzerFieldToMappingProperties('title');
 
+        // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
 
+        // Boolean fields.
         $this->addBooleanFieldToMappingProperties('public');
 
+        // Numeric fields.
         $this->addNumericFieldToMappingProperties('files');
         $this->addNumericFieldToMappingProperties('itemid');
 
-        $this->addTextFieldToMappingProperties('html');
-        $this->addTextFieldToMappingProperties('tags');
-        $this->addTextFieldToMappingProperties('image');
-        $this->addTextFieldToMappingProperties('contributor');
-        $this->addTextFieldToMappingProperties('contributorid');
-        $this->addTextFieldToMappingProperties('thumb');
-        $this->addTextFieldToMappingProperties('url');
+        // Keyword fields.
+        $this->addKeywordFieldToMappingProperties('html');
+        $this->addKeywordFieldToMappingProperties('tags');
+        $this->addKeywordFieldToMappingProperties('image');
+        $this->addKeywordFieldToMappingProperties('contributor');
+        $this->addKeywordFieldToMappingProperties('contributorid');
+        $this->addKeywordFieldToMappingProperties('thumb');
+        $this->addKeywordFieldToMappingProperties('url');
 
         $this->addKeywordFieldToMappingProperties('facet.date');
         $this->addKeywordFieldToMappingProperties('facet.contributor');
