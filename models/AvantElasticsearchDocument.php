@@ -159,10 +159,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $this->createElementTagData($item, $facetData);
 
+        if (!empty($htmlFields))
+        {
+            $this->setField('html', $htmlFields);
+        }
+
         $this->setField('element', $elementData);
         $this->setField('sort', $sortData);
         $this->setField('facet', $facetData);
-        $this->setField('html', $htmlFields);
 
         $this->copyItemAttributesToDocument($item, $titleString);
     }
