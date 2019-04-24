@@ -80,7 +80,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'is_date' => false,
             'is_hierarchy' => $isHierarchy,
             'is_root_hierarchy' => $isRootHierarchy,
-            'multi_value' => false,
             'commingled' => false,
             'not_used' => false);
 
@@ -255,10 +254,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // The order below is the order in which facet names appear in the facets section on the search results page.
 
         $this->createFacet('subject', 'Subjects', true, true);
-        $this->facetDefinitions['subject']['multi_value'] = true;
-
         $this->createFacet('type', 'Item Type', true, true);
-
         $this->createFacet('place', 'Places', true);
 
         $this->createFacet('date', 'Dates');
@@ -269,8 +265,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Tags are fully supported, but for now don't show this facet.
         $this->createFacet('tag', 'Tags');
-        $this->facetDefinitions['tag']['multi_value'] = true;
-        $this->facetDefinitions['tag']['not_used'] = false;
+        $this->facetDefinitions['tag']['not_used'] = true;
     }
 
     public function editQueryStringToAddFacetArg($queryString, $facetToAddGroup, $facetToAddValue, $isRoot)
@@ -831,9 +826,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         }
                         else
                         {
-                            // If the facet can have multiple values, keep hidden the ones that don't have the root
-                            // as their parent.
-
                             // Make the leaf visible by changing its action from 'hide' to 'add'.
                             $actionKind = 'add';
                         }
