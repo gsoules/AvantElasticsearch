@@ -269,7 +269,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Tags are fully supported, but for now don't show this facet.
         $this->createFacet('tag', 'Tags');
-        $this->facetDefinitions['tag']['not_used'] = true;
+        $this->facetDefinitions['tag']['multi_value'] = true;
+        $this->facetDefinitions['tag']['not_used'] = false;
     }
 
     public function editQueryStringToAddFacetArg($queryString, $facetToAddGroup, $facetToAddValue, $isRoot)
@@ -856,7 +857,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($leafFacetNames as $leafFacetName)
             {
                 // Find this applied facet name in the facets table.
-                $facetIndex = $this->findAppliedFacetInFacetsTable($leafFacetGroup, $leafFacetNames);
+                $facetIndex = $this->findAppliedFacetInFacetsTable($leafFacetGroup, $leafFacetName);
 
                 // Set this applied facet's action to remove
                 $this->facetsTable[$leafFacetGroup][$facetIndex]['action'] = 'remove';
