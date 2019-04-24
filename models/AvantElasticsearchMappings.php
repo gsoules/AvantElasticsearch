@@ -86,18 +86,19 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addTextFieldToMappingProperties('html');
         $this->addTextFieldToMappingProperties('tags');
         $this->addTextFieldToMappingProperties('image');
-        $this->addTextFieldToMappingProperties('owner');
-        $this->addTextFieldToMappingProperties('ownerid');
+        $this->addTextFieldToMappingProperties('contributor');
+        $this->addTextFieldToMappingProperties('contributorid');
         $this->addTextFieldToMappingProperties('thumb');
         $this->addTextFieldToMappingProperties('url');
 
         $this->addFacetFieldToMappingProperties('facet.date');
-        $this->addFacetFieldToMappingProperties('facet.tag');
+        $this->addFacetFieldToMappingProperties('facet.contributor');
         $this->addFacetFieldToMappingProperties('facet.place');
-        $this->addFacetFieldToMappingProperties('facet.type.root');
-        $this->addFacetFieldToMappingProperties('facet.type.leaf');
-        $this->addFacetFieldToMappingProperties('facet.subject.root');
         $this->addFacetFieldToMappingProperties('facet.subject.leaf');
+        $this->addFacetFieldToMappingProperties('facet.subject.root');
+        $this->addFacetFieldToMappingProperties('facet.tag');
+        $this->addFacetFieldToMappingProperties('facet.type.leaf');
+        $this->addFacetFieldToMappingProperties('facet.type.root');
 
         $this->addTextFieldToMappingProperties('sort.address-number');
         $this->addTextFieldToMappingProperties('sort.address-street');

@@ -27,8 +27,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Fields that the query will return.
         $source = [
             'itemid',
-            'ownerid',
-            'owner',
+            'contributorid',
+            'contributor',
             'public',
             'url',
             'thumb',

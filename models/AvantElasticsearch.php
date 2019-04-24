@@ -37,9 +37,14 @@ class AvantElasticsearch
         return strtolower(preg_replace('/[^a-zA-Z0-9-_]/', '', $elementName));
     }
 
-    protected function createFieldText($text = '', $html = 0)
+    protected function createFieldText($text, $html = 0)
     {
         return array('text' => $text, 'html' => $html);
+    }
+
+    protected function createFieldTexts($text)
+    {
+        return array($this->createFieldText($text));
     }
 
     public function getDocumentMappingType()
@@ -58,8 +63,8 @@ class AvantElasticsearch
         // The item Id alone is not sufficient since multiple organizations may have an item with
         // that Id. However, the item Id combined with the item's owner Id is unique.
 
-        $ownerId = ElasticsearchConfig::getOptionValueForOwnerId();
-        $documentId = "$ownerId-$item->id";
+        $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
+        $documentId = "$contributorId-$item->id";
         return $documentId;
     }
 

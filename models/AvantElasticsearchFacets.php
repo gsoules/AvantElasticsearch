@@ -256,10 +256,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         // Tags are fully supported, but for now don't show this facet.
         $this->createFacet('tag', 'Tags');
-        $this->facetDefinitions['tag']['not_used'] = true;
+        $this->facetDefinitions['tag']['not_used'] = false;
 
-        $this->createFacet('owner', 'Owner');
-        $this->facetDefinitions['owner']['not_used'] = true;
+        $this->createFacet('contributor', 'Contributor');
+        $this->facetDefinitions['contributor']['not_used'] = false;
     }
 
     public function editQueryStringToAddFacetArg($queryString, $facetToAddGroup, $facetToAddValue, $isRoot)
@@ -693,6 +693,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 if ($this->facetDefinitions[$elasticsearchFieldName]['is_date'])
                 {
                     $values[] = $this->getFacetValueForDate($text);
+                }
+                else
+                {
+                    $values[] = $text;
                 }
             }
         }

@@ -138,10 +138,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->createElementFacetData($elasticsearchFieldName, $fieldTexts, $facetData);
         }
 
+        // Add facet data for this installation's as the contributor.
+        $contributorFieldTexts = $this->createFieldTexts($this->installation['contributor']);
+        $this->createElementFacetData('contributor', $contributorFieldTexts, $facetData);
+
         if (!$itemHasDate)
         {
             // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
-            $emptyDateFieldTexts = array($this->createFieldText());
+            $emptyDateFieldTexts = $this->createFieldTexts('');
             $this->createElementFacetData('date', $emptyDateFieldTexts, $facetData);
         }
 
@@ -176,8 +180,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         $this->setFields([
             'itemid' => (int)$item->id,
-            'ownerid' => $this->installation['ownerid'],
-            'owner' => $this->installation['owner'],
+            'contributorid' => $this->installation['contributorid'],
+            'contributor' => $this->installation['contributor'],
             'title' => $titleString,
             'public' => (bool)$item->public,
             'url' => $itemPublicUrl,

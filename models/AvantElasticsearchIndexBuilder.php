@@ -20,8 +20,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $this->installation['integer_sort_fields'] = array_map('strtolower', SearchConfig::getOptionDataForIntegerSorting());
         $this->installation['installation_elements'] = $this->getElementsUsedByThisInstallation();
-        $this->installation['owner'] = ElasticsearchConfig::getOptionValueForOwner();
-        $this->installation['ownerid'] = ElasticsearchConfig::getOptionValueForOwnerId();
+        $this->installation['contributor'] = ElasticsearchConfig::getOptionValueForContributor();
+        $this->installation['contributorid'] = ElasticsearchConfig::getOptionValueForContributorId();
         $this->installation['item_path'] = public_url('items/show/');
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
