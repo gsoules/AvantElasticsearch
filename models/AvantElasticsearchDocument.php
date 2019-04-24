@@ -157,14 +157,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->body['suggestions'] = $suggestionData;
         }
 
-        $tags = $this->constructTags($item);
-        $facetData['tag'] = $tags;
+        $this->createElementTagData($item, $facetData);
 
         $this->setField('element', $elementData);
         $this->setField('sort', $sortData);
         $this->setField('facet', $facetData);
         $this->setField('html', $htmlFields);
-        $this->setField('tags', $tags);
 
         $this->copyItemAttributesToDocument($item, $titleString);
     }
@@ -233,6 +231,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             else
             {
                 $facets[$elasticsearchFieldName][] = $facetValue;
+            }
+        }
+    }
+
+    protected function createElementTagData($item, &$facets)
+    {
+        if (!$this->facetDefinitions['tag']['not_used'])
+        {
+            $tags = $this->constructTags($item);
+            if (!empty($tags))
+            {
+                $facets['tag'] = $tags;
+                $this->setField('tags', $tags);
             }
         }
     }
