@@ -69,7 +69,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         // Text fields for elements that don't require a corresponding keyword field for sorting or aggregating
         // because these fields have a separate keyword field for those purposes.
-        // To learn abou text fields see: www.elastic.co/guide/en/elasticsearch/reference/master/text.html
+        // To learn about text fields see: www.elastic.co/guide/en/elasticsearch/reference/master/text.html
+        // TO-DO: Make text-only-fields list configurable so that site specific fields like datestart and status can be added.
+        // Also make a keywordOnlyFields list for the same purpose.
         $textOnlyFields = array(
             'address',
             'identifier',
