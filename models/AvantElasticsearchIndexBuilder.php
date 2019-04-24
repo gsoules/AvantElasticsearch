@@ -287,7 +287,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $response;
     }
 
-    protected function preformBulkIndexExport($filename, $limit = 0)
+    protected function performBulkIndexExport($filename, $limit = 0)
     {
         $json = '';
         $this->cacheInstallationParameters();
@@ -378,7 +378,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if ($export)
         {
-            $this->preformBulkIndexExport($filename, $limit);
+            $this->performBulkIndexExport($filename, $limit);
         }
         else
         {

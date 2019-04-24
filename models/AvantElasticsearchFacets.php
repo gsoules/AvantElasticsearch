@@ -263,7 +263,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->createFacet('contributor', 'Contributor');
         $this->facetDefinitions['contributor']['commingled'] = true;
 
-        // Tags are fully supported, but for now don't show this facet.
+        // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
+        // If/when supported, see performance improvement comment in AvantElasticsearchDocument::constructTags().
         $this->createFacet('tag', 'Tags');
         $this->facetDefinitions['tag']['not_used'] = true;
     }

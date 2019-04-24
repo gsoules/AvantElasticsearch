@@ -54,6 +54,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function constructTags($item)
     {
+        // TO-DO: Optimize indexing of tags to reduce export time.
+        // Replace this SQL call loop with a single fetch in preformBulkIndexExport as is done for items, files,
+        // and element texts. But this can wait until tags are being used.
         $tags = array();
         foreach ($item->getTags() as $tag)
         {
