@@ -6,9 +6,7 @@ $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
 $exportFile = ElasticsearchConfig::getOptionValueForExportFile();
 $host = ElasticsearchConfig::getOptionValueForHost();
 $key = ElasticsearchConfig::getOptionValueForKey();
-$port = ElasticsearchConfig::getOptionValueForPort();
 $region = ElasticsearchConfig::getOptionValueForRegion();
-$scheme = ElasticsearchConfig::getOptionValueForScheme();
 $secret = ElasticsearchConfig::getOptionValueForSecret();
 
 ?>
@@ -54,31 +52,11 @@ $secret = ElasticsearchConfig::getOptionValueForSecret();
 
 <div class="field">
     <div class="two columns alpha">
-        <label><?php echo CONFIG_LABEL_ES_SCHEME; ?></label>
-    </div>
-    <div class="inputs five columns omega">
-        <p class="explanation"><?php echo __('Scheme e.g. https'); ?></p>
-        <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_SCHEME, $scheme); ?>
-    </div>
-</div>
-
-<div class="field">
-    <div class="two columns alpha">
         <label><?php echo CONFIG_LABEL_ES_REGION; ?></label>
     </div>
     <div class="inputs five columns omega">
         <p class="explanation"><?php echo __('AWS server region'); ?></p>
         <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_REGION, $region); ?>
-    </div>
-</div>
-
-<div class="field">
-    <div class="two columns alpha">
-        <label><?php echo CONFIG_LABEL_ES_PORT; ?></label>
-    </div>
-    <div class="inputs five columns omega">
-        <p class="explanation"><?php echo __('Port number e.g. 443'); ?></p>
-        <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_PORT, $port); ?>
     </div>
 </div>
 

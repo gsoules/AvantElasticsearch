@@ -139,10 +139,13 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function getHosts()
     {
+        // The Amazon AWS documentation says that it always uses port 443 for https Elasticsearch access.
+        // As such, port and scheme are not configurable by the user.
+
         $host = [
             'host' => ElasticsearchConfig::getOptionValueForHost(),
-            'port' => ElasticsearchConfig::getOptionValueForPort(),
-            'scheme' => ElasticsearchConfig::getOptionValueForScheme(),
+            'port' => 443,
+            'scheme' => 'https',
             'user' => '',
             'pass' => ''
         ];
