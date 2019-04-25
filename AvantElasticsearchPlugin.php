@@ -54,7 +54,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookPublicFooter($args)
     {
-        if (get_option(SearchConfig::OPTION_ELASTICSEARCH))
+        if (AvantSearch::useElasticsearch())
         {
             // Emit the Javascript for Elasticsearch suggestions while typing in the search box.
             echo get_view()->partial('avantelasticsearch-script.php');
