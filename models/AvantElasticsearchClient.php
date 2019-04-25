@@ -120,6 +120,23 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return new ElasticsearchPhpHandler($region, $provider);
     }
 
+    public function getHealth()
+    {
+        try
+        {
+            $response = $this->client->cat()->health();
+            $health = $response[0];
+            $healthReport = array('ok' => true, 'message' => "Cluster OK. Health status {$health['status']} ({$health['cluster']})");
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            $healthReport = array('ok' => false, 'message' => $this->error);
+        }
+
+        return $healthReport;
+    }
+
     protected function getHosts()
     {
         $host = [

@@ -1,14 +1,23 @@
 <?php
 ini_set('max_execution_time', 1200);
 
+$avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
+$avantElasticserachClient = new AvantElasticsearchClient();
+
+$health = $avantElasticserachClient->getHealth();
+$healthReport = $health['message'];
+$healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error') . '"';
+
 $pageTitle = __('Elasticsearch Indexing');
-echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 $operation = isset($_REQUEST['operation']) ? $_REQUEST['operation'] : 'none';
 $limit = isset($_REQUEST['limit']) ? intval($_REQUEST['limit']) : 100;
 $options = array('none' => 'No Action', 'import' =>'Import', 'export' => 'Export');
 $action = url("elasticsearch/indexing?operation=$operation&limit=$limit");
-$file = ElasticsearchConfig::getOptionValueForExportFile();
+$filename = $avantElasticsearchIndexBuilder->getindexDataFilename();
 
+echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
+echo "<div$healthReportClass>$healthReport</div>";
+echo "<hr/>";
 echo "<form id='indexing-form' name='indexing-form' action='$action' method='get'>";
 echo '<div class="indexing-radio-buttons">';
 echo $this->formRadio('operation', $operation, null, $options);
@@ -18,7 +27,7 @@ echo $this->formText('limit', $limit, array('size' => '4', 'id' => 'limit'));
 echo '</div>';
 echo "<button id='submit_index' 'type='submit' value='Index'>Start Indexing</button>";
 echo '</form>';
-echo "<div>$file</div>";
+echo "<div>$filename</div>";
 
 $mb = 1048576;
 $mem1 = intval(memory_get_usage() / $mb);
@@ -27,8 +36,18 @@ $message = '';
 if ($operation != 'none')
 {
     $export = $operation == 'export';
-    $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-    $responses = $avantElasticsearchIndexBuilder->indexAll($export, $limit);
+    $deleteExistingIndex = true;
+
+    if ($export)
+    {
+        $avantElasticsearchIndexBuilder->performBulkIndexExport($filename, $limit);
+    }
+    else
+    {
+        $avantElasticsearchIndexBuilder->performBulkIndexImport($filename, $deleteExistingIndex);
+    }
+
+    $responses = $avantElasticsearchIndexBuilder->performBulkIndex($export, $deleteExistingIndex, $limit);
     $message = $avantElasticsearchIndexBuilder->convertResponsesToMessageString($responses);
 }
 
