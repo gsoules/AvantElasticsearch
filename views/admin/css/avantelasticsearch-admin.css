@@ -1,16 +1,15 @@
-#avantelasticsearch_es_owner_id,
-#avantelasticsearch_es_scheme,
-#avantelasticsearch_es_port {
+#avantelasticsearch_es_contributor_id {
     width: 60px;
 }
 
-#avantelasticsearch_es_region {
-    width: 85px;
+#avantelasticsearch_es_region,
+#avantelasticsearch_es_export_file {
+    width: 100px;
 }
 
 #avantelasticsearch_es_key,
-#avantelasticsearch_es_owner {
-    width: 220px;
+#avantelasticsearch_es_contributor {
+    width: 280px;
 }
 
 #avantelasticsearch_es_secret {
