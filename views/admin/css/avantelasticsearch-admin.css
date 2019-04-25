@@ -27,4 +27,17 @@
     padding: 8px 0;
 }
 
+.health-report-ok,
+.health-report-error {
+    font-size: 16px;
+}
+.health-report-ok {
+    color: green;
+}
+
+.health-report-error {
+    color: red;
+    font-weight: bold;
+}
+
 
