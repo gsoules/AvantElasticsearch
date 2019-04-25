@@ -254,6 +254,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $params;
     }
 
+    public function getindexDataFilename()
+    {
+        $adapterOptions = Zend_Registry::get('storage')->getAdapter()->getOptions();
+        $path = $adapterOptions['localDir'];
+        $indexDataId = ElasticsearchConfig::getOptionValueForExportFile();
+        $filename = $path . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $indexDataId . '.json';
+        return $filename;
+    }
+
     protected function getItemFieldTexts($item)
     {
         // Get all the elements and all element texts.
@@ -274,6 +283,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         return $fieldTexts;
     }
+
     public function indexSingleItem($item)
     {
         $this->cacheInstallationParameters();
@@ -287,7 +297,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $response;
     }
 
-    protected function performBulkIndexExport($filename, $limit = 0)
+    public function performBulkIndexExport($filename, $limit = 0)
     {
         $json = '';
         $this->cacheInstallationParameters();
@@ -332,8 +342,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         file_put_contents($filename, "[$json]");
     }
 
-    protected function performBulkIndexImport($filename)
+    public function performBulkIndexImport($filename, $deleteExistingIndex)
     {
+        if ($deleteExistingIndex)
+        {
+            $this->deleteIndex();
+        }
 
         $batchSize = 500;
         $responses = array();
@@ -367,31 +381,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $responses[] = $response["items"][0]["index"];
             }
         }
-
-        return $responses;
-    }
-
-    public function performBulkIndex($export, $limit)
-    {
-        $responses = array();
-        $filename = ElasticsearchConfig::getOptionValueForExportFile();
-
-        if ($export)
-        {
-            $this->performBulkIndexExport($filename, $limit);
-        }
-        else
-        {
-            $this->deleteIndex();
-            $responses = $this->performBulkIndexImport($filename);
-        }
-
-        return $responses;
-    }
-
-    public function indexAll($export, $limit)
-    {
-        $responses = $this->performBulkIndex($export, $limit);
 
         return $responses;
     }
