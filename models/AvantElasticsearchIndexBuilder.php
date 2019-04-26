@@ -254,12 +254,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $params;
     }
 
-    public function getindexDataFilename()
+    public function getindexDataFilename($name)
     {
         $adapterOptions = Zend_Registry::get('storage')->getAdapter()->getOptions();
         $path = $adapterOptions['localDir'];
-        $indexDataId = ElasticsearchConfig::getOptionValueForExportFile();
-        $filename = $path . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $indexDataId . '.json';
+        $filename = $path . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $name . '.json';
         return $filename;
     }
 

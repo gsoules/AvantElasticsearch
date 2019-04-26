@@ -1,6 +1,5 @@
 <?php
 
-define('CONFIG_LABEL_ES_EXPORT_FILE',  __('Export Filename'));
 define('CONFIG_LABEL_ES_HOST', __('Host'));
 define('CONFIG_LABEL_ES_KEY', __('Key'));
 define('CONFIG_LABEL_ES_CONTRIBUTOR', __('Contributor'));
@@ -12,7 +11,6 @@ class ElasticsearchConfig extends ConfigOptions
 {
     const OPTION_ES_CONTRIBUTOR = 'avantelasticsearch_es_contributor';
     const OPTION_ES_CONTRIBUTOR_ID = 'avantelasticsearch_es_contributor_id';
-    const OPTION_ES_EXPORT_FILE = 'avantelasticsearch_es_export_file';
     const OPTION_ES_HOST = 'avantelasticsearch_es_host';
     const OPTION_ES_KEY = 'avantelasticsearch_es_key';
     const OPTION_ES_REGION = 'avantelasticsearch_es_region';
@@ -26,11 +24,6 @@ class ElasticsearchConfig extends ConfigOptions
     public static function getOptionValueForContributorId()
     {
         return self::getOptionText(self::OPTION_ES_CONTRIBUTOR_ID);
-    }
-
-    public static function getOptionValueForExportFile()
-    {
-        return self::getOptionText(self::OPTION_ES_EXPORT_FILE);
     }
 
     public static function getOptionValueForHost()
@@ -55,7 +48,6 @@ class ElasticsearchConfig extends ConfigOptions
 
     public static function saveConfiguration()
     {
-        self::saveOptionDataForExportFile();
         self::saveOptionDataForHost();
         self::saveOptionDataForKey();
         self::saveOptionDataForContributor();
@@ -80,11 +72,6 @@ class ElasticsearchConfig extends ConfigOptions
         $hasInvalidCharacters = $strippedValue != $value;
         self::errorIf(strlen($value) < 3 || strlen($value) > 6 || $hasInvalidCharacters, $optionLabel, __('The value does not satisfy the rules for a contributor Id'));
         set_option($optionName, $value);
-    }
-
-    public static function saveOptionDataForExportFile()
-    {
-        self::saveOptionText(self::OPTION_ES_EXPORT_FILE , CONFIG_LABEL_ES_EXPORT_FILE);
     }
 
     public static function saveOptionDataForHost()
