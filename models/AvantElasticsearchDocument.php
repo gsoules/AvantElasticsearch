@@ -74,8 +74,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $facetData = [];
         $htmlFields = [];
 
-        $avantElasticsearch = new AvantElasticsearch();
-
         $itemHasDate = false;
         $titleString = '';
         $titleFieldTexts = null;

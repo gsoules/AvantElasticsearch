@@ -9,7 +9,6 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         'config',
         'config_form',
         'define_routes',
-        'install',
         'public_footer',
         'public_head'
     );
@@ -45,11 +44,6 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     public function hookDefineRoutes($args)
     {
         $args['router']->addConfig(new Zend_Config_Ini(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'routes.ini', 'routes'));
-    }
-
-    public function hookInstall()
-    {
-        ElasticsearchConfig::setDefaultOptionValues();
     }
 
     public function hookPublicFooter($args)

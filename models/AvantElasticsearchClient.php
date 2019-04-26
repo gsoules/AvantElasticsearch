@@ -44,8 +44,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
             ]
         ]);
 
-        // Return the Elasticsearch\Client object;
-        $this->client = $builder->build();
+        try
+        {
+            // Create the actual Elasticsearch Client object.
+            $this->client = $builder->build();
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            return null;
+        }
     }
 
     public function createIndex($params)
@@ -80,8 +88,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         try
         {
-            $response = $this->client->indices()->delete($params);
-            return $response;
+            if ($this->client)
+            {
+                $response = $this->client->indices()->delete($params);
+                return $response;
+            }
+            else
+            {
+                // TO-DO: Return an error if deleteIndex fails because of no client
+                return null;
+            }
         }
         catch (\Elasticsearch\Common\Exceptions\Missing404Exception $e)
         {
@@ -124,9 +140,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         try
         {
-            $response = $this->client->cat()->health();
-            $health = $response[0];
-            $healthReport = array('ok' => true, 'message' => "Cluster OK. Health status {$health['status']} ({$health['cluster']})");
+            if ($this->client)
+            {
+                $response = $this->client->cat()->health();
+                $health = $response[0];
+                $healthReport = array('ok' => true, 'message' => "Cluster OK. Health status {$health['status']} ({$health['cluster']})");
+            }
+            else
+            {
+                $healthReport = array('ok' => false, 'message' => "The Elasticsearch plugin has not been configured.");
+            }
         }
         catch (Exception $e)
         {
@@ -179,6 +202,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
             $this->reportClientException($e);
             return null;
         }
+    }
+
+    public function ready()
+    {
+        return $this->client != null;
     }
 
     protected function reportClientException(Exception $e)

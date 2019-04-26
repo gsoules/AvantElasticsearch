@@ -54,7 +54,7 @@ class AvantElasticsearch
 
     public function getElasticsearchIndexName()
     {
-        return get_option('avantsearch_elasticsearch_index');
+        return 'omeka';
     }
 
     public function getDocumentIdForItem($item)

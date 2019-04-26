@@ -340,6 +340,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         file_put_contents($filename, "[$json]");
+
+        return array();
     }
 
     public function performBulkIndexImport($filename, $deleteExistingIndex)
