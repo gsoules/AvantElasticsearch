@@ -345,11 +345,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function performBulkIndexImport($filename, $deleteExistingIndex)
     {
-        if ($deleteExistingIndex)
-        {
-            $this->deleteIndex();
-        }
-
         $batchSize = 500;
         $responses = array();
 
@@ -370,7 +365,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         ];
 
         $avantElasticsearchClient = new AvantElasticsearchClient();
-        $response = $avantElasticsearchClient->createIndex($params);
+        if ($deleteExistingIndex)
+        {
+            $response = $this->deleteIndex();
+            $response = $avantElasticsearchClient->createIndex($params);
+        }
 
         for ($offset = 0; $offset < $docsCount; $offset += $batchSize)
         {
