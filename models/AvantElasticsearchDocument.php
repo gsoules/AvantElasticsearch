@@ -75,6 +75,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $htmlFields = [];
 
         $itemHasDate = false;
+        $itemHasIdentifier = false;
         $titleString = '';
         $titleFieldTexts = null;
         $itemTypeIsReference = false;
@@ -113,6 +114,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $titleFieldTexts = $fieldTexts;
             }
 
+            if ($elasticsearchFieldName == 'identifier')
+            {
+                $itemHasIdentifier = true;
+            }
+
             if ($elasticsearchFieldName == 'date')
             {
                 $itemHasDate = true;
@@ -142,6 +148,15 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // Add facet data for this installation's as the contributor.
         $contributorFieldTexts = $this->createFieldTexts($this->installation['contributor']);
         $this->createElementFacetData('contributor', $contributorFieldTexts, $facetData);
+
+        if (!$itemHasIdentifier)
+        {
+            // This installation does not use the Identifier element because it has an Identifier Alias
+            // configured in AvantCommon. Get the alias value and use it as the identifier field value.
+            $aliasElementId = CommonConfig::getOptionDataForIdentifierAlias();
+            $aliasText = $itemFieldTexts[$aliasElementId][0]['text'];
+            $elementData['identifier'] = $aliasText;
+        }
 
         if (!$itemHasDate)
         {
