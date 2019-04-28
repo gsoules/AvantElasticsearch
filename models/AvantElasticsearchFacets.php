@@ -234,16 +234,39 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function createQueryStringWithFacets($query)
     {
-        // Get the search terms plus the root and leaf facets specified in the query.
-        $terms = isset($query['query']) ? $query['query'] : '';
-        $facets = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : array();
-        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : array();
+        $terms = '';
+        $roots = array();
+        $leafs = array();
+        $otherArgs = array();
+
+        foreach ($query as $arg => $value)
+        {
+            switch ($arg)
+            {
+                case 'query';
+                    $terms = $value;
+                    break;
+                case 'root':
+                    $roots = $value;
+                    break;
+                case 'leaf':
+                    $leafs = $value;
+                    break;
+                default:
+                    $otherArgs[$arg] = $value;
+            }
+        }
 
         // Create a query string that contains the terms and args.
         $queryString = "query=" . urlencode($terms);
         $updatedQueryString = $queryString;
         $updatedQueryString .= $this->createQueryStringArgsForFacets($roots, true);
-        $updatedQueryString .= $this->createQueryStringArgsForFacets($facets, false);
+        $updatedQueryString .= $this->createQueryStringArgsForFacets($leafs, false);
+
+        foreach ($otherArgs as $arg => $value)
+        {
+            $updatedQueryString .= '&' . urlencode("$arg") . '=' . urlencode($value);
+        }
 
         $this->queryStringWithApplieFacets = $updatedQueryString;
         return $updatedQueryString;
@@ -557,6 +580,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function findAppliedFacetInFacetsTable($group, $facetName)
     {
+        if (!isset($this->facetsTable[$group]))
+        {
+            // Normally this won't happen, but it could if the caller is attempting to look for a group that's not in
+            // the facets table, e.g. a facet used only for commingled results when the results are not commingled.
+            return -1;
+        }
+
         $facetIndex = 0;
         foreach ($this->facetsTable[$group] as $index => $facetTableEntry)
         {
@@ -851,6 +881,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             {
                 // Find this applied facet name in the facets table.
                 $facetIndex = $this->findAppliedFacetInFacetsTable($leafFacetGroup, $leafFacetName);
+
+                if ($facetIndex == -1)
+                {
+                    // This facet is not in the table.
+                    continue;
+                }
 
                 // Set this applied facet's action to remove
                 $this->facetsTable[$leafFacetGroup][$facetIndex]['action'] = 'remove';
