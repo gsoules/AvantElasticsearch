@@ -265,6 +265,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($otherArgs as $arg => $value)
         {
+            // Ignore any pagination arg from the query string that will be there if the user paged through the previous
+            // search results. The query string created here will be used to produce new results and must not have the arg.
+            if ($arg == 'page')
+                continue;
+
             $updatedQueryString .= '&' . urlencode("$arg") . '=' . urlencode($value);
         }
 
@@ -296,14 +301,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         $queryString = $this->queryStringWithApplieFacets;
         $args = explode('&', $queryString);
-
-        // Remove any pagination arg from the query string that will be there if the user paged through the previous
-        // search results. The query string created here will be used to produce new results and must not have the arg.
-        foreach ($args as $index => $arg)
-        {
-            if (strpos($arg, 'page=') === 0)
-                unset($args[$index]);
-        }
 
         // Create the arg to be added.
         $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
