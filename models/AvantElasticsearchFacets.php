@@ -451,7 +451,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             $className = 'facet-section' . ($facetApplied ? '-applied' : '');
             $sectionHeader = "<div class='$className'>{$facetDefinition['name']}</div>";
-            return "$sectionHeader<ul>$html</ul>";
+            return "$sectionHeader<ul id='facet-$group'>$html</ul>";
         }
     }
 
@@ -788,6 +788,20 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $filterBarFacets;
+    }
+
+    public function getRootAndFirstChildNameFromLeafName($leafName)
+    {
+        // Get the root and its first child from the leaf name.
+        $rootName = $this->getRootNameFromLeafName($leafName);
+        $firstChildName = '';
+        $remainder = substr($leafName, strlen($rootName) + 1);
+        if (strlen($remainder) > 0)
+        {
+            $firstChildName = ',' . $this->getRootNameFromLeafName($remainder);
+        }
+
+        return $rootName . $firstChildName;
     }
 
     protected function getRootNameFromLeafName($leafName)

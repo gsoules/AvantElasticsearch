@@ -245,8 +245,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             if (is_array($facetValue))
             {
                 // When the value is an array, the components are always root and leaf.
-                $facets["$elasticsearchFieldName.root"][] = $facetValue['root'];
-                $facets["$elasticsearchFieldName.leaf"][] = $facetValue['leaf'];
+                // Add the root and leaf values to the facets array.
+                $rootName = $facetValue['root'];
+                $leafName = $facetValue['leaf'];
+                $facets["$elasticsearchFieldName.root"][] = $rootName;
+                $facets["$elasticsearchFieldName.leaf"][] = $leafName;
+
+                // If the leaf has a grandchild, add the root and first child name to the facets array.
+                // This will allow the user to use facets to filter by root, by first child, or by leaf.
+                $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
+                if ($rootAndFirstChild != $leafName)
+                {
+                    $facets["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
+                }
             }
             else
             {
