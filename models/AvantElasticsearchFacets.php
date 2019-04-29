@@ -357,7 +357,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetEntryHtml = $this->createFacetEntryHtml($entry, $isRoot);
 
         $facetApplied = $entry['action'] == 'remove' ? true : $facetApplied;
-        $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot);
+        $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot, false);
 
         // Emit hierarchy  leaf entries for this facet entry.
         if (isset($entry['leafs']))
@@ -368,20 +368,31 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 if ($leafEntry['action'] == 'hide')
                     return $html;
 
-
                 $facetApplied = $leafEntry['action'] == 'remove' ? true : $facetApplied;
                 if ($this->entryHasNoFilteringEffect($leafEntry))
                 {
                     $leafEntry['action'] = 'dead';
                 }
+
+                $isGrandchild = false;
+                $name = $leafEntry['name'];
+                $pos = strpos($leafEntry['name'], ',');
+                if ($pos !== false)
+                {
+                    $isGrandchild = true;
+                    $leafEntry['name'] = substr($name, $pos + 1);
+                }
+
                 $leafEntryHtml = $this->createFacetEntryHtml($leafEntry, false);
-                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $leafEntry['action'], 2);
+
+                $level = $isGrandchild ? 3 : 2;
+                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $leafEntry['action'], $level, false);
             }
         }
         return $html;
     }
 
-    protected function emitHtmlForFacetEntryListItem($html, $action, $level, $isRoot = false)
+    protected function emitHtmlForFacetEntryListItem($html, $action, $level, $isRoot)
     {
         $className = "facet-entry-$level";
 
