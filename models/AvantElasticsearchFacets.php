@@ -292,34 +292,65 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions['tag']['not_used'] = true;
     }
 
-    public function editQueryStringToAddFacetArg($queryString, $facetToAddGroup, $facetToAddValue, $isRoot)
+    public function editQueryStringToAddFacetArg($facetToAddGroup, $facetToAddValue, $isRoot)
     {
-        $args = explode('&', $queryString);
-        $addFacet = true;
+        $queryString = $this->queryStringWithApplieFacets;
+        $beforeArgs = explode('&', $queryString);
+        $afterArgs = array();
+        $argToBeAddedIsAppliedFacet = false;
+        $argToAdd = '';
 
-        foreach ($args as $rawArg)
+        // Update the query string to includes an arg for the facet to be added.
+        foreach ($beforeArgs as $rawArg)
         {
-            // Decode any %## encoding in the arg and change '+' to a space character.
+            // Decode any %# encoding in the arg and change '+' to a space character.
             $arg = urldecode($rawArg);
-            $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
-            $facetArg = "{$kind}_{$facetToAddGroup}[]";
 
-            $target = "$facetArg=$facetToAddValue";
-            $argContainsTarget = $target == $arg;
-
-            if ($argContainsTarget)
+            // Check if this is a pagination arg.
+            $argIsPagination = strpos($arg, 'page=') === 0;
+            if ($argIsPagination)
             {
-                $addFacet = false;
-                break;
+                // This arg specifies a results page that is only meaningful when a user is paging through a long
+                // list of results. The query string created here will be producing new results. If this arg is not
+                // removed, it could refer to a page that does not exist.
+                continue;
+            }
+
+            // Include this existing arg in the updated query string.
+            $afterArgs[] = $arg;
+
+            if ($argToBeAddedIsAppliedFacet)
+            {
+                // The arg to be added has already been identified as an applied facet so don't check again.
+                // Continue processing the rest of the args so that all the existing args will get added to the
+                // query string and any pagination arg will get removed.
+                continue;
+            }
+            else
+            {
+                // Determine if the arg to be added should be added.
+                $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+                $facetArg = "{$kind}_{$facetToAddGroup}[]";
+                $argToAdd = "$facetArg=$facetToAddValue";
+                $argToBeAddedIsAppliedFacet = $argToAdd == $arg;
+                if ($argToBeAddedIsAppliedFacet )
+                {
+                    // The arg is already in the query string which means it's been applied.
+                    // Instead of getting an add-link, this facet will get a remove-X.
+                    $argToBeAddedIsAppliedFacet = true;
+                    $argToAdd = '';
+                }
             }
         }
 
-        if ($addFacet)
+        if (!empty($argToAdd))
         {
-            $queryString = "$queryString&$target";
+            // Add the arg to be added to the new query string.
+            $afterArgs[] = $argToAdd;
         }
 
-        return $queryString;
+        $updatedQueryString = implode('&', $afterArgs);
+        return $updatedQueryString;
     }
 
     public function editQueryStringToRemoveFacetArg($queryString, $facetToRemoveGroup, $facetToRemoveValue, $isRoot)
@@ -501,29 +532,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function emitHtmlLinkForAddFilter($facetToAddGroup, $facetToAddName, $facetToAddRootPath, $isRoot)
     {
-        // Add an argument to the query string for each facet that is already applied.
-        // The applied facets are structured as follows:
-        // - At the top level there are two facet kinds: FACET_KIND_ROOT and FACET_KIND_LEAF
-        // - For each kind, there can be zero or more facet groups e.g. 'subject', 'type', 'place'.
-        // - For each group, there can be one or more values e.g. two subjects.
-        //
-        // Note that the user interface might not allow, for example, two root level facets of the same
-        // type to be selected as filters, but this logic handles any combination of applied facets.
-        //
-        $updatedQueryString = $this->queryStringWithApplieFacets;
-        foreach ($this->appliedFacets as $kind => $appliedFacet)
-        {
-            foreach ($appliedFacet as $appliedFacetGroup => $appliedFacetValues)
-            {
-                foreach ($appliedFacetValues as $appliedFacetValue)
-                {
-                    $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $appliedFacetGroup, $appliedFacetValue, $kind == FACET_KIND_ROOT);
-                }
-            }
-        }
-
         // Add an argument to the query string for the facet now being added.
-        $updatedQueryString = $this->editQueryStringToAddFacetArg($updatedQueryString, $facetToAddGroup, $facetToAddRootPath, $isRoot);
+        $updatedQueryString = $this->editQueryStringToAddFacetArg($facetToAddGroup, $facetToAddRootPath, $isRoot);
 
         // Create the link that the user can click to apply this facet plus all the already applied facets.
         // In the link text, add a space after each comma for readability.
