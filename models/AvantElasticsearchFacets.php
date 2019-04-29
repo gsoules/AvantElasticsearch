@@ -398,11 +398,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     protected function emitHtmlForResetLink($query)
     {
         if (empty($this->appliedFacets['root']) && empty($this->appliedFacets['leaf']))
+        {
+            // No facets are applied and therefore no reset link is needed.
             return '';
+        }
+
+        // Create new query string args minus root or leaf facets, or the pagination arg if it exists.
+        $otherArgs = '';
+        foreach ($query as $argName => $argValue)
+        {
+            if ($argName == 'query' || $argName == 'root' || $argName == 'leaf' || $argName == 'page')
+                continue;
+
+            $otherArgs .= "&$argName=$argValue";
+        }
 
         $terms = isset($query['query']) ? $query['query'] : '';
         $queryString = "query=" . urlencode($terms);
-        $resetUrl = $this->findUrl . '?' . $queryString;
+        $resetUrl = $this->findUrl . '?' . $queryString . $otherArgs;
         $resetLink = '&nbsp;&nbsp;<a href="' . $resetUrl . '" title="Reset">' . '&#10006;' . '</a>';
         return $resetLink;
     }
