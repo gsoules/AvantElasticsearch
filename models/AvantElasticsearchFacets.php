@@ -270,6 +270,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             if ($arg == 'page')
                 continue;
 
+            // Ignore any unexpected array values. This could happen if the user mistyped or edited the query string,
+            // for example by specifying 'rot_type[]=Image' instead of 'root_type[]=Image'.
+            if (is_array($value))
+                continue;
+
             $updatedQueryString .= '&' . urlencode("$arg") . '=' . urlencode($value);
         }
 
@@ -545,6 +550,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($queryStringRoots as $group => $facetValues)
         {
+            if (!$this->isDefinedGroup($group))
+                continue;
+
             foreach ($facetValues as $facetValue)
             {
                 $appliedFacets[FACET_KIND_ROOT][$group][] = $facetValue;
@@ -553,6 +561,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         foreach ($queryStringFacets as $group => $facetValues)
         {
+            if (!$this->isDefinedGroup($group))
+                continue;
+
             foreach ($facetValues as $facetValue)
             {
                 $appliedFacets[FACET_KIND_LEAF][$group][] = $facetValue;
@@ -788,6 +799,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $rootName = substr($leafName, 0, $index);
         }
         return $rootName;
+    }
+
+    protected function isDefinedGroup($group)
+    {
+        // Check to see if the group is valid. It can be bad if the user mistyped or edited the query string,
+        // for example by specifying 'root_tpe[]=image' instead of 'root_type[]=image'.
+        return isset($this->facetDefinitions[$group]);
     }
 
     protected function setFacetsTableActions()
