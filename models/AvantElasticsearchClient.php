@@ -216,7 +216,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return;
     }
 
-    public function search($params, $retry = false)
+    public function search($params, $attempt = 1)
     {
         try
         {
@@ -225,14 +225,17 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (\Elasticsearch\Common\Exceptions\NoNodesAvailableException $e)
         {
-            if ($retry)
+            if ($attempt == 3)
             {
-                $this->reportClientException($e);
+                $error = $this->getElasticsearchExceptionMessage($e);
+                $this->error = $error . '<br.>' . "Tried $attempt times";
                 return null;
             }
             else
             {
-                $this->search($params, true);
+                $attempt++;
+                $response = $this->search($params, $attempt);
+                return $response;
             }
         }
         catch (Exception $e)
