@@ -295,61 +295,25 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function editQueryStringToAddFacetArg($facetToAddGroup, $facetToAddValue, $isRoot)
     {
         $queryString = $this->queryStringWithApplieFacets;
-        $beforeArgs = explode('&', $queryString);
-        $afterArgs = array();
-        $argToBeAddedIsAppliedFacet = false;
-        $argToAdd = '';
+        $args = explode('&', $queryString);
 
-        // Update the query string to includes an arg for the facet to be added.
-        foreach ($beforeArgs as $rawArg)
+        // Remove any pagination arg from the query string that will be there if the user paged through the previous
+        // search results. The query string created here will be used to produce new results and must not have the arg.
+        foreach ($args as $index => $arg)
         {
-            // Decode any %# encoding in the arg and change '+' to a space character.
-            $arg = urldecode($rawArg);
-
-            // Check if this is a pagination arg.
-            $argIsPagination = strpos($arg, 'page=') === 0;
-            if ($argIsPagination)
-            {
-                // This arg specifies a results page that is only meaningful when a user is paging through a long
-                // list of results. The query string created here will be producing new results. If this arg is not
-                // removed, it could refer to a page that does not exist.
-                continue;
-            }
-
-            // Include this existing arg in the updated query string.
-            $afterArgs[] = $arg;
-
-            if ($argToBeAddedIsAppliedFacet)
-            {
-                // The arg to be added has already been identified as an applied facet so don't check again.
-                // Continue processing the rest of the args so that all the existing args will get added to the
-                // query string and any pagination arg will get removed.
-                continue;
-            }
-            else
-            {
-                // Determine if the arg to be added should be added.
-                $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
-                $facetArg = "{$kind}_{$facetToAddGroup}[]";
-                $argToAdd = "$facetArg=$facetToAddValue";
-                $argToBeAddedIsAppliedFacet = $argToAdd == $arg;
-                if ($argToBeAddedIsAppliedFacet )
-                {
-                    // The arg is already in the query string which means it's been applied.
-                    // Instead of getting an add-link, this facet will get a remove-X.
-                    $argToBeAddedIsAppliedFacet = true;
-                    $argToAdd = '';
-                }
-            }
+            if (strpos($arg, 'page=') === 0)
+                unset($args[$index]);
         }
 
-        if (!empty($argToAdd))
-        {
-            // Add the arg to be added to the new query string.
-            $afterArgs[] = $argToAdd;
-        }
+        // Create the arg to be added.
+        $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+        $facetArg = "{$kind}_{$facetToAddGroup}[]";
+        $argToAdd = "$facetArg=$facetToAddValue";
 
-        $updatedQueryString = implode('&', $afterArgs);
+        // Add the arg to be added to the new query string.
+        $args[] = $argToAdd;
+
+        $updatedQueryString = implode('&', $args);
         return $updatedQueryString;
     }
 
