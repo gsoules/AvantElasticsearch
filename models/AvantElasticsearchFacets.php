@@ -59,10 +59,16 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $terms[$group] = [
                     'terms' => [
                         'field' => "facet.$group",
-                        'size' => 1000,
-                        'order' => ['_key' => 'asc']
+                        'size' => 1000
                     ]
                 ];
+
+                if ($definition['sort'])
+                {
+                    // Sort the buckets by their values in ascending order. When not sorted, Elasticsearch
+                    // returns them in reverse count order (buckets with the most values are at the top).
+                    $terms[$group]['terms']['order'] = array('_key' => 'asc');
+                }
             }
         }
 
@@ -81,6 +87,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'is_hierarchy' => $isHierarchy,
             'is_root_hierarchy' => $isRootHierarchy,
             'commingled' => false,
+            'sort' => true,
             'not_used' => false);
 
         $this->facetDefinitions[$group] = $definition;
@@ -295,6 +302,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $this->createFacet('contributor', 'Contributor');
         $this->facetDefinitions['contributor']['commingled'] = true;
+
+        // Don't sort the contributor results. That way contributors with the most results appear first.
+        $this->facetDefinitions['contributor']['sort'] = false;
 
         // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
         // If/when supported, see performance improvement comment in AvantElasticsearchDocument::constructTags().
@@ -786,8 +796,19 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Add all the leaf facets to the filter bar facets.
         foreach ($appliedLeafFacets as $leafFacetGroup => $leafFacetNames)
         {
-            foreach ($leafFacetNames as $leafFacetName)
+            foreach ($leafFacetNames as $index => $leafFacetName)
             {
+                // Check for the special case where the user applied a child facet such as 'Image,Photograph' and then
+                // applied a grandchild facet like 'Glass Plate'. In this case, don't show the child, only the grandchild.
+                if (count($leafFacetNames) == 2 && $index == 0)
+                {
+                    if (strpos($leafFacetNames[1], $leafFacetNames[0] . ',') === 0)
+                    {
+                        // The 0th value is the child and the 1st is the grandchild. Ignore the child.
+                        continue;
+                    }
+                }
+
                 $leafFacetName = str_replace(',', ', ', $leafFacetName);
                 $groupName = $this->facetDefinitions[$leafFacetGroup]['name'];
                 $filterBarFacets[$groupName][] = $leafFacetName;
