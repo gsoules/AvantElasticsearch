@@ -316,26 +316,26 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function editQueryStringToRemoveFacetArg($queryString, $facetToRemoveGroup, $facetToRemoveValue, $isRoot)
     {
-        $beforeArgs = explode('&', $queryString);
-        $afterArgs = array();
+        $args = explode('&', $queryString);
 
-        foreach ($beforeArgs as $rawArg)
+        foreach ($args as $index => $rawArg)
         {
-            // Decode any %## encoding in the arg and change '+' to a space character.
+            // Remove any %# encoding from the arg so it can be compared to the arg to be removed.
             $arg = urldecode($rawArg);
+
+            // Construct the name/value of the arg to be remove.
             $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
             $facetArg = "{$kind}_{$facetToRemoveGroup}[]";
+            $argToRemove = "$facetArg=$facetToRemoveValue";
 
-            $target = "$facetArg=$facetToRemoveValue";
-            $argContainsTarget = $target == $arg;
-
-            if (!$argContainsTarget)
+            if ($arg == $argToRemove)
             {
-                // Keep this arg since it not the one to be removed.
-                $afterArgs[] = $arg;
+                unset($args[$index]);
+                break;
             }
         }
-        return implode('&', $afterArgs);
+
+        return implode('&', $args);
     }
 
     protected function emitHtmlForFacetEntry($entry, $facetDefinition, &$facetApplied)
