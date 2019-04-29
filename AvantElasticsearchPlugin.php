@@ -19,10 +19,14 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function filterAdminNavigationMain($nav)
     {
-        $nav[] = array(
-            'label' => __('Elasticsearch'),
-            'uri' => url('elasticsearch/indexing')
-        );
+        $user = current_user();
+        if ($user->role == 'super')
+        {
+            $nav[] = array(
+                'label' => __('Elasticsearch'),
+                'uri' => url('elasticsearch/indexing')
+            );
+        }
         return $nav;
     }
 
