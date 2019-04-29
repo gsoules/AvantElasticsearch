@@ -363,7 +363,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if (isset($entry['leafs']))
         {
             $leafEntries = $entry['leafs'];
-            foreach ($leafEntries as $leafEntry)
+            $leafEntryListItems = array();
+
+            foreach ($leafEntries as $index => $leafEntry)
             {
                 if ($leafEntry['action'] == 'hide')
                     return $html;
@@ -383,10 +385,34 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $leafEntry['name'] = substr($name, $pos + 1);
                 }
 
-                $leafEntryHtml = $this->createFacetEntryHtml($leafEntry, false);
+                // Record this leaf's entry, level, and action.
+                $leafEntryListItems[$index]['entry'] = $leafEntry;
+                $leafEntryListItems[$index]['level'] = $isGrandchild ? 3 : 2;
+                $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+            }
 
-                $level = $isGrandchild ? 3 : 2;
-                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $leafEntry['action'], $level, false);
+            // Check for the special case where the user applied a child facet such as 'Image,Photograph'
+            // and then applied a grandchild facet like 'Glass Plate'. In this case, don't show a remove-X
+            // for the child facet, only for the grandchild.
+            if (count($leafEntryListItems) == 2)
+            {
+                if ($leafEntryListItems[0]['level'] == 2 && $leafEntryListItems[1]['level'] == 3)
+                {
+                    if ($leafEntryListItems[0]['action'] == 'remove')
+                    {
+                        $leafEntryListItems[0]['action'] = 'none';
+                        $leafEntryListItems[0]['entry']['action'] = 'none';
+                    }
+                }
+            }
+
+            // Emit the HTML for the leafs.
+            foreach ($leafEntryListItems as $listItem)
+            {
+                $leafEntryHtml = $this->createFacetEntryHtml($listItem['entry'], false);
+                $level = $listItem['level'];
+                $action = $listItem['action'];
+                $html .= $this->emitHtmlForFacetEntryListItem($leafEntryHtml, $action, $level, false);
             }
         }
         return $html;
