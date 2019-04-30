@@ -106,30 +106,30 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // Note that the 'title' field is a copy of the 'element.title' field. This one uses the English analyzer
         // and the other doesn't in order to get the best possible search results on title content.
         $this->addAnalyzerFieldToMappingProperties('element.description');
-        $this->addAnalyzerFieldToMappingProperties('title');
+        $this->addAnalyzerFieldToMappingProperties('item.title');
 
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
 
         // Boolean fields.
-        $this->addBooleanFieldToMappingProperties('public');
+        $this->addBooleanFieldToMappingProperties('item.public');
 
         // Numeric fields.
-        $this->addNumericFieldToMappingProperties('files');
-        $this->addNumericFieldToMappingProperties('itemid');
+        $this->addNumericFieldToMappingProperties('item.file-count');
+        $this->addNumericFieldToMappingProperties('item.id');
 
         // Keyword fields. None of these require full-text search.
         // To learn about keyword fields see: www.elastic.co/guide/en/elasticsearch/reference/master/keyword.html
-        $this->addKeywordFieldToMappingProperties('html');
+        $this->addKeywordFieldToMappingProperties('item.contributor');
+        $this->addKeywordFieldToMappingProperties('item.contributor-id');
+        $this->addKeywordFieldToMappingProperties('html-fields');
         $this->addKeywordFieldToMappingProperties('tags');
-        $this->addKeywordFieldToMappingProperties('image');
-        $this->addKeywordFieldToMappingProperties('contributor');
-        $this->addKeywordFieldToMappingProperties('contributorid');
-        $this->addKeywordFieldToMappingProperties('thumb');
-        $this->addKeywordFieldToMappingProperties('url');
+        $this->addKeywordFieldToMappingProperties('url.image');
+        $this->addKeywordFieldToMappingProperties('url.item');
+        $this->addKeywordFieldToMappingProperties('url.thumb');
 
-        $this->addKeywordFieldToMappingProperties('facet.date');
         $this->addKeywordFieldToMappingProperties('facet.contributor');
+        $this->addKeywordFieldToMappingProperties('facet.date');
         $this->addKeywordFieldToMappingProperties('facet.place');
         $this->addKeywordFieldToMappingProperties('facet.subject.leaf');
         $this->addKeywordFieldToMappingProperties('facet.subject.root');

@@ -13,7 +13,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     // Cached data.
     private $installation;
-    private $itemFiles;
+    private $itemFileCount;
 
     public function __construct($documentId)
     {
@@ -67,7 +67,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     public function copyItemElementValuesToDocument($item, $itemFieldTexts, $files)
     {
-        $this->itemFiles = $files;
+        $this->itemFileCount = $files;
 
         $elementData = [];
         $sortData = [];
@@ -177,36 +177,18 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (!empty($htmlFields))
         {
-            $this->setField('html', $htmlFields);
+            $this->setField('html-fields', $htmlFields);
         }
+
+        $urlData = $this->getItemUrlData($item);
+        $this->setField('url', $urlData);
+
+        $itemData = $this->getItemData($item, $titleString);
+        $this->setField('item', $itemData);
 
         $this->setField('element', $elementData);
         $this->setField('sort', $sortData);
         $this->setField('facet', $facetData);
-
-        $this->copyItemAttributesToDocument($item, $titleString);
-    }
-
-    protected function copyItemAttributesToDocument($item, $titleString)
-    {
-        $itemPath = $this->installation['item_path'] . $item->id;
-        $serverUrl = $this->installation['server_url'];
-        $itemPublicUrl = $serverUrl . $itemPath;
-
-        $itemImageThumbUrl = $this->getImageUrl($item, true);
-        $itemImageOriginalUrl = $this->getImageUrl($item, false);
-
-        $this->setFields([
-            'itemid' => (int)$item->id,
-            'contributorid' => $this->installation['contributorid'],
-            'contributor' => $this->installation['contributor'],
-            'title' => $titleString,
-            'public' => (bool)$item->public,
-            'url' => $itemPublicUrl,
-            'thumb' => $itemImageThumbUrl,
-            'image' => $itemImageOriginalUrl,
-            'files' => count($this->itemFiles)
-        ]);
     }
 
     protected function createAddressElementSortData($elasticsearchFieldName, $fieldText, &$sortData)
@@ -337,6 +319,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
+    public function deleteDocumentFromIndex()
+    {
+        $documentParmas = $this->constructDocumentParameters();
+        $avantElasticsearchClient = new AvantElasticsearchClient();
+        $response = $avantElasticsearchClient->deleteDocument($documentParmas);
+        return $response;
+    }
+
     protected function getImageUrl($item, $thumbnail)
     {
         $itemImageUrl = $this->getItemFileUrl($thumbnail);
@@ -354,6 +344,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $itemImageUrl;
     }
 
+    protected function getItemData($item, $titleString)
+    {
+        $itemData = array(
+            'id' => (int)$item->id,
+            'title' => $titleString,
+            'public' => (bool)$item->public,
+            'file-count' => count($this->itemFileCount),
+            'contributor' => $this->installation['contributor'],
+            'contributor-id' => $this->installation['contributor-id']
+        );
+        return $itemData;
+    }
+
     protected function getItemFileUrl($thumbnail)
     {
         // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFiles
@@ -361,7 +364,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // This improvement saves a significant amount of time when indexing all items.
 
         $url = '';
-        $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
+        $file = empty($this->itemFileCount) ? null : $this->itemFileCount[0];
         if (!empty($file) && $file->hasThumbnail())
         {
             $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
@@ -374,12 +377,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $url;
     }
 
-    public function deleteDocumentFromIndex()
+    protected function getItemUrlData($item)
     {
-        $documentParmas = $this->constructDocumentParameters();
-        $avantElasticsearchClient = new AvantElasticsearchClient();
-        $response = $avantElasticsearchClient->deleteDocument($documentParmas);
-        return $response;
+        $itemPath = $this->installation['item_path'] . $item->id;
+        $serverUrl = $this->installation['server_url'];
+        $itemUrl = $serverUrl . $itemPath;
+        $thumbUrl = $this->getImageUrl($item, true);
+        $imageUrl = $this->getImageUrl($item, false);
+
+        $urlData = array(
+            'item' => $itemUrl,
+            'thumb' => $thumbUrl,
+            'image' => $imageUrl);
+
+        return $urlData;
     }
 
     public function setAvantElasticsearchFacets($avantElasticsearchFacets)

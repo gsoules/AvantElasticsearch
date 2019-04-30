@@ -25,7 +25,7 @@
     $titles = array();
     foreach ($options as $option)
     {
-        $titles[] = $option["_source"]["title"];
+        $titles[] = $option["_source"]["item"]["title"];
     }
 
     // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.

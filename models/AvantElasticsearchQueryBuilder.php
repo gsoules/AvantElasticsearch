@@ -26,17 +26,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         // Fields that the query will return.
         $source = [
-            'itemid',
-            'contributorid',
-            'contributor',
-            'public',
-            'url',
-            'thumb',
-            'image',
-            'files',
             'element.*',
-            'html',
-            'tags'
+            'item.*',
+            'html-fields',
+            'tags',
+            'url.*'
         ];
 
         // Highlighting the query will return.        $highlight = ['fields' =>
