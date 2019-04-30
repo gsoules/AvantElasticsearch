@@ -38,7 +38,7 @@ if ($avantElasticserachClient->ready())
     echo $this->formRadio('operation', 'none', null, $options);
     echo '</div>';
     echo '<div id="limit-section">Limit: ' . $this->formText('limit', $limit, array('size' => '4', 'id' => 'limit')) . '</div>';
-    echo '<div>File: ' . $this->formText('file', $file, array('size' => '10', 'id' => 'file')). '</div>';
+    echo '<div>File: ' . $this->formText('file', $file, array('size' => '12', 'id' => 'file')). '</div>';
     echo "<button id='submit_index' 'type='submit' value='Index'>Start</button>";
     echo '</form>';
 }

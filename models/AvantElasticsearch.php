@@ -16,20 +16,6 @@ class AvantElasticsearch
         $this->documentIndexName = $this->getElasticsearchIndexName();
     }
 
-    protected function catentateElementTexts($fieldTexts)
-    {
-        $catenatedText = '';
-        foreach ($fieldTexts as $fieldText)
-        {
-            if (!empty($catenatedText))
-            {
-                $catenatedText .= PHP_EOL;
-            }
-            $catenatedText .= $fieldText['text'];
-        }
-        return $catenatedText;
-    }
-
     public function convertElementNameToElasticsearchFieldName($elementName)
     {
         // Convert the element name to lowercase and strip away spaces and other non-alphanumberic characters

@@ -7,13 +7,25 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     public $type;
     public $body = [];
 
+    // Cached data.
+    private $installation;
+    private $itemFiles;
+
     /* @var $avantElasticsearchFacets AvantElasticsearchFacets */
     protected $avantElasticsearchFacets;
     protected $facetDefinitions;
+    protected $itemHasDate = false;
+    protected $itemHasIdentifier = false;
+    protected $itemTypeIsReference = false;
+    protected $itemSubjectIsPeople = false;
+    protected $titleString = '';
+    protected $titleFieldTexts = null;
 
-    // Cached data.
-    private $installation;
-    private $itemFileCount;
+    // Arrays for collecting multiple values.
+    protected $elementData = [];
+    protected $sortData = [];
+    protected $facetData = [];
+    protected $htmlFields = [];
 
     public function __construct($documentId)
     {
@@ -30,6 +42,43 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $avantElasticsearchClient = new AvantElasticsearchClient();
         $response = $avantElasticsearchClient->indexDocument($documentParmas);
         return $response;
+    }
+
+    protected function addItemDataToDocumentBody($item)
+    {
+        if (!empty($this->htmlFields))
+        {
+            $this->setField('html-fields', $this->htmlFields);
+        }
+
+        $urlData = $this->getItemUrlData($item);
+        $this->setField('url', $urlData);
+
+        $itemData = $this->getItemData($item, $this->titleString);
+        $this->setField('item', $itemData);
+
+        $this->setField('element', $this->elementData);
+        $this->setField('sort', $this->sortData);
+        $this->setField('facet', $this->facetData);
+    }
+
+    protected function catentateElementTexts($fieldTexts)
+    {
+        // Get the element's text and catentate them into a single string separate by EOL breaks.
+        // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
+        // sorting based on the first value as is required by AvantSearch when a user sorts by column.
+        // By catenating the values, sorting will work as desired.
+
+        $catenatedText = '';
+        foreach ($fieldTexts as $fieldText)
+        {
+            if (!empty($catenatedText))
+            {
+                $catenatedText .= PHP_EOL;
+            }
+            $catenatedText .= $fieldText['text'];
+        }
+        return $catenatedText;
     }
 
     public function constructDocumentParameters()
@@ -65,133 +114,24 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $tags;
     }
 
-    public function copyItemElementValuesToDocument($item, $itemFieldTexts, $files)
+    public function copyItemElementValuesToDocument($item, $itemFieldTexts, $itemFiles)
     {
-        $this->itemFileCount = $files;
-
-        $elementData = [];
-        $sortData = [];
-        $facetData = [];
-        $htmlFields = [];
-
-        $itemHasDate = false;
-        $itemHasIdentifier = false;
-        $titleString = '';
-        $titleFieldTexts = null;
-        $itemTypeIsReference = false;
-        $itemSubjectIsPeople = false;
+        $this->itemFiles = $itemFiles;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
-            $elasticsearchFieldName = $this->installation['installation_elements'][$elementId];
-
-            foreach ($fieldTexts as $key => $fieldText)
-            {
-                if ($fieldText['html'] == 1)
-                {
-                    // Change any HTML content to plain text so that Elasticsearch won't get hits on HTML tags. For
-                    // example, if the query contained 'strong' we don't want the search to find the <strong> tag.
-                    $fieldTexts[$key]['text'] = strip_tags($fieldText['text']);
-                }
-            }
-
-            // Get the element's text and catentate them into a single string separate by EOL breaks.
-            // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
-            // sorting based on the first value as is required by AvantSearch when a user sorts by column.
-            // By catenating the values, sorting will work as desired.
-            $fieldTextsString = $this->catentateElementTexts($fieldTexts);
-
-            // Identify which if any of this element's text values contain HTML.
-            $this->createHtmlData($elasticsearchFieldName, $fieldTexts, $htmlFields);
-
-            if ($elasticsearchFieldName == 'title')
-            {
-                $titleString = $fieldTextsString;
-                if (strlen($titleString) == 0)
-                {
-                    $titleString = __('Untitled');
-                }
-                $titleFieldTexts = $fieldTexts;
-            }
-
-            if ($elasticsearchFieldName == 'identifier')
-            {
-                $itemHasIdentifier = true;
-            }
-
-            if ($elasticsearchFieldName == 'date')
-            {
-                $itemHasDate = true;
-            }
-
-            if ($elasticsearchFieldName == 'type')
-            {
-                // TO-DO: Make this logic generic so it doesn't depend on knowledge of specific type and subject values.
-                $itemTypeIsReference = $fieldTextsString == 'Reference';
-            }
-
-            if ($elasticsearchFieldName == 'subject')
-            {
-                $itemSubjectIsPeople = strpos($fieldTextsString, 'People') !== false;
-            }
-
-            // Save the element's text.
-            $elementData[$elasticsearchFieldName] = $fieldTextsString;
-
-            // Add information to the document about special elements.
-            $this->createIntegerElementSortData($elasticsearchFieldName, $fieldTextsString, $sortData);
-            $this->createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts, $sortData);
-            $this->createAddressElementSortData($elasticsearchFieldName, $fieldTexts, $sortData);
-            $this->createElementFacetData($elasticsearchFieldName, $fieldTexts, $facetData);
+            $this->createFieldDataForElement($elementId, $fieldTexts);
         }
 
-        // Add facet data for this installation's as the contributor.
-        $contributorFieldTexts = $this->createFieldTexts($this->installation['contributor']);
-        $this->createElementFacetData('contributor', $contributorFieldTexts, $facetData);
+        $this->createFacetDataForContributor();
+        $this->createSpecialFieldsData($itemFieldTexts);
+        $this->createSuggestionsData();
+        $this->createTagData($item);
 
-        if (!$itemHasIdentifier)
-        {
-            // This installation does not use the Identifier element because it has an Identifier Alias
-            // configured in AvantCommon. Get the alias value and use it as the identifier field value.
-            $aliasElementId = CommonConfig::getOptionDataForIdentifierAlias();
-            $aliasText = $itemFieldTexts[$aliasElementId][0]['text'];
-            $elementData['identifier'] = $aliasText;
-        }
-
-        if (!$itemHasDate)
-        {
-            // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
-            $emptyDateFieldTexts = $this->createFieldTexts('');
-            $this->createElementFacetData('date', $emptyDateFieldTexts, $facetData);
-        }
-
-        if (!empty($titleFieldTexts))
-        {
-            $avantLogicSuggest = new AvantElasticsearchSuggest();
-            $itemTitleIsPerson = $itemTypeIsReference && $itemSubjectIsPeople;
-            $suggestionData = $avantLogicSuggest->CreateSuggestionsDataForTitle($titleFieldTexts, $itemTypeIsReference, $itemTitleIsPerson);
-            $this->body['suggestions'] = $suggestionData;
-        }
-
-        $this->createElementTagData($item, $facetData);
-
-        if (!empty($htmlFields))
-        {
-            $this->setField('html-fields', $htmlFields);
-        }
-
-        $urlData = $this->getItemUrlData($item);
-        $this->setField('url', $urlData);
-
-        $itemData = $this->getItemData($item, $titleString);
-        $this->setField('item', $itemData);
-
-        $this->setField('element', $elementData);
-        $this->setField('sort', $sortData);
-        $this->setField('facet', $facetData);
+        $this->addItemDataToDocumentBody($item);
     }
 
-    protected function createAddressElementSortData($elasticsearchFieldName, $fieldText, &$sortData)
+    protected function createAddressElementSortData($elasticsearchFieldName, $fieldText)
     {
         if ($elasticsearchFieldName == 'address')
         {
@@ -204,18 +144,18 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $number = intval($numberMatch);
 
                 // Pad the beginning of the number with leading zeros so that it can be sorted correctly as text.
-                $sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
+                $this->sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
 
-                $sortData[$elasticsearchFieldName . '-street'] = $matches[2];
+                $this->sortData[$elasticsearchFieldName . '-street'] = $matches[2];
             }
         }
     }
 
-    protected function createElementFacetData($elasticsearchFieldName, $fieldTexts, &$facets)
+    protected function createFacetDataForField($elasticsearchFieldName, $fieldTexts)
     {
         if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
         {
-            // This element is not used as a facet.
+            // This field is not used as a facet.
             return;
         }
 
@@ -230,38 +170,48 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // Add the root and leaf values to the facets array.
                 $rootName = $facetValue['root'];
                 $leafName = $facetValue['leaf'];
-                $facets["$elasticsearchFieldName.root"][] = $rootName;
-                $facets["$elasticsearchFieldName.leaf"][] = $leafName;
+                $this->facetData["$elasticsearchFieldName.root"][] = $rootName;
+                $this->facetData["$elasticsearchFieldName.leaf"][] = $leafName;
 
                 // If the leaf has a grandchild, add the root and first child name to the facets array.
                 // This will allow the user to use facets to filter by root, by first child, or by leaf.
                 $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
                 if ($rootAndFirstChild != $leafName)
                 {
-                    $facets["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
+                    $this->facetData["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
                 }
             }
             else
             {
-                $facets[$elasticsearchFieldName][] = $facetValue;
+                $this->facetData[$elasticsearchFieldName][] = $facetValue;
             }
         }
     }
 
-    protected function createElementTagData($item, &$facets)
+    protected function createFieldDataForElement($elementId, $fieldTexts)
     {
-        if (!$this->facetDefinitions['tag']['not_used'])
-        {
-            $tags = $this->constructTags($item);
-            if (!empty($tags))
-            {
-                $facets['tag'] = $tags;
-                $this->setField('tags', $tags);
-            }
-        }
+        // Get the element's field name.
+        $elasticsearchFieldName = $this->installation['installation_elements'][$elementId];
+
+        // Strip any HTML tags from the field's text value(s).
+        $this->removeHtmlTagsFromFieldText($fieldTexts);
+
+        // Save the element's text value(s) as single string.
+        $fieldTextsString = $this->catentateElementTexts($fieldTexts);
+        $this->elementData[$elasticsearchFieldName] = $fieldTextsString;
+
+        // Set flags to indicate if this field requires special handling.
+        $this->setSpecialFieldFlags($elasticsearchFieldName, $fieldTextsString, $fieldTexts);
+
+        // Create the various kinds of data associated with this field.
+        $this->createHtmlData($elasticsearchFieldName, $fieldTexts);
+        $this->createIntegerElementSortData($elasticsearchFieldName, $fieldTextsString);
+        $this->createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts);
+        $this->createAddressElementSortData($elasticsearchFieldName, $fieldTexts);
+        $this->createFacetDataForField($elasticsearchFieldName, $fieldTexts);
     }
 
-    protected function createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts, &$sortData)
+    protected function createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts)
     {
         if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
         {
@@ -281,13 +231,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // Filter out the ancestry to leave just the leaf text.
                 $text = trim(substr($text, $index + 1));
             }
-            $sortData[$elasticsearchFieldName] = $text;
+            $this->sortData[$elasticsearchFieldName] = $text;
         }
     }
 
-    protected function createHtmlData($elasticsearchFieldName, $fieldTexts, &$htmlFields)
+    protected function createHtmlData($elasticsearchFieldName, $fieldTexts)
     {
-        // Determine if this element contains and HTML texts. If so, record the field name
+        // Determine if this element contains any HTML texts. If so, record the field name
         // followed by a comma-separated list of the indices of containing HTML. For example,
         // if the Creator element has three values and the first (index 0) and last (index 2)
         // contain HTML, create the value "creator,0,2".
@@ -306,16 +256,66 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (!empty($htmlTextIndices))
         {
-            $htmlFields[] = $elasticsearchFieldName . $htmlTextIndices;
+            $this->htmlFields[] = $elasticsearchFieldName . $htmlTextIndices;
         }
     }
 
-    protected function createIntegerElementSortData($elasticsearchFieldName, $textString, &$sortData)
+    protected function createFacetDataForContributor()
+    {
+        // Add facet data for this installation as the contributor.
+        $contributorFieldTexts = $this->createFieldTexts($this->installation['contributor']);
+        $this->createFacetDataForField('contributor', $contributorFieldTexts);
+    }
+
+    protected function createIntegerElementSortData($elasticsearchFieldName, $textString)
     {
         if (in_array($elasticsearchFieldName, $this->installation['integer_sort_fields']))
         {
             // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
-            $sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
+            $this->sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
+        }
+    }
+
+    protected function createSpecialFieldsData($itemFieldTexts)
+    {
+        if (!$this->itemHasIdentifier)
+        {
+            // This installation does not use the Identifier element because it has an Identifier Alias
+            // configured in AvantCommon. Get the alias value and use it as the identifier field value.
+            $aliasElementId = CommonConfig::getOptionDataForIdentifierAlias();
+            $aliasText = $itemFieldTexts[$aliasElementId][0]['text'];
+            $this->elementData['identifier'] = $aliasText;
+        }
+
+        if (!$this->itemHasDate)
+        {
+            // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
+            $emptyDateFieldTexts = $this->createFieldTexts('');
+            $this->createFacetDataForField('date', $emptyDateFieldTexts);
+        }
+    }
+
+    protected function createSuggestionsData()
+    {
+        if (!empty($this->titleFieldTexts))
+        {
+            $avantLogicSuggest = new AvantElasticsearchSuggest();
+            $itemTitleIsPerson = $this->itemTypeIsReference && $this->itemSubjectIsPeople;
+            $suggestionData = $avantLogicSuggest->createSuggestionsDataForTitle($this->titleFieldTexts, $this->itemTypeIsReference, $itemTitleIsPerson);
+            $this->body['suggestions'] = $suggestionData;
+        }
+    }
+
+    protected function createTagData($item)
+    {
+        if (!$this->facetDefinitions['tag']['not_used'])
+        {
+            $tags = $this->constructTags($item);
+            if (!empty($tags))
+            {
+                $this->facetData['tag'] = $tags;
+                $this->setField('tags', $tags);
+            }
         }
     }
 
@@ -350,7 +350,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'id' => (int)$item->id,
             'title' => $titleString,
             'public' => (bool)$item->public,
-            'file-count' => count($this->itemFileCount),
+            'file-count' => count($this->itemFiles),
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
         );
@@ -364,7 +364,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // This improvement saves a significant amount of time when indexing all items.
 
         $url = '';
-        $file = empty($this->itemFileCount) ? null : $this->itemFileCount[0];
+        $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
         if (!empty($file) && $file->hasThumbnail())
         {
             $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
@@ -393,6 +393,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $urlData;
     }
 
+    protected function removeHtmlTagsFromFieldText(&$fieldTexts)
+    {
+        foreach ($fieldTexts as $key => $fieldText)
+        {
+            if ($fieldText['html'] == 1)
+            {
+                // Change any HTML content to plain text so that Elasticsearch won't get hits on HTML tags. For
+                // example, if the query contained 'strong' we don't want the search to find the <strong> tag.
+                $fieldTexts[$key]['text'] = strip_tags($fieldText['text']);
+            }
+        }
+    }
+
     public function setAvantElasticsearchFacets($avantElasticsearchFacets)
     {
         $this->avantElasticsearchFacets = $avantElasticsearchFacets;
@@ -409,13 +422,42 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->body[$key] = $value;
     }
 
-    public function setFields(array $params = array())
-    {
-        $this->body = array_merge($this->body, $params);
-    }
-
     public function setInstallationParameters($installation)
     {
         $this->installation = $installation;
+    }
+
+    protected function setSpecialFieldFlags($elasticsearchFieldName, $fieldTextsString, $fieldTexts)
+    {
+        if ($elasticsearchFieldName == 'title')
+        {
+            $this->titleString = $fieldTextsString;
+            if (strlen($this->titleString) == 0)
+            {
+                $this->titleString = __('Untitled');
+            }
+            $this->titleFieldTexts = $fieldTexts;
+        }
+
+        if ($elasticsearchFieldName == 'identifier')
+        {
+            $this->itemHasIdentifier = true;
+        }
+
+        if ($elasticsearchFieldName == 'date')
+        {
+            $this->itemHasDate = true;
+        }
+
+        if ($elasticsearchFieldName == 'type')
+        {
+            // TO-DO: Make this logic generic so it doesn't depend on knowledge of specific type and subject values.
+            $this->itemTypeIsReference = $fieldTextsString == 'Reference';
+        }
+
+        if ($elasticsearchFieldName == 'subject')
+        {
+            $this->itemSubjectIsPeople = strpos($fieldTextsString, 'People') !== false;
+        }
     }
 }

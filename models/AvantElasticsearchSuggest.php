@@ -1,7 +1,7 @@
 <?php
 class AvantElasticsearchSuggest extends AvantElasticsearch
 {
-    public function CreateSuggestionsDataForTitle($titleFieldTexts, $itemTypeIsReference, $itemTitleIsPerson)
+    public function createSuggestionsDataForTitle($titleFieldTexts, $itemTypeIsReference, $itemTitleIsPerson)
     {
         $suggestionsData = array();
         $titleIsPerson = $itemTypeIsReference && $itemTitleIsPerson;

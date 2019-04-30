@@ -47,7 +47,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $messageString;
     }
 
-    public function createElasticsearchDocumentFromItem($item, $itemFieldTexts, $files)
+    public function createElasticsearchDocumentFromItem($item, $itemFieldTexts, $itemFiles)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($item);
@@ -61,7 +61,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($item, $itemFieldTexts, $files);
+        $document->copyItemElementValuesToDocument($item, $itemFieldTexts, $itemFiles);
 
         return $document;
     }
@@ -288,8 +288,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->cacheInstallationParameters();
 
         $itemFieldTexts = $this->getItemFieldTexts($item);
-        $files = $item->Files;
-        $document = $this->createElasticsearchDocumentFromItem($item, $itemFieldTexts, $files);
+        $itemFiles = $item->Files;
+        $document = $this->createElasticsearchDocumentFromItem($item, $itemFieldTexts, $itemFiles);
 
         // Add the document to the index.
         $response = $document->addDocumentToIndex();
