@@ -112,7 +112,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             'index' => 'omeka',
             'body' => [
                 '_source' => [
-                    'suggestions', 'title'
+                    'suggestions', 'item.title'
                 ],
                 'suggest' => [
                     'keywords-suggest' => [
