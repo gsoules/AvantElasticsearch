@@ -8,6 +8,11 @@ $key = ElasticsearchConfig::getOptionValueForKey();
 $region = ElasticsearchConfig::getOptionValueForRegion();
 $secret = ElasticsearchConfig::getOptionValueForSecret();
 
+$avantElasticserachClient = new AvantElasticsearchClient();
+$health = $avantElasticserachClient->getHealth();
+$healthReport = $health['message'];
+$healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error') . '"';
+
 ?>
 
 <style>
@@ -18,6 +23,8 @@ $secret = ElasticsearchConfig::getOptionValueForSecret();
 <div class="plugin-help learn-more">
     <a href="https://github.com/gsoules/AvantElasticsearch" target="_blank">Learn about this plugin</a>
 </div>
+
+<?php echo "<div$healthReportClass>$healthReport<br/><br/></div>"; ?>
 
 <div class="field">
     <div class="two columns alpha">
