@@ -37,11 +37,8 @@ if ($avantElasticserachClient->ready())
     echo '<div class="indexing-radio-buttons">';
     echo $this->formRadio('operation', 'none', null, $options);
     echo '</div>';
-    echo '<div>';
-    echo 'File: ' . $this->formText('file', $file, array('size' => '10', 'id' => 'file'));
-    echo '&nbsp;&nbsp;&nbsp;';
-    echo 'Limit:' . $this->formText('limit', $limit, array('size' => '4', 'id' => 'limit'));
-    echo '</div>';
+    echo '<div id="limit-section">Limit: ' . $this->formText('limit', $limit, array('size' => '4', 'id' => 'limit')) . '</div>';
+    echo '<div>File: ' . $this->formText('file', $file, array('size' => '10', 'id' => 'file')). '</div>';
     echo "<button id='submit_index' 'type='submit' value='Index'>Start</button>";
     echo '</form>';
 }
@@ -97,3 +94,27 @@ echo '</div>';
 
 echo foot();
 ?>
+
+<script type="text/javascript">
+    jQuery(document).ready(function ()
+    {
+        var limitSection = jQuery("#limit-section");
+        var startButton = jQuery("#submit_index");
+        setControls(true, true);
+
+        function setControls(disableStartButton, hideLimit)
+        {
+            startButton.prop("disabled", disableStartButton);
+            hideLimit ? limitSection.hide() : limitSection.show();
+        }
+
+        jQuery("input[name='operation']").change(function (e)
+        {
+            var checkedButton = jQuery("input[name='operation']:checked");
+            var value = checkedButton.val();
+            var disableStartButton = value === 'none';
+            setControls(disableStartButton, value !== 'export_limit');
+        });
+    });
+</script>
+
