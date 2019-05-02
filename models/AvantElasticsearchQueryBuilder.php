@@ -29,6 +29,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             'element.*',
             'item.*',
             'html-fields',
+            'pdf.file-name',
             'tags',
             'url.*'
         ];

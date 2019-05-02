@@ -402,10 +402,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 continue;
             }
 
-            // Attempt to extract the PDF file's text. Tell pdftotext to not emit formfeeds (\f) for page breaks.
+            // Attempt to extract the PDF file's text.
+            //   The -nopgbrk option tells pdftotext not to emit formfeeds (\f) for page breaks.
+            //   The trailing '-' at the end of the command says to emit the text to stdout instead of to a text file.
             $path = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
             $path = escapeshellarg($path);
-            $pdfText = shell_exec("pdftotext -enc UTF-8 -nopgbrk $path -");
+            $command = "pdftotext -enc UTF-8 -nopgbrk $path -";
+            $pdfText = shell_exec($command);
 
             if (!is_string($pdfText))
             {
