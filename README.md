@@ -16,6 +16,8 @@ knowledge of the following Omeka elements and how they are used in these install
 This AvantElaticsearch plugin works only with Elasticsearch on AWS, but could be adapted by someone
 else for another application.
 
+The host Linux OS must have pdftotext installed.
+
 ## Installation
 
 To install the AvantElasticsearch plugin, follow these steps:
