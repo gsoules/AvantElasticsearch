@@ -47,6 +47,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'pdf.text' =>
                     (object)[
                         'number_of_fragments' => 3,
+                        'fragment_size' => 0,
                         'pre_tags' => ['<span class="hit-highlight">'],
                         'post_tags' => ['</span>']
                     ]
