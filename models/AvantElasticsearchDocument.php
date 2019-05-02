@@ -47,12 +47,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected function addItemDataToDocumentBody($item)
     {
         if (!empty($this->htmlFields))
-        {
             $this->setField('html-fields', $this->htmlFields);
-        }
 
         $urlData = $this->getItemUrlData($item);
         $this->setField('url', $urlData);
+
+        $pdfData = $this->getItemPdfData();
+        if (!empty($pdfData))
+            $this->setField('pdf', $pdfData);
 
         $itemData = $this->getItemData($item, $this->titleString);
         $this->setField('item', $itemData);
@@ -377,6 +379,52 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $url;
     }
 
+    protected function getItemPdfData()
+    {
+        $pdfMimeTypes = array(
+            'application/pdf',
+            'application/x-pdf',
+            'application/acrobat',
+            'text/x-pdf',
+            'text/pdf',
+            'applications/vnd.pdf'
+        );
+
+        $pdfData = array();
+        $text = array();
+        $filename = array();
+
+        foreach ($this->itemFiles as $file)
+        {
+            if (in_array($file->mime_type, $pdfMimeTypes))
+            {
+                $path = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
+                $path = escapeshellarg($path);
+                $pdfText = shell_exec("pdftotext -enc UTF-8 $path -");
+                if (is_string($pdfText))
+                {
+                    // Remove form feeds. Some PDFs that have not been OCR'd have only these to separate pages.
+                    $pdfText = str_replace("\f", "", $pdfText);
+                    if (!empty($pdfText))
+                    {
+                        $text[] = $pdfText;
+                        $filename[] = $file->original_filename;
+                    }
+                }
+            }
+        }
+
+        if (!empty($text) && !empty($filename))
+        {
+            $pdfData = array(
+                'text' => $text,
+                'file-name' => $filename
+            );
+        }
+
+        return $pdfData;
+    }
+
     protected function getItemUrlData($item)
     {
         $itemPath = $this->installation['item_path'] . $item->id;
@@ -388,7 +436,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $urlData = array(
             'item' => $itemUrl,
             'thumb' => $thumbUrl,
-            'image' => $imageUrl);
+            'image' => $imageUrl
+        );
 
         return $urlData;
     }

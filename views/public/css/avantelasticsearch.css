@@ -97,7 +97,7 @@
     margin-bottom: 8px;
 }
 
-.elasticsearch-highlight {
+.hit-highlight {
     color: #1a77bd;
     font-style: normal;
     font-weight: bold;

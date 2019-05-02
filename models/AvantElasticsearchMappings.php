@@ -108,6 +108,10 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addAnalyzerFieldToMappingProperties('element.description');
         $this->addAnalyzerFieldToMappingProperties('item.title');
 
+        // Fields for PDF searching.
+        $this->addAnalyzerFieldToMappingProperties('pdf.text');
+        $this->addKeywordFieldToMappingProperties('pdf.file-name');
+
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
 
@@ -120,14 +124,13 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         // Keyword fields. None of these require full-text search.
         // To learn about keyword fields see: www.elastic.co/guide/en/elasticsearch/reference/master/keyword.html
+        $this->addKeywordFieldToMappingProperties('html-fields');
         $this->addKeywordFieldToMappingProperties('item.contributor');
         $this->addKeywordFieldToMappingProperties('item.contributor-id');
-        $this->addKeywordFieldToMappingProperties('html-fields');
         $this->addKeywordFieldToMappingProperties('tags');
         $this->addKeywordFieldToMappingProperties('url.image');
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');
-
         $this->addKeywordFieldToMappingProperties('facet.contributor');
         $this->addKeywordFieldToMappingProperties('facet.date');
         $this->addKeywordFieldToMappingProperties('facet.place');
@@ -136,7 +139,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('facet.tag');
         $this->addKeywordFieldToMappingProperties('facet.type.leaf');
         $this->addKeywordFieldToMappingProperties('facet.type.root');
-
         $this->addKeywordFieldToMappingProperties('sort.address-number');
         $this->addKeywordFieldToMappingProperties('sort.address-street');
         $this->addKeywordFieldToMappingProperties('sort.identifier');

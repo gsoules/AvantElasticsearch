@@ -36,10 +36,17 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Highlighting the query will return.        $highlight = ['fields' =>
         $highlight =
             ['fields' =>
-                ['element.description' =>
+                [
+                    'element.description' =>
                     (object)[
                         'number_of_fragments' => 0,
-                        'pre_tags' => ['<span class="elasticsearch-highlight">'],
+                        'pre_tags' => ['<span class="hit-highlight">'],
+                        'post_tags' => ['</span>']
+                    ],
+                    'pdf.text' =>
+                    (object)[
+                        'number_of_fragments' => 3,
+                        'pre_tags' => ['<span class="hit-highlight">'],
                         'post_tags' => ['</span>']
                     ]
                 ]
@@ -54,7 +61,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     "title^5",
                     "element.title^15",
                     "element.identifier^2",
-                    "element.*"
+                    "element.*",
+                    "pdf.text"
                 ]
             ]
         ];
