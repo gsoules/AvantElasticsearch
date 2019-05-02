@@ -404,8 +404,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         );
 
         $pdfData = array();
-        $text = array();
-        $filename = array();
+        $pdfText = array();
+        $originalFileName = array();
+
 
         foreach ($this->itemFiles as $file)
         {
@@ -416,10 +417,24 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
 
             // Attempt to extract the PDF file's text.
-            $filepath = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
-            $pdfText = $this->extractTextFromPdf($filepath);
+            $filename = $file->filename;
+            $filepath = $this->getItemPdfFilepath('original', $filename);
+            if (!file_exists($filepath))
+            {
+                // This installation does not have its files ar the root of the 'original' folder. Check to see if
+                // the files are located in a sub directory having the item identifier as its name.
+                $itemIdentifier = $this->elementData['identifier'];
+                $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $filename);
+                if (!file_exists($filepath))
+                {
+                    // This should never happen, but if it does, skip to the next file.
+                    break;
+                }
+            }
 
-            if (!is_string($pdfText))
+            $text = $this->extractTextFromPdf($filepath);
+
+            if (!is_string($text))
             {
                 // This can happen in these two cases and possibly others:
                 // 1. The string is null because the PDF has no content, probably because it has not been OCR'd.
@@ -428,19 +443,24 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
 
             // Record the PDF's text and its file name in parallel arrays so we know which file contains which text.
-            $text[] = $pdfText;
-            $filename[] = $file->original_filename;
+            $pdfText[] = $text;
+            $originalFileName[] = $file->original_filename;
         }
 
-        if (!empty($text) && !empty($filename))
+        if (!empty($pdfText) && !empty($originalFileName))
         {
             $pdfData = array(
-                'text' => $text,
-                'file-name' => $filename
+                'text' => $pdfText,
+                'file-name' => $originalFileName
             );
         }
 
         return $pdfData;
+    }
+
+    protected function getItemPdfFilepath($directory, $filename)
+    {
+        return FILES_DIR . DIRECTORY_SEPARATOR . $directory . DIRECTORY_SEPARATOR . $filename;
     }
 
     protected function getItemUrlData($item)
