@@ -8,6 +8,15 @@ $health = $avantElasticserachClient->getHealth();
 $healthReport = $health['message'];
 $healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error') . '"';
 
+$pdfSupportReport = '';
+$path = FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . 'pdftotext-test.pdf';
+$path = escapeshellarg($path);
+$command = "pdftotext -enc UTF-8 -nopgbrk $path -";
+$pdfText = shell_exec($command);
+$pdfToTextIsSupported = !empty($pdfText);
+$pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'error') . '"';
+$pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
+
 $pageTitle = __('Elasticsearch Indexing');
 $operation = isset($_REQUEST['operation']) ? $_REQUEST['operation'] : 'none';
 $limit = isset($_REQUEST['limit']) ? intval($_REQUEST['limit']) : 100;
@@ -29,6 +38,7 @@ $message = '';
 
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 echo "<div$healthReportClass>$healthReport</div>";
+echo "<div$pdfReportClass>$pdfSupportReport</div>";
 
 if ($avantElasticserachClient->ready())
 {
