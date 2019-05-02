@@ -396,22 +396,28 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         foreach ($this->itemFiles as $file)
         {
-            if (in_array($file->mime_type, $pdfMimeTypes))
+            if (!in_array($file->mime_type, $pdfMimeTypes))
             {
-                $path = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
-                $path = escapeshellarg($path);
-                $pdfText = shell_exec("pdftotext -enc UTF-8 $path -");
-                if (is_string($pdfText))
-                {
-                    // Remove form feeds. Some PDFs that have not been OCR'd have only these to separate pages.
-                    $pdfText = str_replace("\f", "", $pdfText);
-                    if (!empty($pdfText))
-                    {
-                        $text[] = $pdfText;
-                        $filename[] = $file->original_filename;
-                    }
-                }
+                // This is not a PDF file.
+                continue;
             }
+
+            // Attempt to extract the PDF file's text. Tell pdftotext to not emit formfeeds (\f) for page breaks.
+            $path = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
+            $path = escapeshellarg($path);
+            $pdfText = shell_exec("pdftotext -enc UTF-8 -nopgbrk $path -");
+
+            if (!is_string($pdfText))
+            {
+                // This can happen in these two cases and possibly others:
+                // 1. The string is null because the PDF has no content, probably because it has not been OCR'd.
+                // 2. pdftotext is not installed on the host system and so the shell exec returned null.
+                continue;
+            }
+
+            // Record the PDF's text and its file name in parallel arrays so we know which file contains which text.
+            $text[] = $pdfText;
+            $filename[] = $file->original_filename;
         }
 
         if (!empty($text) && !empty($filename))
