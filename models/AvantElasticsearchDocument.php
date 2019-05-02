@@ -346,6 +346,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $itemImageUrl;
     }
 
+    public function extractTextFromPdf($filepath)
+    {
+        $path = escapeshellarg($filepath);
+
+        // Attempt to extract the PDF file's text.
+        //   The -nopgbrk option tells pdftotext not to emit formfeeds (\f) for page breaks.
+        //   The trailing '-' at the end of the command says to emit the text to stdout instead of to a text file.
+        $command = "pdftotext -enc UTF-8 -nopgbrk $path -";
+        $pdfText = shell_exec($command);
+
+        return $pdfText;
+    }
+
     protected function getItemData($item, $titleString)
     {
         $itemData = array(
@@ -403,12 +416,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
 
             // Attempt to extract the PDF file's text.
-            //   The -nopgbrk option tells pdftotext not to emit formfeeds (\f) for page breaks.
-            //   The trailing '-' at the end of the command says to emit the text to stdout instead of to a text file.
-            $path = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
-            $path = escapeshellarg($path);
-            $command = "pdftotext -enc UTF-8 -nopgbrk $path -";
-            $pdfText = shell_exec($command);
+            $filepath = FILES_DIR . DIRECTORY_SEPARATOR . 'original' . DIRECTORY_SEPARATOR . $file->filename;
+            $pdfText = $this->extractTextFromPdf($filepath);
 
             if (!is_string($pdfText))
             {
@@ -449,6 +458,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         );
 
         return $urlData;
+    }
+
+    public function pdfSearchingIsSupported()
+    {
+        $path = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'pdftotext-test.pdf';
+        $pdfText = $this->extractTextFromPdf($path);
+        $pdfSearchingIsSupported = !empty($pdfText);
+        return $pdfSearchingIsSupported;
     }
 
     protected function removeHtmlTagsFromFieldText(&$fieldTexts)

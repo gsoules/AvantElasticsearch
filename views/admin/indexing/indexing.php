@@ -2,18 +2,14 @@
 ini_set('max_execution_time', 1200);
 
 $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-$avantElasticserachClient = new AvantElasticsearchClient();
+$avantElasticsearchClient = new AvantElasticsearchClient();
+$avantElasticsearchDocument = new AvantElasticsearchDocument(null);
 
-$health = $avantElasticserachClient->getHealth();
+$health = $avantElasticsearchClient->getHealth();
 $healthReport = $health['message'];
 $healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error') . '"';
 
-$pdfSupportReport = '';
-$path = FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . 'pdftotext-test.pdf';
-$path = escapeshellarg($path);
-$command = "pdftotext -enc UTF-8 -nopgbrk $path -";
-$pdfText = shell_exec($command);
-$pdfToTextIsSupported = !empty($pdfText);
+$pdfToTextIsSupported = $avantElasticsearchDocument->pdfSearchingIsSupported();
 $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'error') . '"';
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
 
@@ -40,7 +36,7 @@ echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 echo "<div$healthReportClass>$healthReport</div>";
 echo "<div$pdfReportClass>$pdfSupportReport</div>";
 
-if ($avantElasticserachClient->ready())
+if ($avantElasticsearchClient->ready())
 {
     echo "<hr/>";
     echo "<form id='indexing-form' name='indexing-form' action='$action' method='get'>";

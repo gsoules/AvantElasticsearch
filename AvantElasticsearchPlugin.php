@@ -1,5 +1,7 @@
 <?php
 
+define('AVANTELASTICSEARCH_PLUGIN_DIR', dirname(__FILE__));
+
 class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 {
     protected $item;
