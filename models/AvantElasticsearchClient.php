@@ -19,6 +19,26 @@ class AvantElasticsearchClient extends AvantElasticsearch
         $this->createElasticsearchClient($options);
     }
 
+    public function convertElasticsearchErrorToMessage($response)
+    {
+        $messageString = '';
+
+        if (isset($response['error']))
+        {
+            $error = $response['error'];
+            $reason = isset($error['reason']) ? $error['reason'] : '';
+            $causedBy = isset($error['caused_by']['reason']) ? $error['caused_by']['reason'] : '';
+            $message = $response['_id'] . ' : ' . $error['type'] . ' - ' . $reason . ' - ' . $causedBy;
+            $messageString .= $message;
+        }
+        else
+        {
+            $messageString = __('NO ERROR MESSAGE');
+        }
+
+        return $messageString;
+    }
+
     protected function createElasticsearchClient(array $options)
     {
         $timeout = isset($options['timeout']) ? $options['timeout'] : 30;
@@ -60,14 +80,13 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         try
         {
-            $response = $this->client->indices()->create($params);
-            return $response;
+            $this->client->indices()->create($params);
+            return true;
         }
         catch (Exception $e)
         {
             $this->reportClientException($e);
-            $response['failure'] = __('Failed to create index: %s', $this->error);
-            return $response;
+            return false;
         }
     }
 
@@ -75,13 +94,13 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         try
         {
-            $response = $this->client->delete($params);
-            return $response;
+            $this->client->delete($params);
+            return true;
         }
         catch (Exception $e)
         {
             $this->reportClientException($e);
-            return null;
+            return false;
         }
     }
 
@@ -198,15 +217,23 @@ class AvantElasticsearchClient extends AvantElasticsearch
         try
         {
             $response = $this->client->bulk($params);
-            return $response;
         }
         catch (Exception $e)
         {
+
             $this->reportClientException($e);
-            $response['errors'] = false;
-            $response['failure'] = $this->error;
-            return $response;
+            return false;
         }
+
+        if ($response['errors'] == true)
+        {
+            // Get the error for the first item. No point in reporting all of them since they are probably the same
+            // and even if they are different, this one needs to get fixed and after that, any other errors will surface.
+            $this->error = $this->convertElasticsearchErrorToMessage($response['items'][0]['index']);
+            return false;
+        }
+
+        return true;
     }
 
     public function ready()

@@ -55,7 +55,9 @@ else
 
 $filename = $avantElasticsearchIndexBuilder->getIndexDataFilename($file);
 
-$status = array();
+$status['events'] = array();
+$eventsMessages = '';
+
 if ($operation == 'export_all' || $operation == 'export_limit')
 {
     $limit = $operation == 'export_all' ? 0 : $limit;
@@ -67,15 +69,21 @@ else if ($operation == 'import_new' || $operation == 'import_update')
     $status = $avantElasticsearchIndexBuilder->performBulkIndexImport($filename, $deleteExistingIndex);
 }
 
-$hasError = isset($status['error']);
-$errorMessage = $hasError ? $status['error'] : '';
-$stats = $status['stats'];
+if ($operation != 'none')
+{
+    $hasError = isset($status['error']);
+    $errorMessage = $hasError ? $status['error'] : '';
+    foreach ($status['events'] as $eventMessage)
+    {
+        $eventsMessages .= $eventMessage . '<br/>';
+    }
+}
 
 $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
 
 if ($operation != 'none')
 {
-    echo "<div class='health-report-ok'>$stats</div>";
+    echo "<div class='health-report-ok'>$eventsMessages</div>";
     echo '<hr/>';
     if (empty($errorMessage))
     {
