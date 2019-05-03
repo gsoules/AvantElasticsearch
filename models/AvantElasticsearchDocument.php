@@ -421,7 +421,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $filepath = $this->getItemPdfFilepath('original', $filename);
             if (!file_exists($filepath))
             {
-                // This installation does not have its files ar the root of the 'original' folder. Check to see if
+                // This installation does not have its files at the root of the 'original' folder. Check to see if
                 // the files are located in a sub directory having the item identifier as its name.
                 $itemIdentifier = $this->elementData['identifier'];
                 $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $filename);
