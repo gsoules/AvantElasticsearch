@@ -200,7 +200,9 @@ class AvantElasticsearchClient extends AvantElasticsearch
         catch (Exception $e)
         {
             $this->reportClientException($e);
-            return null;
+            $response['errors'] = false;
+            $response['exception'] = $this->error;
+            return $response;
         }
     }
 

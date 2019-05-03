@@ -28,20 +28,21 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
     }
 
-    public function convertResponsesToMessageString($responses)
+    public function convertElasticsearchErrorToMessage($response)
     {
         $messageString = '';
 
-        foreach ($responses as $response)
+        if (isset($response['error']))
         {
-            if (isset($response['error']))
-            {
-                $error = $response['error'];
-                $reason = isset($error['reason']) ? $error['reason'] : '';
-                $causedBy = isset($error['caused_by']['reason']) ? $error['caused_by']['reason'] : '';
-                $message = $response['_id'] . ' : ' . $error['type'] . ' - ' . $reason . ' - ' . $causedBy;
-                $messageString .= $message .= '<br/>';
-            }
+            $error = $response['error'];
+            $reason = isset($error['reason']) ? $error['reason'] : '';
+            $causedBy = isset($error['caused_by']['reason']) ? $error['caused_by']['reason'] : '';
+            $message = $response['_id'] . ' : ' . $error['type'] . ' - ' . $reason . ' - ' . $causedBy;
+            $messageString .= $message;
+        }
+        else
+        {
+            $messageString = __('NO ERROR MESSAGE');
         }
 
         return $messageString;
@@ -244,7 +245,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     '_type'  => $document->type,
                 ]
             ];
-            if(isset($document->id))
+            if (isset($document->id))
             {
                 $actionsAndMetadata['index']['_id'] = $document->id;
             }
@@ -254,7 +255,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $params;
     }
 
-    public function getindexDataFilename($name)
+    public function getIndexDataFilename($name)
     {
         $filename = FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $name . '.json';
         return $filename;
@@ -344,42 +345,65 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     public function performBulkIndexImport($filename, $deleteExistingIndex)
     {
         $batchSize = 500;
-        $responses = array();
+        $batchSize = 10;
+        $status = array();
 
-        $docs = array();
+        $documents = array();
         if (file_exists($filename))
         {
-            $docs = file_get_contents($filename);
-            $docs = json_decode($docs, false);
+            $documents = file_get_contents($filename);
+            $documents = json_decode($documents, false);
+        }
+        else
+        {
+            $status['error'] = __("File %s was not found", $filename);
         }
 
-        $docsCount = count($docs);
-
-        $avantelasticSearchMappings = new AvantElasticsearchMappings();
-
-        $params = [
-            'index' => 'omeka',
-            'body' => ['mappings' => $avantelasticSearchMappings->constructElasticsearchMapping()]
-        ];
-
+        $documentsCount = count($documents);
         $avantElasticsearchClient = new AvantElasticsearchClient();
+
         if ($deleteExistingIndex)
         {
-            $response = $this->deleteIndex();
-            $response = $avantElasticsearchClient->createIndex($params);
+            $this->createNewIndex($avantElasticsearchClient);
         }
 
-        for ($offset = 0; $offset < $docsCount; $offset += $batchSize)
+        for ($offset = 0; $offset < $documentsCount; $offset += $batchSize)
         {
-            $params = $this->getBulkParams($docs, $offset, $batchSize);
-            $response = $avantElasticsearchClient->indexMultipleDocuments($params);
+            $bulkParams = $this->getBulkParams($documents, $offset, $batchSize);
+            $response = $avantElasticsearchClient->indexMultipleDocuments($bulkParams);
 
             if ($response['errors'] == true)
             {
-                $responses[] = $response["items"][0]["index"];
+                $status['error'] = $this->convertElasticsearchErrorToMessage($response);
+                break;
+            }
+            else if (isset($response['exception']))
+            {
+                $status['error'] = $response['exception'];
+                break;
             }
         }
 
-        return $responses;
+        if (!isset($status['error']))
+        {
+            $status['stats'] = __("%s documents indexed", $documentsCount);
+        }
+
+        return $status;
+    }
+
+    protected function createNewIndex(AvantElasticsearchClient $avantElasticsearchClient)
+    {
+        $avantElasticsearchMappings = new AvantElasticsearchMappings();
+
+        $params = [
+            'index' => 'omeka',
+            'body' => ['mappings' => $avantElasticsearchMappings->constructElasticsearchMapping()]
+        ];
+
+        //$response = $this->deleteIndex();
+        //$response = $avantElasticsearchClient->createIndex($params);
+        $this->deleteIndex();
+        $avantElasticsearchClient->createIndex($params);
     }
 }

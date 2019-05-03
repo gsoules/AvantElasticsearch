@@ -30,7 +30,7 @@ $options = array(
 $action = url("elasticsearch/indexing?operation=$operation&limit=$limit");
 $mb = 1048576;
 $mem1 = intval(memory_get_usage() / $mb);
-$message = '';
+$errorMessage = '';
 
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 echo "<div$healthReportClass>$healthReport</div>";
@@ -53,35 +53,40 @@ else
     $operation = 'none';
 }
 
-$filename = $avantElasticsearchIndexBuilder->getindexDataFilename($file);
+$filename = $avantElasticsearchIndexBuilder->getIndexDataFilename($file);
 
-$responses = array();
+$status = array();
 if ($operation == 'export_all' || $operation == 'export_limit')
 {
     $limit = $operation == 'export_all' ? 0 : $limit;
-    $responses = $avantElasticsearchIndexBuilder->performBulkIndexExport($filename, $limit);
+    $status = $avantElasticsearchIndexBuilder->performBulkIndexExport($filename, $limit);
 }
 else if ($operation == 'import_new' || $operation == 'import_update')
 {
     $deleteExistingIndex = $operation == 'import_new';
-    $responses = $avantElasticsearchIndexBuilder->performBulkIndexImport($filename, $deleteExistingIndex);
+    $status = $avantElasticsearchIndexBuilder->performBulkIndexImport($filename, $deleteExistingIndex);
 }
 
-$message = $avantElasticsearchIndexBuilder->convertResponsesToMessageString($responses);
+$hasError = isset($status['error']);
+$errorMessage = $hasError ? $status['error'] : '';
+$stats = $hasError ? '' : $status['stats'];
+
 $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
 
 if ($operation != 'none')
 {
     echo '<hr/>';
-    if (empty($message))
+    if (empty($errorMessage))
     {
-        echo "<p class='health-report-ok'>SUCCESS</p>";
+        echo "<div class='health-report-ok'>SUCCESS</div>";
+        echo "<div class='health-report-ok'>$stats</div>";
     }
     else
     {
-        echo "<p>ERRORS</p>";
-        echo "<p class='health-report-error'>$message</p>";
+        echo "<div class='health-report-error'>ERRORS</div>";
+        echo "<div class='health-report-error'>$errorMessage</div>";
     }
+    echo '<hr/>';
     echo "<div>$options[$operation]</br>Execution time: $executionTime seconds</div>";
 }
 
