@@ -66,7 +66,8 @@ class AvantElasticsearchClient extends AvantElasticsearch
         catch (Exception $e)
         {
             $this->reportClientException($e);
-            return null;
+            $response['failure'] = __('Failed to create index: %s', $this->error);
+            return $response;
         }
     }
 
@@ -107,12 +108,14 @@ class AvantElasticsearchClient extends AvantElasticsearch
             // index will trigger this exception. We are handling the exception instead of first testing with
             // indices()->exists() since the exists call caused a timeout with a "no alive nodes in your cluster"
             // error unless CURLOPT_NOBODY was set to true.  Note that 'nobody' means don't return the body.
-            return null;
+            $response['status'] = __('Attempted to delete nonexistent index');
+            return $response;
         }
         catch (Exception $e)
         {
             $this->reportClientException($e);
-            return null;
+            $response['failure'] = __('Failed to delete index: %s', $this->error);
+            return $response;
         }
     }
 
@@ -201,7 +204,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         {
             $this->reportClientException($e);
             $response['errors'] = false;
-            $response['exception'] = $this->error;
+            $response['failure'] = $this->error;
             return $response;
         }
     }

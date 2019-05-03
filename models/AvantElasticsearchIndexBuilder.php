@@ -67,6 +67,28 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $document;
     }
 
+    protected function createNewIndex(AvantElasticsearchClient $avantElasticsearchClient)
+    {
+        $response = $this->deleteIndex();
+        if (isset($response['failure']))
+            return $response;
+
+        $avantElasticsearchMappings = new AvantElasticsearchMappings();
+
+        $indexName = 'omeka';
+        $params = [
+            'index' => $indexName,
+            'body' => ['mappings' => $avantElasticsearchMappings->constructElasticsearchMapping()]
+        ];
+
+        $response = $avantElasticsearchClient->createIndex($params);
+        if (isset($response['failure']))
+            return $response;
+
+        $response['status'] = __("Created index '%s'", $indexName);
+        return $response;
+    }
+
     public function deleteIndex()
     {
         $params = ['index' => $this->documentIndexName];
@@ -346,25 +368,34 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         $batchSize = 500;
         $batchSize = 10;
-        $status = array();
+        $status['stats'] = '';
 
-        $documents = array();
-        if (file_exists($filename))
-        {
-            $documents = file_get_contents($filename);
-            $documents = json_decode($documents, false);
-        }
-        else
+        if (!file_exists($filename))
         {
             $status['error'] = __("File %s was not found", $filename);
+            return $status;
         }
 
-        $documentsCount = count($documents);
         $avantElasticsearchClient = new AvantElasticsearchClient();
+
+        $documents = file_get_contents($filename);
+        $documents = json_decode($documents, false);
+        $documentsCount = count($documents);
+        $status['stats'] .= __('Attempt to index %s documents<br/>', $documentsCount);
 
         if ($deleteExistingIndex)
         {
-            $this->createNewIndex($avantElasticsearchClient);
+            $response = $this->createNewIndex($avantElasticsearchClient);
+
+            if (isset($response['failure']))
+            {
+                $status['error'] = $response['failure'];
+                return $status;
+            }
+            else
+            {
+                $status['stats'] .= __('New index created<br/>');
+            }
         }
 
         for ($offset = 0; $offset < $documentsCount; $offset += $batchSize)
@@ -377,9 +408,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $status['error'] = $this->convertElasticsearchErrorToMessage($response);
                 break;
             }
-            else if (isset($response['exception']))
+            else if (isset($response['failure']))
             {
-                $status['error'] = $response['exception'];
+                $status['error'] = $response['failure'];
                 break;
             }
         }
@@ -390,20 +421,5 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $status;
-    }
-
-    protected function createNewIndex(AvantElasticsearchClient $avantElasticsearchClient)
-    {
-        $avantElasticsearchMappings = new AvantElasticsearchMappings();
-
-        $params = [
-            'index' => 'omeka',
-            'body' => ['mappings' => $avantElasticsearchMappings->constructElasticsearchMapping()]
-        ];
-
-        //$response = $this->deleteIndex();
-        //$response = $avantElasticsearchClient->createIndex($params);
-        $this->deleteIndex();
-        $avantElasticsearchClient->createIndex($params);
     }
 }

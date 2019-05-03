@@ -69,17 +69,17 @@ else if ($operation == 'import_new' || $operation == 'import_update')
 
 $hasError = isset($status['error']);
 $errorMessage = $hasError ? $status['error'] : '';
-$stats = $hasError ? '' : $status['stats'];
+$stats = $status['stats'];
 
 $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
 
 if ($operation != 'none')
 {
+    echo "<div class='health-report-ok'>$stats</div>";
     echo '<hr/>';
     if (empty($errorMessage))
     {
         echo "<div class='health-report-ok'>SUCCESS</div>";
-        echo "<div class='health-report-ok'>$stats</div>";
     }
     else
     {
