@@ -51,7 +51,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $document;
     }
 
-    protected function createNewIndex($indexName)
+    protected function createIndex($indexName)
     {
         $avantElasticsearchMappings = new AvantElasticsearchMappings();
 
@@ -61,6 +61,35 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         ];
 
         if (!$this->avantElasticsearchClient->createIndex($params))
+        {
+            $this->logClientError();
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function createNewIndex()
+    {
+        // TO-DO: Get the index name from configuration instead of hard-coded.
+        $indexName = 'omeka';
+
+        $params = ['index' => $this->documentIndexName];
+        if ($this->avantElasticsearchClient->deleteIndex($params))
+        {
+            $this->logEvent(__('Deleted index: %s', $indexName));
+        }
+        else
+        {
+            $this->logClientError();
+            return false;
+        }
+
+        if ($this->createIndex($indexName))
+        {
+            $this->logEvent(__('Created new index: %s', $indexName));
+        }
+        else
         {
             $this->logClientError();
             return false;
@@ -354,10 +383,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     public function performBulkIndexImport($filename, $deleteExistingIndex)
     {
         $batchSize = 500;
-        $batchSize = 10;
-
+        //$batchSize = 10;
         $this->avantElasticsearchClient = new AvantElasticsearchClient();
-
         $this->logEvent(__('Begin bulk import'));
 
         if (!file_exists($filename))
@@ -373,27 +400,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if ($deleteExistingIndex)
         {
-            // TO-DO: Get the index name from configuration instead of hard-coded.
-            $indexName = 'omeka';
-
-            $params = ['index' => $this->documentIndexName];
-            if ($this->avantElasticsearchClient->deleteIndex($params))
+            if (!$this->createNewIndex())
             {
-                $this->logEvent(__('Deleted index: %s', $indexName));
-            }
-            else
-            {
-                $this->logClientError();
-                return $this->status;
-            }
-
-            if ($this->createNewIndex($indexName))
-            {
-                $this->logEvent(__('Created new index: %s', $indexName));
-            }
-            else
-            {
-                $this->logClientError();
                 return $this->status;
             }
         }

@@ -110,31 +110,33 @@ class AvantElasticsearchClient extends AvantElasticsearch
         {
             if ($this->client)
             {
-                $response = $this->client->indices()->delete($params);
-                return $response;
+                $this->client->indices()->delete($params);
+                return true;
             }
             else
             {
-                // TO-DO: Return an error if deleteIndex fails because of no client
-                return null;
+                // This should never happen, but it has during debugging so we handle it.
+                $this->error = 'Failed to delete index: Client is null';
+                return false;
             }
         }
         catch (\Elasticsearch\Common\Exceptions\Missing404Exception $e)
         {
-            // Index not found.
-            // This should never happen under normal operation, but can occur while debugging if execution gets
-            // stopped after an index is deleted, but before it gets recreated. The next attempt to delete the
-            // index will trigger this exception. We are handling the exception instead of first testing with
-            // indices()->exists() since the exists call caused a timeout with a "no alive nodes in your cluster"
-            // error unless CURLOPT_NOBODY was set to true.  Note that 'nobody' means don't return the body.
-            $response['status'] = __('Attempted to delete nonexistent index');
-            return $response;
+            // Index not found. This should never happen under normal operation, but can occur while debugging if
+            // you stop execution after an index is deleted, but before it gets recreated. The next attempt to
+            // delete the index will trigger this exception.
+            //
+            // This code handles the exception and returns true instead of first calling indices()->exists() to see
+            // if a delete is needed. However, the exists() call caused a timeout with a "no alive nodes in your cluster"
+            // error unless CURLOPT_NOBODY was set to true (NOBODY means don't return the body). Simply allowing the
+            // exception to occur and handling it like this seems both okay and more efficient than calling exists().
+            return true;
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
-            $response['failure'] = __('Failed to delete index: %s', $this->error);
-            return $response;
+            $this->error = $this->getElasticsearchExceptionMessage($e);
+            $this->error = __('Failed to delete index: %s', $this->error);
+            return false;
         }
     }
 
@@ -243,7 +245,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function reportClientException(Exception $e)
     {
-        // FINISH: Need to figure out what to do in this situation. For now keep a breakpoint here.
+        // TO-DO: Need to figure out what to do in this situation. For now keep a breakpoint here.
         $this->error = $this->getElasticsearchExceptionMessage($e);
         return;
     }
