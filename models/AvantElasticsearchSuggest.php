@@ -64,6 +64,7 @@ class AvantElasticsearchSuggest extends AvantElasticsearch
             $allInputs = array_merge($allInputs, $inputs);
         }
 
+        // Remove any duplicate inputs. Duplicates can occur when an item has multiple titles with shared phrases.
         $allInputs = array_unique($allInputs);
         return $allInputs;
     }

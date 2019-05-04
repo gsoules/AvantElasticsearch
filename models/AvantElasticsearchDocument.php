@@ -262,7 +262,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             $avantLogicSuggest = new AvantElasticsearchSuggest();
             $itemTitleIsPerson = $this->itemTypeIsReference && $this->itemSubjectIsPeople;
+
+            // Get the suggestion data for the title text(s).
             $suggestionData = $avantLogicSuggest->createSuggestionsDataForTitle($this->titleFieldTexts, $this->itemTypeIsReference, $itemTitleIsPerson);
+
+            // Make sure the array keys are consecutive. If there are holes which can occur
+            // where duplicates were removed, Elasticsearch will complain during indexing.
+            $inputs = array();
+            foreach ($suggestionData['input'] as $input)
+            {
+                $inputs[] = $input;
+            }
+            $suggestionData['input'] = $inputs;
+
             $this->body['suggestions'] = $suggestionData;
         }
     }
