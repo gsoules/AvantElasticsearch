@@ -19,24 +19,12 @@ class AvantElasticsearchClient extends AvantElasticsearch
         $this->createElasticsearchClient($options);
     }
 
-    public function convertElasticsearchErrorToMessage($response)
+    public function convertElasticsearchErrorToMessage($id, $error)
     {
-        $messageString = '';
-
-        if (isset($response['error']))
-        {
-            $error = $response['error'];
-            $reason = isset($error['reason']) ? $error['reason'] : '';
-            $causedBy = isset($error['caused_by']['reason']) ? $error['caused_by']['reason'] : '';
-            $message = $response['_id'] . ' : ' . $error['type'] . ' - ' . $reason . ' - ' . $causedBy;
-            $messageString .= $message;
-        }
-        else
-        {
-            $messageString = __('NO ERROR MESSAGE');
-        }
-
-        return $messageString;
+        $reason = isset($error['reason']) ? $error['reason'] : '';
+        $causedBy = isset($error['caused_by']['reason']) ? $error['caused_by']['reason'] : '';
+        $message = $id . ' : ' . $error['type'] . ' - ' . $reason . ' - ' . $causedBy;
+        return $message;
     }
 
     protected function createElasticsearchClient(array $options)
@@ -215,9 +203,33 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
         if ($response['errors'] == true)
         {
-            // Get the error for the first item. No point in reporting all of them since they are probably the same
-            // and even if they are different, this one needs to get fixed and after that, any other errors will surface.
-            $this->error = $this->convertElasticsearchErrorToMessage($response['items'][0]['index']);
+            $errorCount = 0;
+            $errorsReported = 0;
+            $errorMessage = '';
+            $maxErrorsShown = 9;
+
+            foreach ($response['items'] as $responseItem)
+            {
+                if (isset($responseItem['index']['error']))
+                {
+                    $errorCount++;
+                    $id = $responseItem['index']['_id'];
+                    $error = $responseItem['index']['error'];
+                    if ($errorCount <= $maxErrorsShown)
+                    {
+                        $errorsReported++;
+                        if ($errorCount > 0)
+                            $errorMessage .= '<br/>';
+                        $errorMessage .= $this->convertElasticsearchErrorToMessage($id, $error);
+                    }
+                }
+            }
+
+            if ($errorCount > $errorsReported)
+            {
+                $errorMessage .= __('<br/>Showing %s of %s errors', $errorsReported, $errorCount);
+            }
+            $this->error = $errorMessage;
             return false;
         }
 
@@ -228,13 +240,13 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         try
         {
-            $response = $this->client->index($params);
-            return $response;
+            $this->client->index($params);
+            return true;
         }
         catch (Exception $e)
         {
             $this->reportClientException($e);
-            return null;
+            return false;
         }
     }
 

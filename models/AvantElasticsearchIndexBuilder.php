@@ -15,6 +15,33 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     public function __construct()
     {
         parent::__construct();
+        $this->avantElasticsearchClient = new AvantElasticsearchClient();
+    }
+
+    public function addItemToIndex($item)
+    {
+        // This method adds a new item to the index or updates an existing item in the index.
+        $this->cacheInstallationParameters();
+
+        $identifier = ItemMetadata::getItemIdentifier($item);
+        $itemFieldTexts = $this->getItemFieldTexts($item);
+        $itemFiles = $item->Files;
+        $document = $this->createElasticsearchDocumentFromItem($item, $identifier, $itemFieldTexts, $itemFiles);
+
+        $params = [
+            'id' => $document->id,
+            'index' => $this->documentIndexName,
+            'type' => $document->type,
+            'body' => $document->body
+        ];
+
+        // Add the document to the index.
+        if (!$this->avantElasticsearchClient->indexDocument($params))
+        {
+            // TO-DO: Report this error to the user or log it and email it to the admin.
+            $errorMessage = $this->avantElasticsearchClient->getError();
+            throw new Exception($errorMessage);
+        }
     }
 
     protected function cacheInstallationParameters()
@@ -40,7 +67,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         $documentBatchParams = ['body' => []];
 
-        for ($index = $start; $index < $end; $index++)
+        for ($index = $start; $index <= $end; $index++)
         {
             $document = $this->batchDocuments[$index];
 
@@ -59,10 +86,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createElasticsearchDocumentFromItem($item, $itemFieldTexts, $itemFiles)
+    public function createElasticsearchDocumentFromItem( $item, $identifier,$itemFieldTexts, $itemFiles)
     {
         // Create a new document.
-        $documentId = $this->getDocumentIdForItem($item);
+        $documentId = $this->getDocumentIdForItem($identifier);
         $document = new AvantElasticsearchDocument($documentId);
 
         // Provide the document with data that has been cached here by the index builder to improve performance.
@@ -125,12 +152,24 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return true;
     }
 
-    public function deleteItem($item)
+    public function deleteItemFromIndex($item)
     {
-        $documentId = (new AvantElasticsearch())->getDocumentIdForItem($item);
+        $identifier = ItemMetadata::getItemIdentifier($item);
+        $documentId = $this->getDocumentIdForItem($identifier);
         $document = new AvantElasticsearchDocument($documentId);
-        $response = $document->deleteDocumentFromIndex();
-        return $response;
+
+        $params = [
+            'id' => $document->id,
+            'index' => $this->documentIndexName,
+            'type' => $document->type
+        ];
+
+        if (!$this->avantElasticsearchClient->deleteDocument($params))
+        {
+            // TO-DO: Report this error to the user or log it and email it to the admin.
+            $errorMessage = $this->avantElasticsearchClient->getError();
+            throw new Exception($errorMessage);
+        }
     }
 
     protected function fetchAllFiles($public = true)
@@ -289,19 +328,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $fieldTexts;
     }
 
-    public function indexSingleItem($item)
-    {
-        $this->cacheInstallationParameters();
-
-        $itemFieldTexts = $this->getItemFieldTexts($item);
-        $itemFiles = $item->Files;
-        $document = $this->createElasticsearchDocumentFromItem($item, $itemFieldTexts, $itemFiles);
-
-        // Add the document to the index.
-        $response = $document->addDocumentToIndex();
-        return $response;
-    }
-
     protected function logClientError()
     {
         $this->logError($this->avantElasticsearchClient->getError());
@@ -333,6 +359,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // to index all the items. It serves no purpose in a production environment
         $itemsCount = $limit == 0 ? count($items) : $limit;
 
+        $identifierElementId = ItemMetadata::getIdentifierElementId();
+
+        $this->logEvent(__('Begin exporting %s items', $itemsCount));
+
         for ($index = 0; $index < $itemsCount; $index++)
         {
             $itemId = $items[$index]->id;
@@ -344,7 +374,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
 
             // Create a document for the item.
-            $document = $this->createElasticsearchDocumentFromItem($items[$index], $fieldTextsForAllItems[$itemId], $itemFiles);
+            $item = $items[$index];
+            $fieldTextsForItem = $fieldTextsForAllItems[$itemId];
+            $identifier = $fieldTextsForItem[$identifierElementId][0]['text'];
+            $document = $this->createElasticsearchDocumentFromItem($item, $identifier, $fieldTextsForItem, $itemFiles);
 
             // Write the document as an object to the JSON array, separating each object by a comma.
             $separator = $index > 0 ? ',' : '';
@@ -359,14 +392,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             unset($document);
         }
 
+        $fileSize = number_format(strlen($json) / MB_BYTES, 2);
+        $this->logEvent(__('Write JSON to %s (%s MB)', $filename, $fileSize));
         file_put_contents($filename, "[$json]");
 
-        return array();
+        return $this->status;
     }
 
     public function performBulkIndexImport($filename, $deleteExistingIndex)
     {
-        $this->avantElasticsearchClient = new AvantElasticsearchClient();
         $this->logEvent(__('Begin bulk import'));
 
         // Verify that the import file exists.
@@ -404,38 +438,46 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function performBulkIndexImportBatches()
     {
-        $mb = 1048576;
-        $limit = $mb * 1;
+        $limit = MB_BYTES * 2;
         $start = 0;
         $end = 0;
+        $last = $this->batchDocumentsCount - 1;
 
-        while ($start < $this->batchDocumentsCount)
+        while ($start < $last)
         {
             $batchSize = 0;
             $limitReached = false;
 
-            while (!$limitReached && $end < $this->batchDocumentsCount)
+            // Determine which subset of the document will fit in the next batch. When this loop ends, we know the
+            // index of the first and last document to be indexed.
+            while (!$limitReached && $end <= $last)
             {
                 $documentSize = $this->batchDocumentsSizes[$end];
 
-                if ($batchSize + $documentSize <= $limit)
+                if ($batchSize + $documentSize <= $limit || $batchSize == 0)
                 {
+                    // This document will fit within in the batch, or it's the first document in the batch in which case
+                    // it's allowed even if its size exceeds the limit. Note that this logic does not handle the case
+                    // where a single document exceeds the upload limit of 10 MB. In that case, an error will be
+                    // reported and either that document's size will have to be reduced or this logic will have to
+                    // somehow handle splitting a document across multiple uploads. 10 MB of text would be unusual.
                     $batchSize += $documentSize;
                     $end++;
                 }
                 else
                 {
                     $limitReached = true;
-                    $end--;
                 }
             }
 
+            $end--;
+
             $this->batchDocumentsTotalSize += $batchSize;
-
-            $batchSizeMb = $batchSize / $mb;
+            $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
             $this->logEvent(__('Indexing documents %s - %s (%s MB)', $start, $end, $batchSizeMb));
-            $documentBatchParams = $this->createDocumentBatchParams($start, $end);
 
+            // Perform the actual indexing on this batch of documents.
+            $documentBatchParams = $this->createDocumentBatchParams($start, $end);
             if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
             {
                 $this->logClientError();
@@ -446,7 +488,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $start = $end;
         }
 
-        $totalSizeMb = $this->batchDocumentsTotalSize / $mb;
-        $this->logEvent(__("%s documents indexed %s MB", $this->batchDocumentsCount, $totalSizeMb));
+        $totalSizeMb = number_format($this->batchDocumentsTotalSize / MB_BYTES, 2);
+        $this->logEvent(__("%s documents indexed (%s MB)", $this->batchDocumentsCount, $totalSizeMb));
     }
 }

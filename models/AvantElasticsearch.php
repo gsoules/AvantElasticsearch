@@ -3,6 +3,8 @@
 require __DIR__ . '/../vendor/autoload.php';
 use Elasticsearch\ClientBuilder;
 
+define('MB_BYTES', 1024 * 1024);
+
 class AvantElasticsearch
 {
     protected $documentIndexName;
@@ -43,14 +45,14 @@ class AvantElasticsearch
         return 'omeka';
     }
 
-    public function getDocumentIdForItem($item)
+    public function getDocumentIdForItem($identifier)
     {
         // Create an id that is unique among all organizations that have items in the index.
         // The item Id alone is not sufficient since multiple organizations may have an item with
         // that Id. However, the item Id combined with the item's owner Id is unique.
 
         $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
-        $documentId = "$contributorId-$item->id";
+        $documentId = "$contributorId-$identifier";
         return $documentId;
     }
 

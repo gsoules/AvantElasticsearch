@@ -36,14 +36,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->type = $this->getDocumentMappingType();
     }
 
-    public function addDocumentToIndex()
-    {
-        $documentParmas = $this->constructDocumentParameters();
-        $avantElasticsearchClient = new AvantElasticsearchClient();
-        $response = $avantElasticsearchClient->indexDocument($documentParmas);
-        return $response;
-    }
-
     protected function addItemDataToDocumentBody($item)
     {
         if (!empty($this->htmlFields))
@@ -81,26 +73,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $catenatedText .= $fieldText['text'];
         }
         return $catenatedText;
-    }
-
-    public function constructDocumentParameters()
-    {
-        $params = [
-            'index' => $this->documentIndexName,
-            'type' => $this->type,
-        ];
-
-        if (isset($this->id))
-        {
-            $params['id'] = $this->id;
-        }
-
-        if (!empty($this->body))
-        {
-            $params['body'] = $this->body;
-        }
-
-        return $params;
     }
 
     protected function constructTags($item)
@@ -319,14 +291,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->setField('tags', $tags);
             }
         }
-    }
-
-    public function deleteDocumentFromIndex()
-    {
-        $documentParmas = $this->constructDocumentParameters();
-        $avantElasticsearchClient = new AvantElasticsearchClient();
-        $response = $avantElasticsearchClient->deleteDocument($documentParmas);
-        return $response;
     }
 
     protected function getImageUrl($item, $thumbnail)

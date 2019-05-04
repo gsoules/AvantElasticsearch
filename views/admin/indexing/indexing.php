@@ -28,8 +28,7 @@ $options = array(
 );
 
 $action = url("elasticsearch/indexing?operation=$operation&limit=$limit");
-$mb = 1048576;
-$mem1 = intval(memory_get_usage() / $mb);
+$mem1 = memory_get_usage() / MB_BYTES;
 $errorMessage = '';
 
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
@@ -84,29 +83,28 @@ $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
 if ($operation != 'none')
 {
     echo "<div class='health-report-ok'>$eventsMessages</div>";
-    echo '<hr/>';
     if (empty($errorMessage))
     {
+        echo '<hr/>';
         echo "<div class='health-report-ok'>SUCCESS</div>";
     }
     else
     {
-        echo "<div class='health-report-error'>ERRORS</div>";
         echo "<div class='health-report-error'>$errorMessage</div>";
     }
     echo '<hr/>';
     echo "<div>$options[$operation]</br>Execution time: $executionTime seconds</div>";
 }
 
-$mem2 = intval(memory_get_usage() / $mb);
-$used = intval($mem2 - $mem1);
-$peak = intval(memory_get_peak_usage() /  $mb);
+$mem2 = memory_get_usage() / MB_BYTES;
+$used = $mem2 - $mem1;
+$peak = memory_get_peak_usage() /  MB_BYTES;
 echo "<hr/>";
 echo '<div>';
 if ($operation != 'none')
 {
-    echo "Memory used: $used MB</br>";
-    echo "Peak usage: $peak MB</br>";
+    echo 'Memory used: ' . number_format($used, 2) . ' MB</br>';
+    echo 'Peak usage: ' . number_format($peak, 2) . ' MB</br>';
 }
 echo "File name: $filename";
 echo '</div>';
