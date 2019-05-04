@@ -36,19 +36,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->type = $this->getDocumentMappingType();
     }
 
-    protected function addItemDataToDocumentBody($item)
+    protected function addItemDataToDocumentBody($itemId, $isPublic)
     {
         if (!empty($this->htmlFields))
             $this->setField('html-fields', $this->htmlFields);
 
-        $urlData = $this->getItemUrlData($item);
+        $urlData = $this->getItemUrlData($itemId);
         $this->setField('url', $urlData);
 
         $pdfData = $this->getItemPdfData();
         if (!empty($pdfData))
             $this->setField('pdf', $pdfData);
 
-        $itemData = $this->getItemData($item, $this->titleString);
+        $itemData = $this->getItemData($itemId, $this->titleString, $isPublic);
         $this->setField('item', $itemData);
 
         $this->setField('element', $this->elementData);
@@ -75,20 +75,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $catenatedText;
     }
 
-    protected function constructTags($item)
-    {
-        // TO-DO: Optimize indexing of tags to reduce export time.
-        // Replace this SQL call loop with a single fetch in preformBulkIndexExport as is done for items, files,
-        // and element texts. But this can wait until tags are being used.
-        $tags = array();
-        foreach ($item->getTags() as $tag)
-        {
-            $tags[] = $tag->name;
-        }
-        return $tags;
-    }
-
-    public function copyItemElementValuesToDocument($item, $itemFieldTexts, $itemFiles)
+    public function copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFiles, $isPublic)
     {
         $this->itemFiles = $itemFiles;
 
@@ -100,9 +87,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createFacetDataForContributor();
         $this->createSpecialFieldsData($itemFieldTexts);
         $this->createSuggestionsData();
-        $this->createTagData($item);
+        $this->createTagData($itemId);
 
-        $this->addItemDataToDocumentBody($item);
+        $this->addItemDataToDocumentBody($itemId, $isPublic);
     }
 
     protected function createAddressElementSortData($elasticsearchFieldName, $fieldText)
@@ -280,11 +267,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createTagData($item)
+    protected function createTagData($itemId)
     {
         if (!$this->facetDefinitions['tag']['not_used'])
         {
-            $tags = $this->constructTags($item);
+            // TO-DO: Optimize indexing of tags to reduce export time.
+            // Replace the SQL calls to getItemFromId and getTags with a single fetch in preformBulkIndexExport
+            // as is done for items, files, and element texts. But this can wait until tags are being used.
+            $item = ItemMetadata::getItemFromId($itemId);
+            $tags = array();
+            foreach ($item->getTags() as $tag)
+            {
+                $tags[] = $tag->name;
+            }
+
             if (!empty($tags))
             {
                 $this->facetData['tag'] = $tags;
@@ -293,13 +289,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function getImageUrl($item, $thumbnail)
+    protected function getImageUrl($itemId, $thumbnail)
     {
         $itemImageUrl = $this->getItemFileUrl($thumbnail);
 
         if (empty($itemImageUrl))
         {
-            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($item->id);
+            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemId);
             if (!empty($coverImageIdentifier))
             {
                 $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
@@ -323,12 +319,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $pdfText;
     }
 
-    protected function getItemData($item, $titleString)
+    protected function getItemData($itemId, $titleString, $isPublic)
     {
         $itemData = array(
-            'id' => (int)$item->id,
+            'id' => $itemId,
             'title' => $titleString,
-            'public' => (bool)$item->public,
+            'public' => (bool)$isPublic,
             'file-count' => count($this->itemFiles),
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
@@ -427,13 +423,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return FILES_DIR . DIRECTORY_SEPARATOR . $directory . DIRECTORY_SEPARATOR . $filename;
     }
 
-    protected function getItemUrlData($item)
+    protected function getItemUrlData($itemId)
     {
-        $itemPath = $this->installation['item_path'] . $item->id;
+        $itemPath = $this->installation['item_path'] . $itemId;
         $serverUrl = $this->installation['server_url'];
         $itemUrl = $serverUrl . $itemPath;
-        $thumbUrl = $this->getImageUrl($item, true);
-        $imageUrl = $this->getImageUrl($item, false);
+        $thumbUrl = $this->getImageUrl($itemId, true);
+        $imageUrl = $this->getImageUrl($itemId, false);
 
         $urlData = array(
             'item' => $itemUrl,

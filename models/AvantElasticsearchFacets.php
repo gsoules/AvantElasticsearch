@@ -307,7 +307,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions['contributor']['sort'] = false;
 
         // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
-        // If/when supported, see performance improvement comment in AvantElasticsearchDocument::constructTags().
+        // IMPORTANT: If you want to use tags, see performance comment in AvantElasticsearchDocument::createTagData().
         $this->createFacet('tag', 'Tags');
         $this->facetDefinitions['tag']['not_used'] = true;
     }

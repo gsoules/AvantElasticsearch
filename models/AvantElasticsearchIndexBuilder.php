@@ -26,7 +26,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $identifier = ItemMetadata::getItemIdentifier($item);
         $itemFieldTexts = $this->getItemFieldTexts($item);
         $itemFiles = $item->Files;
-        $document = $this->createElasticsearchDocumentFromItem($item, $identifier, $itemFieldTexts, $itemFiles);
+        $document = $this->createDocumentFromItemMetadata($item->id, $identifier, $itemFieldTexts, $itemFiles, $item->public);
 
         $params = [
             'id' => $document->id,
@@ -86,7 +86,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createElasticsearchDocumentFromItem( $item, $identifier,$itemFieldTexts, $itemFiles)
+    public function createDocumentFromItemMetadata($itemId, $identifier, $itemFieldTexts, $itemFiles, $isPublic)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($identifier);
@@ -100,7 +100,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($item, $itemFieldTexts, $itemFiles);
+        $document->copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFiles, $isPublic);
 
         return $document;
     }
@@ -377,7 +377,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $item = $items[$index];
             $fieldTextsForItem = $fieldTextsForAllItems[$itemId];
             $identifier = $fieldTextsForItem[$identifierElementId][0]['text'];
-            $document = $this->createElasticsearchDocumentFromItem($item, $identifier, $fieldTextsForItem, $itemFiles);
+            $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $fieldTextsForItem, $itemFiles, $item->public);
 
             // Write the document as an object to the JSON array, separating each object by a comma.
             $separator = $index > 0 ? ',' : '';
