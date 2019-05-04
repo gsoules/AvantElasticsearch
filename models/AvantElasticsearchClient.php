@@ -200,25 +200,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return [$host];
     }
 
-    public function indexDocument($params)
+    public function indexBulkDocuments($bulkDocumentsSet)
     {
         try
         {
-            $response = $this->client->index($params);
-            return $response;
-        }
-        catch (Exception $e)
-        {
-            $this->reportClientException($e);
-            return null;
-        }
-    }
-
-    public function indexMultipleDocuments($params)
-    {
-        try
-        {
-            $response = $this->client->bulk($params);
+            $response = $this->client->bulk($bulkDocumentsSet);
         }
         catch (Exception $e)
         {
@@ -236,6 +222,20 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
 
         return true;
+    }
+
+    public function indexDocument($params)
+    {
+        try
+        {
+            $response = $this->client->index($params);
+            return $response;
+        }
+        catch (Exception $e)
+        {
+            $this->reportClientException($e);
+            return null;
+        }
     }
 
     public function ready()
