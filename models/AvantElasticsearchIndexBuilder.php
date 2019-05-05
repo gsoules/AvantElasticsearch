@@ -474,7 +474,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $this->batchDocumentsTotalSize += $batchSize;
             $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
-            $this->logEvent(__('Indexing documents %s - %s (%s MB)', $start, $end, $batchSizeMb));
+            $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start, $end, $batchSizeMb));
 
             // Perform the actual indexing on this batch of documents.
             $documentBatchParams = $this->createDocumentBatchParams($start, $end);
