@@ -5,27 +5,33 @@
     $maxRequests = 7;
 
     $avantElasticsearchClient = new AvantElasticsearchClient();
+    if ($avantElasticsearchClient != null)
+    {
+        // This should never happen, but if it does, simply return no suggestions.
+        return '';
+    }
+
     $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
     $avantElasticsearchSuggest = new AvantElasticsearchSuggest();
 
     $prefix = $avantElasticsearchSuggest->stripPunctuation($prefix);
 
     $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, $maxRequests);
-    $options = $avantElasticsearchClient->suggest($params);
+    $rawSuggestions = $avantElasticsearchClient->suggest($params);
 
-    if (empty($options))
+    if (empty($rawSuggestions))
     {
         // Add fuzziness to see if that will get some results.
         $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, true, $maxRequests);
-        $options = $avantElasticsearchClient->suggest($params);
+        $rawSuggestions = $avantElasticsearchClient->suggest($params);
     }
 
     $suggestions = array();
 
     $titles = array();
-    foreach ($options as $option)
+    foreach ($rawSuggestions as $rawSuggestion)
     {
-        $titles[] = $option["_source"]["item"]["title"];
+        $titles[] = $rawSuggestion["_source"]["item"]["title"];
     }
 
     // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.

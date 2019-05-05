@@ -7,11 +7,20 @@ $host = ElasticsearchConfig::getOptionValueForHost();
 $key = ElasticsearchConfig::getOptionValueForKey();
 $region = ElasticsearchConfig::getOptionValueForRegion();
 $secret = ElasticsearchConfig::getOptionValueForSecret();
+$healthOk = false;
 
 $avantElasticserachClient = new AvantElasticsearchClient();
-$health = $avantElasticserachClient->getHealth();
-$healthReport = $health['message'];
-$healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error') . '"';
+if ($avantElasticserachClient->ready())
+{
+    $health = $avantElasticserachClient->getHealth();
+    $healthReport = $health['message'];
+    $healthOk = $health['ok'];
+}
+else
+{
+    $healthReport = __('Unable to create AvantElasticsearchClient');
+}
+$healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '"';
 
 ?>
 

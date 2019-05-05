@@ -10,8 +10,8 @@ use Aws\ElasticsearchService\ElasticsearchPhpHandler;
 class AvantElasticsearchClient extends AvantElasticsearch
 {
     /* @var $client Elasticsearch\Client */
-    private $client;
-    private $error;
+    private $client = null;
+    private $error = '';
 
     public function __construct(array $options = array())
     {
@@ -55,12 +55,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
         try
         {
             // Create the actual Elasticsearch Client object.
-            $this->client = $builder->build();
+            //$this->client = $builder->build();
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
-            return null;
+            $this->reportException($e);
         }
     }
 
@@ -73,7 +72,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
+            $this->recordExceptionError($e);
             return false;
         }
     }
@@ -87,7 +86,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
+            $this->recordExceptionError($e);
             return false;
         }
     }
@@ -160,12 +159,12 @@ class AvantElasticsearchClient extends AvantElasticsearch
             }
             else
             {
-                $healthReport = array('ok' => false, 'message' => "The Elasticsearch plugin has not been configured.");
+                $healthReport = array('ok' => false, 'message' => "Unable to communicate with the Elasticsearch server.<br/>Verify that the AvantElasticsearch plugin configuration is correct.");
             }
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
+            $this->recordExceptionError($e);
             $healthReport = array('ok' => false, 'message' => $this->error);
         }
 
@@ -197,7 +196,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         catch (Exception $e)
         {
 
-            $this->reportClientException($e);
+            $this->recordExceptionError($e);
             return false;
         }
 
@@ -245,21 +244,26 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
+            $this->recordExceptionError($e);
             return false;
         }
     }
 
     public function ready()
     {
-        return $this->client != null;
+        return isset($this->client);
     }
 
-    protected function reportClientException(Exception $e)
+    protected function recordExceptionError(Exception $e)
     {
-        // TO-DO: Need to figure out what to do in this situation. For now keep a breakpoint here.
         $this->error = $this->getElasticsearchExceptionMessage($e);
-        return;
+    }
+
+    protected function reportException(Exception $e)
+    {
+        // TO-DO: Need to figure out what to do to report a Client exception, e.g. send email.
+        // For now keep a breakpoint here.
+        $this->recordExceptionError($e);
     }
 
     public function search($params, $attempt = 1)
@@ -273,8 +277,8 @@ class AvantElasticsearchClient extends AvantElasticsearch
         {
             if ($attempt == 3)
             {
-                $error = $this->getElasticsearchExceptionMessage($e);
-                $this->error = $error . '<br/>' . "Tried $attempt times";
+                $this->reportException($e);
+                $this->error = $$this->error . '<br/>' . "Tried $attempt times";
                 return null;
             }
             else
@@ -286,7 +290,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
+            $this->recordExceptionError($e);
             return null;
         }
     }
@@ -296,12 +300,12 @@ class AvantElasticsearchClient extends AvantElasticsearch
         try
         {
             $response = $this->search($params);
-            $options = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
-            return $options;
+            $rawSuggestions = isset($response["suggest"]["keywords-suggest"][0]["options"]) ? $response["suggest"]["keywords-suggest"][0]["options"] : array();
+            return $rawSuggestions;
         }
         catch (Exception $e)
         {
-            $this->reportClientException($e);
+            $this->reportException($e);
             return null;
         }
     }
