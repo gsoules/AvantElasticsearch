@@ -55,7 +55,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         try
         {
             // Create the actual Elasticsearch Client object.
-            //$this->client = $builder->build();
+            $this->client = $builder->build();
         }
         catch (Exception $e)
         {
@@ -275,6 +275,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (\Elasticsearch\Common\Exceptions\NoNodesAvailableException $e)
         {
+            // This is the ‘No alive nodes found in your cluster’ exception.
             if ($attempt == 3)
             {
                 $this->reportException($e);
