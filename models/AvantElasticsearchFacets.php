@@ -39,19 +39,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $terms[$group] = [
                     'terms' => [
                         'field' => "facet.$group.root",
-                        'size' => 10,
-                        'order' => ['_key' => 'asc']
+                        'size' => 10
                     ],
                     'aggregations' => [
                         'leafs' => [
                             'terms' => [
                                 'field' => "facet.$group.leaf",
-                                'size' => 1000,
-                                'order' => ['_key' => 'asc']
+                                'size' => 1000
                             ]
                         ]
                     ]
                 ];
+                if ($definition['sort'])
+                {
+                    // Sort the buckets by their values in ascending order. When not sorted, Elasticsearch
+                    // returns them in reverse count order (buckets with the most values are at the top).
+                    $terms[$group]['terms']['order'] = array('_key' => 'asc');
+                    $terms[$group]['aggregations']['leafs']['terms']['order'] = array('_key' => 'asc');
+                }
             }
             else
             {
@@ -87,7 +92,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'is_hierarchy' => $isHierarchy,
             'is_root_hierarchy' => $isRootHierarchy,
             'commingled' => false,
-            'sort' => true,
+            'sort' => false,
             'not_used' => false);
 
         $this->facetDefinitions[$group] = $definition;
@@ -299,12 +304,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $this->createFacet('date', 'Dates');
         $this->facetDefinitions['date']['is_date'] = true;
+        $this->facetDefinitions['date']['sort'] = true;
 
         $this->createFacet('contributor', 'Contributor');
         $this->facetDefinitions['contributor']['commingled'] = true;
-
-        // Don't sort the contributor results. That way contributors with the most results appear first.
-        $this->facetDefinitions['contributor']['sort'] = false;
 
         // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
         // IMPORTANT: If you want to use tags, see performance comment in AvantElasticsearchDocument::createTagData().
