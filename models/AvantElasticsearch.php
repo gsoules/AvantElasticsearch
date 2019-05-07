@@ -110,7 +110,11 @@ class AvantElasticsearch
 
             $elements = $db->query($sql)->fetchAll();
 
+            // Get a list of the private elements, but exclude Identifier which might be private if using an Alias.
             $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+            $identifierElementId = ItemMetadata::getIdentifierElementId();
+            unset($privateElementsData[$identifierElementId]);
+
             $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
 
             $this->elementsForIndex = array();
