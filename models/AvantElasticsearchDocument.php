@@ -376,9 +376,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         );
 
         $pdfData = array();
-        $pdfText = array();
-        $originalFileName = array();
-
+        $pdfTexts = array();
+        $fileNames = array();
+        $filePaths = array();
 
         foreach ($this->itemFiles as $file)
         {
@@ -389,14 +389,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
 
             // Attempt to extract the PDF file's text.
-            $filename = $file->filename;
-            $filepath = $this->getItemPdfFilepath('original', $filename);
+            $fileName = $file->filename;
+            $filepath = $this->getItemPdfFilepath('original', $fileName);
             if (!file_exists($filepath))
             {
                 // This installation does not have its files at the root of the 'original' folder. Check to see if
                 // the files are located in a sub directory having the item identifier as its name.
                 $itemIdentifier = $this->elementData['identifier'];
-                $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $filename);
+                $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $fileName);
                 if (!file_exists($filepath))
                 {
                     // This should never happen, but if it does, skip to the next file.
@@ -414,17 +414,23 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 continue;
             }
 
+            // Strip non ASCII characters from the text.
+            $text = preg_replace('/[\x00-\x1F\x7F-\xFF]/', ' ', $text);
+
             // Record the PDF's text and its file name in parallel arrays so we know which file contains which text.
-            $pdfText[] = $text;
-            $originalFileName[] = $file->original_filename;
+            $pdfTexts[] = $text;
+            $fileNames[] = $file->original_filename;
+            $filePaths[] = $file->getWebPath('original');
         }
 
-        if (!empty($pdfText) && !empty($originalFileName))
+        if (!empty($pdfTexts) && !empty($fileNames))
         {
-            $pdfData = array(
-                'text' => $pdfText,
-                'file-name' => $originalFileName
-            );
+            foreach ($fileNames as $index => $fileName)
+            {
+                $pdfData["text-$index"] = $pdfTexts[$index];
+                $pdfData['file-name'][] = $fileName;
+                $pdfData['file-url'][] = $filePaths[$index];
+            }
         }
 
         return $pdfData;

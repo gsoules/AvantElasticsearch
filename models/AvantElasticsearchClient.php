@@ -279,7 +279,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
             if ($attempt == 3)
             {
                 $this->reportException($e);
-                $this->error = $$this->error . '<br/>' . "Tried $attempt times";
+                $this->error = $this->error . '<br/>' . "Tried $attempt times";
                 return null;
             }
             else

@@ -108,10 +108,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addAnalyzerFieldToMappingProperties('element.description');
         $this->addAnalyzerFieldToMappingProperties('item.title');
 
-        // Fields for PDF searching.
-        $this->addAnalyzerFieldToMappingProperties('pdf.text');
-        $this->addKeywordFieldToMappingProperties('pdf.file-name');
-
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
 
@@ -124,13 +120,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         // Keyword fields. None of these require full-text search.
         // To learn about keyword fields see: www.elastic.co/guide/en/elasticsearch/reference/master/keyword.html
-        $this->addKeywordFieldToMappingProperties('html-fields');
-        $this->addKeywordFieldToMappingProperties('item.contributor');
-        $this->addKeywordFieldToMappingProperties('item.contributor-id');
-        $this->addKeywordFieldToMappingProperties('tags');
-        $this->addKeywordFieldToMappingProperties('url.image');
-        $this->addKeywordFieldToMappingProperties('url.item');
-        $this->addKeywordFieldToMappingProperties('url.thumb');
         $this->addKeywordFieldToMappingProperties('facet.contributor');
         $this->addKeywordFieldToMappingProperties('facet.date');
         $this->addKeywordFieldToMappingProperties('facet.place');
@@ -139,16 +128,40 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('facet.tag');
         $this->addKeywordFieldToMappingProperties('facet.type.leaf');
         $this->addKeywordFieldToMappingProperties('facet.type.root');
+        $this->addKeywordFieldToMappingProperties('html-fields');
+        $this->addKeywordFieldToMappingProperties('item.contributor');
+        $this->addKeywordFieldToMappingProperties('item.contributor-id');
+        $this->addKeywordFieldToMappingProperties('pdf.file-name');
+        $this->addKeywordFieldToMappingProperties('pdf.file-url');
         $this->addKeywordFieldToMappingProperties('sort.address-number');
         $this->addKeywordFieldToMappingProperties('sort.address-street');
         $this->addKeywordFieldToMappingProperties('sort.identifier');
         $this->addKeywordFieldToMappingProperties('sort.place');
         $this->addKeywordFieldToMappingProperties('sort.subject');
         $this->addKeywordFieldToMappingProperties('sort.type');
+        $this->addKeywordFieldToMappingProperties('tags');
+        $this->addKeywordFieldToMappingProperties('url.image');
+        $this->addKeywordFieldToMappingProperties('url.item');
+        $this->addKeywordFieldToMappingProperties('url.thumb');
+
+        // Dynamically map fields pdf.text-0, pdf-text-1, and so on. How many of these fields there are is determined
+        // by the item with the most PDF file attachments (only PDFs that are searchable). For example, most items
+        // will have zero or one PDF attachment, but if there's an item with 10 PDFs, fields up to pdf-text-9 will
+        // created and mapped when that item is indexed.
+        $template = (object) array(
+            "pdf_text" => [
+                "path_match" => "pdf.text-*",
+                    "mapping" => [
+                        'type' => 'text',
+                        'analyzer' => 'english'
+                    ]
+                ]
+            );
 
         $mapping = [
             $mappingType => [
-                'properties' => $this->properties
+                'properties' => $this->properties,
+                'dynamic_templates' => [$template]
             ]
         ];
 

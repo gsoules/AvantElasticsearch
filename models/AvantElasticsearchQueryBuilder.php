@@ -30,11 +30,12 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             'item.*',
             'html-fields',
             'pdf.file-name',
+            'pdf.file-url',
             'tags',
             'url.*'
         ];
 
-        // Highlighting the query will return.        $highlight = ['fields' =>
+        // Highlighting the query will return.
         $highlight =
             ['fields' =>
                 [
@@ -44,10 +45,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                         'pre_tags' => ['<span class="hit-highlight">'],
                         'post_tags' => ['</span>']
                     ],
-                    'pdf.text' =>
+                    'pdf.text-*' =>
                     (object)[
                         'number_of_fragments' => 3,
-                        'fragment_size' => 0,
+                        'fragment_size' => 150,
                         'pre_tags' => ['<span class="hit-highlight">'],
                         'post_tags' => ['</span>']
                     ]
@@ -58,13 +59,14 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             "multi_match" => [
                 'query' => $terms,
                 'type' => "cross_fields",
+                'analyzer' => "english",
                 'operator' => "and",
                 'fields' => [
                     "title^5",
                     "element.title^15",
                     "element.identifier^2",
                     "element.*",
-                    "pdf.text"
+                    "pdf.text-*"
                 ]
             ]
         ];
