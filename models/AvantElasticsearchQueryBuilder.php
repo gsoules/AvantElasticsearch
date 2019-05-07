@@ -90,9 +90,18 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery($commingled);
         $body['aggregations'] = $aggregations;
 
-        // Create the filter portion of the query to limit the reults to specific facet values.
+        // Create the filter portion of the query to limit the results to specific facet values.
         // The results only contain results that satisfy the filters.
         $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($roots, $leafs);
+
+        if (!$commingled)
+        {
+            // Until support is in place for private contributor indexes, filter the results to only show those
+            // contributed by this installation.
+            $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
+            $filters[] = array('term' => ['item.contributor-id' => $contributorId]);
+        }
+
         if (count($filters) > 0)
         {
             $body['query']['bool']['filter'] = $filters;
