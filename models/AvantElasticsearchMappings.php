@@ -46,7 +46,8 @@ class AvantElasticsearchMappings extends AvantElasticsearch
     protected function addTextFieldToMappingProperties($fieldName)
     {
         $this->properties[$fieldName] = [
-            'type' => 'text'
+            'type' => 'text',
+            'analyzer' => 'english'
         ];
     }
 
@@ -54,6 +55,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
     {
         $this->properties[$fieldName] = [
             'type' => 'text',
+            'analyzer' => 'english',
             'fields' => [
                 'keyword' => [
                     'type' => 'keyword'
