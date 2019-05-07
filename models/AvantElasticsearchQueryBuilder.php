@@ -31,9 +31,15 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             'html-fields',
             'pdf.file-name',
             'pdf.file-url',
-            'tags',
             'url.*'
         ];
+
+        // Get tags back from the query, but only if they are being used.
+        $facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
+        if ($facetDefinitions['tag']['not_used'] == false)
+        {
+            $source[] = 'tags';
+        }
 
         // Highlighting the query will return.
         $highlight =
