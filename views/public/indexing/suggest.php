@@ -5,7 +5,7 @@
     $maxRequests = 7;
 
     $avantElasticsearchClient = new AvantElasticsearchClient();
-    if ($avantElasticsearchClient != null)
+    if (!$avantElasticsearchClient->ready())
     {
         // This should never happen, but if it does, simply return no suggestions.
         return '';
