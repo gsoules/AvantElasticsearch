@@ -39,7 +39,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         if (!$this->avantElasticsearchClient->indexDocument($params))
         {
             // TO-DO: Report this error to the user or log it and email it to the admin.
-            $errorMessage = $this->avantElasticsearchClient->getError();
+            $errorMessage = $this->avantElasticsearchClient->getLastError();
             throw new Exception($errorMessage);
         }
     }
@@ -167,7 +167,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         if (!$this->avantElasticsearchClient->deleteDocument($params))
         {
             // TO-DO: Report this error to the user or log it and email it to the admin.
-            $errorMessage = $this->avantElasticsearchClient->getError();
+            $errorMessage = $this->avantElasticsearchClient->getLastError();
             throw new Exception($errorMessage);
         }
     }
@@ -330,7 +330,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function logClientError()
     {
-        $this->logError($this->avantElasticsearchClient->getError());
+        $this->logError($this->avantElasticsearchClient->getLastError());
     }
 
     protected function logError($errorMessage)

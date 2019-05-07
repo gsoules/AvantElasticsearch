@@ -11,7 +11,8 @@ class AvantElasticsearchClient extends AvantElasticsearch
 {
     /* @var $client Elasticsearch\Client */
     private $client = null;
-    private $error = '';
+    private $lastError = '';
+    private $lastException = null;
 
     public function __construct(array $options = array())
     {
@@ -72,7 +73,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->recordExceptionError($e);
+            $this->recordException($e);
             return false;
         }
     }
@@ -86,7 +87,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->recordExceptionError($e);
+            $this->recordException($e);
             return false;
         }
     }
@@ -103,7 +104,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
             else
             {
                 // This should never happen, but it has during debugging so we handle it.
-                $this->error = 'Failed to delete index: Client is null';
+                $this->lastError = 'Failed to delete index: Client is null';
                 return false;
             }
         }
@@ -121,15 +122,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->error = $this->getElasticsearchExceptionMessage($e);
-            $this->error = __('Failed to delete index: %s', $this->error);
+            $this->lastException = $e;
+            $this->lastError = $this->getElasticsearchExceptionMessage($e);
+            $this->lastError = __('Failed to delete index: %s', $this->lastError);
             return false;
         }
-    }
-
-    public function getError()
-    {
-        return $this->error;
     }
 
     protected function getHandler()
@@ -164,8 +161,8 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->recordExceptionError($e);
-            $healthReport = array('ok' => false, 'message' => $this->error);
+            $this->recordException($e);
+            $healthReport = array('ok' => false, 'message' => $this->lastError);
         }
 
         return $healthReport;
@@ -187,6 +184,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return [$host];
     }
 
+    public function getLastError()
+    {
+        return $this->lastError;
+    }
+
+    public function getLastException()
+    {
+        return $this->lastException;
+    }
+
     public function indexBulkDocuments($bulkDocumentsSet)
     {
         try
@@ -196,7 +203,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         catch (Exception $e)
         {
 
-            $this->recordExceptionError($e);
+            $this->recordException($e);
             return false;
         }
 
@@ -228,7 +235,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
             {
                 $errorMessage .= __('<br/>Showing %s of %s errors', $errorsReported, $errorCount);
             }
-            $this->error = $errorMessage;
+            $this->lastError = $errorMessage;
             return false;
         }
 
@@ -244,7 +251,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->recordExceptionError($e);
+            $this->recordException($e);
             return false;
         }
     }
@@ -254,19 +261,20 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return isset($this->client);
     }
 
-    protected function recordExceptionError(Exception $e)
+    protected function recordException(Exception $e)
     {
-        $this->error = $this->getElasticsearchExceptionMessage($e);
+        $this->lastException = $e;
+        $this->lastError = $this->getElasticsearchExceptionMessage($e);
     }
 
     protected function reportException(Exception $e)
     {
         // TO-DO: Need to figure out what to do to report a Client exception, e.g. send email.
         // For now keep a breakpoint here.
-        $this->recordExceptionError($e);
+        $this->recordException($e);
     }
 
-    public function search($params, $attempt = 1)
+    public function search($params)
     {
         try
         {
@@ -275,23 +283,12 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (\Elasticsearch\Common\Exceptions\NoNodesAvailableException $e)
         {
-            // This is the ‘No alive nodes found in your cluster’ exception.
-            if ($attempt == 3)
-            {
-                $this->reportException($e);
-                $this->error = $this->error . '<br/>' . "Tried $attempt times";
-                return null;
-            }
-            else
-            {
-                $attempt++;
-                $response = $this->search($params, $attempt);
-                return $response;
-            }
+            $this->recordException($e);
+            return null;
         }
         catch (Exception $e)
         {
-            $this->recordExceptionError($e);
+            $this->recordException($e);
             return null;
         }
     }
