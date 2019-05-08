@@ -37,11 +37,18 @@
     // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.
     $titles = array_unique($titles);
 
+    // Determine if the user is searching all sites.
+    $showAll = isset($_COOKIE['SEARCH-ALL']) ? $_COOKIE['SEARCH-ALL'] == 'true' : false;
+
     // Create an array of title/link pairs so that when the user chooses a suggestion they are effectively
     // clicking a link to search for their selection.
     foreach ($titles as $title)
     {
         $value = url('find?query=' . urlencode($title));
+        if ($showAll)
+        {
+            $value .= '&all=on';
+        }
         $suggestions[] = (object) array('label' => $title, 'value' => $value);
     }
 
