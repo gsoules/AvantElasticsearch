@@ -300,7 +300,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->createFacet('type', 'Item Type', true, true);
 
         $this->createFacet('place', 'Places', true);
-        $this->facetDefinitions['place']['sort'] = false;
 
         $this->createFacet('date', 'Dates');
         $this->facetDefinitions['date']['is_date'] = true;
