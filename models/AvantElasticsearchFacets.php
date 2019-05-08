@@ -408,7 +408,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             // for the child facet, only for the grandchild.
             if (count($leafEntryListItems) == 2)
             {
-                if ($leafEntryListItems[0]['level'] == 2 && $leafEntryListItems[1]['level'] == 3)
+                if (isset($leafEntryListItems[0]) && $leafEntryListItems[0]['level'] == 2 && $leafEntryListItems[1]['level'] == 3)
                 {
                     if ($leafEntryListItems[0]['action'] == 'remove')
                     {
