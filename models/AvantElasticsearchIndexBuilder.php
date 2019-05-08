@@ -355,6 +355,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $files = $this->fetchAllFiles();
         $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems();
 
+        $fileStats = array();
+        $documentSizeTotal = 0;
+
         // The limit is only used during development so that we don't always have
         // to index all the items. It serves no purpose in a production environment
         $itemsCount = $limit == 0 ? count($items) : $limit;
@@ -373,15 +376,34 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $itemFiles = $files[$itemId];
             }
 
+            foreach ($itemFiles as $itemFile)
+            {
+                $count = 1;
+                $size = $itemFile->size;
+                $mimeType = $itemFile->mime_type;
+                if (isset($fileStats[$mimeType]))
+                {
+                    $count += $fileStats[$mimeType]['count'];
+                    $size += $fileStats[$mimeType]['size'];
+                }
+                $fileStats[$mimeType]['count'] = $count;
+                $fileStats[$mimeType]['size'] = $size;
+            }
+
             // Create a document for the item.
             $item = $items[$index];
             $fieldTextsForItem = $fieldTextsForAllItems[$itemId];
             $identifier = $fieldTextsForItem[$identifierElementId][0]['text'];
             $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $fieldTextsForItem, $itemFiles, $item->public);
 
+            // Determine the size of the document in bytes.
+            $documentJson = json_encode($document);
+            $documentSize = strlen($documentJson);
+            $documentSizeTotal += $documentSize;
+
             // Write the document as an object to the JSON array, separating each object by a comma.
             $separator = $index > 0 ? ',' : '';
-            $json .= $separator . json_encode($document);
+            $json .= $separator . $documentJson;
 
             // Let PHP know that it can garbage-collect these objects.
             unset($items[$index]);
@@ -392,8 +414,17 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             unset($document);
         }
 
+        // Report statistics.
+        $this->logEvent(__('Export complete. %s items totaling %s MB', $itemsCount, number_format($documentSizeTotal / MB_BYTES, 2)));
+        $this->logEvent(__('File Attachments:'));
+        foreach ($fileStats as $key => $fileStat)
+        {
+            $this->logEvent(__('&nbsp;&nbsp;&nbsp; %s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
+        }
+
+        // Write the JSON data to a file.
         $fileSize = number_format(strlen($json) / MB_BYTES, 2);
-        $this->logEvent(__('Write JSON to %s (%s MB)', $filename, $fileSize));
+        $this->logEvent(__('Write data to %s (%s MB)', $filename, $fileSize));
         file_put_contents($filename, "[$json]");
 
         return $this->status;
