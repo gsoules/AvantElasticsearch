@@ -8,6 +8,8 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     protected $_hooks = array(
         'admin_head',
+        'after_delete_item',
+        'after_save_item',
         'config',
         'config_form',
         'define_routes',
@@ -18,6 +20,16 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     protected $_filters = array(
         'admin_navigation_main'
     );
+
+    protected function AvantSearchUsesElasticsearch()
+    {
+        // Determine if the installed version of AvantSearch has support for Elasticsearch, and if so, whether it has
+        // Elasticsearch enabled. This method is required for development and testing purposes in situations where this
+        // AvantElasticsearch plugin is installed, but the AvantSearch plugin either has not yet been upgraded to the
+        // version that supports Elasticsearch, or it has Elasticsearch turned off for testing/debuging.
+        $avantSearchSupportsElasticsearch = method_exists('AvantSearch', 'useElasticsearch');
+        return $avantSearchSupportsElasticsearch && AvantSearch::useElasticsearch();
+    }
 
     public function filterAdminNavigationMain($nav)
     {
@@ -37,6 +49,24 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         queue_css_file('avantelasticsearch-admin');
     }
 
+    public function hookAfterDeleteItem($args)
+    {
+        if ($this->AvantSearchUsesElasticsearch() || get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))
+        {
+            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
+            $avantElasticsearchIndexBuilder->deleteItemFromIndex($args['record']);
+        }
+    }
+
+    public function hookAfterSaveItem($args)
+    {
+        if ($this->AvantSearchUsesElasticsearch() || get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))
+        {
+            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
+            $avantElasticsearchIndexBuilder->addItemToIndex($args['record']);
+        }
+    }
+
     public function hookConfig()
     {
         ElasticsearchConfig::saveConfiguration();
@@ -54,10 +84,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookPublicFooter($args)
     {
-        // Determine if the installed version of Avantsearch has support for AvantElasticsearch.
-        $avantSearchVersionSupportsElasticsearch = method_exists('AvantSearch', 'useElasticsearch');
-
-        if ($avantSearchVersionSupportsElasticsearch && AvantSearch::useElasticsearch())
+        if ($this->AvantSearchUsesElasticsearch())
         {
             // Emit the Javascript for Elasticsearch suggestions while typing in the search box.
             echo get_view()->partial('avantelasticsearch-script.php');

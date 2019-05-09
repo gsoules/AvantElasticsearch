@@ -94,3 +94,13 @@ $healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '
         <?php echo $view->formText(ElasticsearchConfig::OPTION_ES_SECRET, $secret); ?>
     </div>
 </div>
+
+<div class="field">
+    <div class="two columns alpha">
+        <label><?php echo CONFIG_LABEL_ES_STANDALONE; ?></label>
+    </div>
+    <div class="inputs five columns omega">
+        <p class="explanation"><?php echo __('Allow the index to be updated even when AvantSearch is not using Elasticsearch'); ?></p>
+        <?php echo $view->formCheckbox(ElasticsearchConfig::OPTION_ES_STANDALONE, true, array('checked' => (boolean)get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))); ?>
+    </div>
+</div>

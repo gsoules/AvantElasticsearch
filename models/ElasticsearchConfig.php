@@ -6,6 +6,7 @@ define('CONFIG_LABEL_ES_CONTRIBUTOR', __('Contributor'));
 define('CONFIG_LABEL_ES_CONTRIBTUOR_ID', __('Contributor Id'));
 define('CONFIG_LABEL_ES_REGION', __('Region'));
 define('CONFIG_LABEL_ES_SECRET', __('Secret'));
+define('CONFIG_LABEL_ES_STANDALONE', __('Standalone Operation'));
 
 class ElasticsearchConfig extends ConfigOptions
 {
@@ -15,6 +16,7 @@ class ElasticsearchConfig extends ConfigOptions
     const OPTION_ES_KEY = 'avantelasticsearch_es_key';
     const OPTION_ES_REGION = 'avantelasticsearch_es_region';
     const OPTION_ES_SECRET = 'avantelasticsearch_es_secret';
+    const OPTION_ES_STANDALONE = 'avantelasticsearch_es_standalone';
 
     public static function getOptionValueForContributor()
     {
@@ -72,6 +74,9 @@ class ElasticsearchConfig extends ConfigOptions
         $hasInvalidCharacters = $strippedValue != $value;
         self::errorIf(strlen($value) < 3 || strlen($value) > 6 || $hasInvalidCharacters, $optionLabel, __('The value does not satisfy the rules for a contributor Id'));
         set_option($optionName, $value);
+
+        set_option(self::OPTION_ES_STANDALONE, intval($_POST[self::OPTION_ES_STANDALONE]));
+
     }
 
     public static function saveOptionDataForHost()
