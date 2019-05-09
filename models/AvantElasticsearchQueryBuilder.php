@@ -171,6 +171,13 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'contributors' => [
                         'terms' => [
                             'field' => $fieldName
+                        ],
+                        'aggregations' => [
+                            'files' => [
+                                'sum' => [
+                                    'field' => 'item.file-count'
+                                ]
+                             ]
                         ]
                     ]
                 ]
