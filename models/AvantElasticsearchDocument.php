@@ -354,8 +354,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
         if (!empty($file) && $file->hasThumbnail())
         {
+            $jpegMimeTypes = array(
+                'image/jpg',
+                'image/jpeg'
+            );
+
             $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
-            if (strlen($url) > 4 && strpos(strtolower($url), '.jpg', strlen($url) - 4) === false)
+
+            if (!in_array($file->mime_type, $jpegMimeTypes))
             {
                 // The original image is not a jpg (it's probably a pdf) so return its derivative image instead.
                 $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'fullsize');
