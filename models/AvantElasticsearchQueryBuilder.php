@@ -161,6 +161,25 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $params;
     }
 
+    public function constructTermAggregationsQueryParams($fieldName)
+    {
+        $params = [
+            'index' => 'omeka',
+            'body' => [
+                'size' => 0,
+                'aggregations' => [
+                    'contributors' => [
+                        'terms' => [
+                            'field' => $fieldName
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        return $params;
+    }
+
     public function getFacetDefinitions()
     {
         return $this->avantElasticsearchFacets->getFacetDefinitions();
