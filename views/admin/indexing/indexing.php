@@ -19,13 +19,21 @@ $limit = isset($_REQUEST['limit']) ? intval($_REQUEST['limit']) : 100;
 $fileDefault =  date('md') . '-' . ElasticsearchConfig::getOptionValueForContributorId();
 $file = isset($_REQUEST['file']) ? $_REQUEST['file'] : $fileDefault;
 
-$options = array(
-    'none' => 'No Action',
-    'import_new' =>'Import into new index',
-    'import_update' =>'Import into existing index',
-    'export_all' => 'Export all items from Omeka',
-    'export_limit' => 'Export limited items from Omeka'
-);
+
+if (isset($_REQUEST['new']) && $_REQUEST['new'] == 'true')
+{
+    // This is a dangerous operation, so make sure the admin really wants to destroy the current index.
+    $options['import_new'] = 'Import into new index';
+}
+else
+{
+    $options = array(
+        'none' => 'No Action',
+        'export_all' => 'Export all items from Omeka',
+        'export_limit' => 'Export limited items from Omeka',
+        'import_update' =>'Import into existing index (add &new=true to the query string to create a new index)'
+    );
+}
 
 $action = url("elasticsearch/indexing?operation=$operation&limit=$limit");
 $mem1 = memory_get_usage() / MB_BYTES;
