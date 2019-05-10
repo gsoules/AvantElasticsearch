@@ -725,8 +725,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             if (empty($year))
             {
-                // Malformed date so just return the original value.
-                $value = $text;
+                // This date is malformed.
+                $value = __('Unknown');
             }
             else
             {
