@@ -81,6 +81,10 @@ class AvantElasticsearch
                 {
                     $message = $jsonMessage->Message;
                 }
+                else if (isset($jsonMessage->result))
+                {
+                    $message = $jsonMessage->result;
+                }
                 else
                 {
                     // Don't know what kind of object this is so just return the raw message.
