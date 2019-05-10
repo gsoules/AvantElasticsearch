@@ -155,6 +155,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     public function deleteItemFromIndex($item)
     {
         $identifier = ItemMetadata::getItemIdentifier($item);
+
+        if (empty($identifier))
+        {
+            throw new Exception("Unable to delete item from the Elasticsearch index.
+            This can happen with Batch Delete. Try deactivating the AvantElasticsearch plugin.");
+        }
+
         $documentId = $this->getDocumentIdForItem($identifier);
         $document = new AvantElasticsearchDocument($documentId);
 
