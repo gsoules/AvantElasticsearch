@@ -49,6 +49,11 @@ $mem1 = memory_get_usage() / MB_BYTES;
 $errorMessage = '';
 
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
+
+if (isset($_COOKIE['XDEBUG_SESSION']))
+{
+    echo '<div class="health-report-error">YOU ARE DEBUGGING</div>';
+}
 echo "<div$healthReportClass>$healthReport</div>";
 echo "<div$pdfReportClass>$pdfSupportReport</div>";
 
@@ -205,6 +210,7 @@ echo foot();
                             label: "Indexing..."
                         });
                         dialog.dialog("open");
+                        statusArea.html('ZZZZZ');
                         jQuery.ajax(
                             url,
                             {
