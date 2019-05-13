@@ -139,6 +139,7 @@ echo foot();
         var statusArea = jQuery("#status-area");
         var selectedOperation = 'none';
         var url = '<?php echo $url; ?>';
+        var progressCount = 0;
 
         enableStartButton(false);
 
@@ -185,24 +186,25 @@ echo foot();
                     closeOnEscape: false,
                     resizable: false,
                     buttons: dialogButtons,
-                    open: function () {
-                        progressTimer = setTimeout(progress, 2000);
+                    open: function ()
+                    {
+                        progressTimer = setTimeout(progress, 0);
                     },
                     beforeClose: function () {
-                        downloadButton.button("option", {
+                        startButton.button("option", {
                             disabled: false,
-                            label: "Start indexing"
+                            label: "Start"
                         });
                     }
                 }),
                 downloadButton = jQuery("#start-button")
                     .button()
                     .on("click", function () {
-                        // jQuery(this).button("option", {
-                        //     disabled: true,
-                        //     label: "Downloading..."
-                        // });
-                        // dialog.dialog("open");
+                        startButton.button("option", {
+                            disabled: true,
+                            label: "Indexing..."
+                        });
+                        dialog.dialog("open");
                         jQuery.ajax(
                             url,
                             {
@@ -241,31 +243,33 @@ echo foot();
 
             function progress()
             {
-                console.log('Called progress');
+                progressCount++;
+                console.log('Called progress ' + progressCount);
                 jQuery.ajax(
                     url,
                     {
                         method: 'POST',
                         dataType: 'json',
                         data: {
-                            action: 'progress'
+                            action: 'progress',
+                            file_name: fileName
                         },
                         success: function (data)
                         {
-                            var percent = data.percent;
+                            var percent = data.progress;
                             console.log('Percent = ' + percent);
-                            //alert('RESPONSE: ' + percent);
-                            if (percent > 0) {
+                            if (percent > 0)
+                            {
                                 progressbar.progressbar("value", percent);
                             }
-                            if (percent <= 99) {
+                            if (percent <= 99)
+                            {
                                 progressTimer = setTimeout(progress, 1000);
                             }
                         },
                         error: function (request, status, error)
                         {
-                            alert('ERROR: ' + status + error + request.responseText);
-                            console.log('***' + status + error + request.responseText);
+                            alert('AJAX ERROR on progress' + ' >>> ' + error);
                         }
                     }
                 );

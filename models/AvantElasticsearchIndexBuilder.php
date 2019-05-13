@@ -335,6 +335,52 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $fieldTexts;
     }
 
+    function handleAjaxRequest()
+    {
+        $action = isset($_POST['action']) ? $_POST['action'] : 0;
+        $fileName = isset($_POST['file_name']) ? $_POST['file_name'] : 'xxx';
+        $filePath = $this->getIndexDataFilename($fileName);
+        $status['events'] = array();
+        $status['message'] = '';
+        $status['error'] = '';
+        $status['events'][] = 'E1';
+        $status['events'][] = 'E2';
+
+        try
+        {
+            switch ($action)
+            {
+                case 'export_all':
+                case 'export_some':
+                    $limit = $action == 'export_all' ? 0 : 100;
+                    $status = $this->performBulkIndexExport($filePath, $limit);
+                    break;
+
+                case 'import_new':
+                case 'import_existing':
+                    $deleteExistingIndex = $action == 'import_new';
+                    //$status = $this->performBulkIndexImport($filePath, $deleteExistingIndex);
+                    break;
+
+                case 'progress':
+                    //$progress = rand (0, 99);
+                    $progress = intval(file_get_contents($filePath . '.txt'));
+                    $status['progress'] = $progress;
+                    break;
+
+                default:
+                    $status['error'] = 'Unexpected action: ' . $action;
+            }
+        }
+        catch (Exception $e)
+        {
+            $status['error'] = $e->getMessage();
+        }
+
+        $response = json_encode($status);
+        echo $response;
+    }
+
     protected function logClientError()
     {
         $this->logError($this->avantElasticsearchClient->getLastError());
@@ -350,10 +396,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->status['events'][] = $eventMessage;
     }
 
-    public function performBulkIndexExport($filename, $limit = 0)
+    public function performBulkIndexExport($fileName, $limit = 0)
     {
         $json = '';
         $this->cacheInstallationParameters();
+
+        file_put_contents($fileName . '.txt', 10);
 
         // Get all the items for this installation.
         $items = $this->fetchAllItems();
@@ -375,6 +423,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         for ($index = 0; $index < $itemsCount; $index++)
         {
+            file_put_contents($fileName . '.txt', intval(($index / $itemsCount) * 100));
+
             $itemId = $items[$index]->id;
 
             $itemFiles = array();
@@ -426,14 +476,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->logEvent(__('File Attachments:'));
         foreach ($fileStats as $key => $fileStat)
         {
-            $this->logEvent(__('&nbsp;&nbsp;&nbsp; %s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
+            $this->logEvent(__('%s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
         }
 
         // Write the JSON data to a file.
         $fileSize = number_format(strlen($json) / MB_BYTES, 2);
-        $this->logEvent(__('Write data to %s (%s MB)', $filename, $fileSize));
-        file_put_contents($filename, "[$json]");
+        $this->logEvent(__('Write data to %s (%s MB)', $fileName, $fileSize));
+        file_put_contents($fileName, "[$json]");
 
+        file_put_contents($fileName . '.txt', 100);
         return $this->status;
     }
 
