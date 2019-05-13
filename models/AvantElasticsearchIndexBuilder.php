@@ -434,9 +434,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         for ($index = 0; $index < $itemsCount; $index++)
         {
-            if ($index % 500 == 0)
+            $statusSize = 1000;
+            if ($index % $statusSize == 0)
             {
-                $this->logEvent(__('Exporting items %s - %s', $index + 1, $index + 500));
+                $last = min($itemsCount, $index + $statusSize);
+                $this->logEvent(__('Exporting items %s - %s', $index + 1, $last));
             }
 
             $itemId = $items[$index]->id;

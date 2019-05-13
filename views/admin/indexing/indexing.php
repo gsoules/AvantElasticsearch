@@ -28,11 +28,11 @@ $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'er
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
 
 $pageTitle = __('Elasticsearch Indexing');
-$operation = isset($_REQUEST['operation']) ? $_REQUEST['operation'] : 'none';
+$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : 'none';
 
 if (isset($_REQUEST['new']) && $_REQUEST['new'] == 'true')
 {
-    // This is a dangerous operation, so make sure the admin really wants to destroy the current index.
+    // This is a dangerous action, so make sure the admin really wants to destroy the current index.
     $options['import_new'] = 'Import into new index';
 }
 else
@@ -61,7 +61,7 @@ if ($avantElasticsearchClient->ready())
 {
     echo "<hr/>";
     echo '<div class="indexing-radio-buttons">';
-    echo $this->formRadio('operation', 'none', null, $options);
+    echo $this->formRadio('action', 'none', null, $options);
     echo '</div>';
     echo '<div>File: ' . $this->formText('file', $fileName, array('size' => '12', 'id' => 'file')). '</div>';
     echo "<button id='start-button'>Start</button>";
@@ -69,12 +69,12 @@ if ($avantElasticsearchClient->ready())
 }
 else
 {
-    $operation = 'none';
+    $action = 'none';
 }
 
 $eventsMessages = '';
 
-if ($operation != 'none')
+if ($action != 'none')
 {
     $hasError = isset($status['error']);
     $errorMessage = $hasError ? $status['error'] : '';
@@ -86,7 +86,7 @@ if ($operation != 'none')
 
 $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
 
-if ($operation != 'none')
+if ($action != 'none')
 {
     echo "<div class='health-report-ok'>$eventsMessages</div>";
     if (empty($errorMessage))
@@ -99,7 +99,7 @@ if ($operation != 'none')
         echo "<div class='health-report-error'>$errorMessage</div>";
     }
     echo '<hr/>';
-    echo "<div>$options[$operation]</br>Execution time: $executionTime seconds</div>";
+    echo "<div>$options[$action]</br>Execution time: $executionTime seconds</div>";
 }
 
 $mem2 = memory_get_usage() / MB_BYTES;
@@ -107,7 +107,7 @@ $used = $mem2 - $mem1;
 $peak = memory_get_peak_usage() /  MB_BYTES;
 echo "<hr/>";
 echo '<div>';
-if ($operation != 'none')
+if ($action != 'none')
 {
     echo 'Memory used: ' . number_format($used, 2) . ' MB</br>';
     echo 'Peak usage: ' . number_format($peak, 2) . ' MB</br>';
@@ -120,16 +120,15 @@ echo foot();
 <script type="text/javascript">
     jQuery(document).ready(function ()
     {
+        var action = jQuery("input[name='action']");
+        var actionCompleted = false;
         var fileName = jQuery("#file").val();
+        var progressTimer;
+        var selectedAction = 'none';
         var startButton = jQuery("#start-button").button();
         var statusArea = jQuery("#status-area");
-        var selectedOperation = 'none';
         var url = '<?php echo $url; ?>';
-        var progressCount = 0;
-        var done = false;
-        var progressTimer;
 
-        enableStartButton(false);
         initialize();
 
         function enableStartButton(enable)
@@ -139,12 +138,14 @@ echo foot();
 
         function initialize()
         {
-            jQuery("input[name='operation']").change(function (e)
+            enableStartButton(false);
+
+            action.change(function (e)
             {
                 // The admin has selected a different radio button.
-                var checkedButton = jQuery("input[name='operation']:checked");
-                selectedOperation = checkedButton.val();
-                enableStartButton(selectedOperation !== 'none');
+                var checkedButton = jQuery("input[name='action']:checked");
+                selectedAction = checkedButton.val();
+                enableStartButton(selectedAction !== 'none');
             });
 
             startButton.on("click", function ()
@@ -153,8 +154,10 @@ echo foot();
             });
         }
 
-        function progress()
+        function reportProgress()
         {
+            // Call back to the server to get the status of the indexing action.
+            // The server returns the complete status since the action began, not just what has since transpired.
             jQuery.ajax(
                 url,
                 {
@@ -167,14 +170,14 @@ echo foot();
                     success: function (data)
                     {
                         showStatus(data);
-                        if (!done)
+                        if (!actionCompleted)
                         {
-                            progressTimer = setTimeout(progress, 3000);
+                            progressTimer = setTimeout(reportProgress, 3000);
                         }
                     },
                     error: function (request, status, error)
                     {
-                        alert('AJAX ERROR on progress' + ' >>> ' + error);
+                        alert('AJAX ERROR on reportProgress' + ' >>> ' + error);
                     }
                 }
             );
@@ -188,25 +191,29 @@ echo foot();
         function startIndexing()
         {
             enableStartButton(false);
-            progressTimer = setTimeout(progress, 1000);
             statusArea.html('');
-            
+            progressTimer = setTimeout(reportProgress, 1000);
+
+            // Call back to the server to initiate the indexing action. This can take several minutes to complete.
+            // In the meantime, the reportProgress function is called periodically to get the status of the action.
             jQuery.ajax(
                 url,
                 {
                     method: 'POST',
                     dataType: 'json',
                     data: {
-                        action: selectedOperation,
+                        action: selectedAction,
                         file_name: fileName
                     },
-                    success: function (data) {
-                        done = true;
+                    success: function (data)
+                    {
+                        actionCompleted = true;
                         showStatus(data);
                         enableStartButton(true);
                     },
-                    error: function (request, status, error) {
-                        alert('AJAX ERROR on ' + selectedOperation + ' >>> ' + error);
+                    error: function (request, status, error)
+                    {
+                        alert('AJAX ERROR on ' + selectedAction + ' >>> ' + error);
                     }
                 }
             );
