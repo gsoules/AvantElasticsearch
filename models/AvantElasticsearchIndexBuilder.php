@@ -11,8 +11,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $batchDocumentsSizes = array();
     protected $batchDocumentsTotalSize;
     protected $eventMessages;
+    protected $logFileName;
     protected $status;
-    protected $statusFileName;
 
     public function __construct()
     {
@@ -340,9 +340,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     function handleAjaxRequest()
     {
         $action = isset($_POST['action']) ? $_POST['action'] : 0;
-        $fileName = isset($_POST['file_name']) ? $_POST['file_name'] : 'xxx';
-        $filePath = $this->getIndexDataFilename($fileName);
+        $filePrefix = isset($_POST['file_name']) ? $_POST['file_name'] : $action;
+        $dataFileName = $this->getIndexDataFilename($filePrefix);
+        $logFileName = $dataFileName . '.log';
         $statusText = 'ABC';
+
+        $mem1 = memory_get_usage() / MB_BYTES;
 
         try
         {
@@ -351,21 +354,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'export_all':
                 case 'export_some':
                     $limit = $action == 'export_all' ? 0 : 100;
-                    //$status = $this->performBulkIndexExport($filePath, $limit);
-                    $this->performBulkIndexExport($filePath, $limit);
-                    $statusText = file_get_contents($filePath . '.txt');
+                    $this->performBulkIndexExport($dataFileName, $logFileName, $limit);
                     break;
 
                 case 'import_new':
                 case 'import_existing':
                     $deleteExistingIndex = $action == 'import_new';
-                    //$status = $this->performBulkIndexImport($filePath, $deleteExistingIndex);
+                    $this->performBulkIndexImport($dataFileName, $logFileName, $deleteExistingIndex);
                     break;
 
                 case 'progress':
-                    $statusText = file_get_contents($filePath . '.txt');
-                    //$status = $this->status;
-                    //$status['progress'] = $progress;
                     break;
 
                 default:
@@ -375,8 +373,23 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         catch (Exception $e)
         {
             $statusText = $e->getMessage();
+            $response = json_encode($statusText);
+            echo $response;
+            return;
         }
 
+        if ($action != 'progress')
+        {
+            $executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
+            $mem2 = memory_get_usage() / MB_BYTES;
+            $used = $mem2 - $mem1;
+            $peak = memory_get_peak_usage() /  MB_BYTES;
+            $this->logEvent(__('Memory used: %s MB', number_format($used, 2)));
+            $this->logEvent(__('Peak usage: %s MB', number_format($peak, 2)));
+            $this->logEvent(__('Execution time: %s seconds', $executionTime));
+        }
+
+        $statusText = file_get_contents($logFileName);
         $response = json_encode($statusText);
         echo $response;
     }
@@ -395,19 +408,19 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         $this->status['events'][] = $eventMessage;
         $this->eventMessages .= '<BR/>' . $eventMessage;
-        file_put_contents($this->statusFileName, $this->eventMessages);
+        file_put_contents($this->logFileName, $this->eventMessages);
     }
 
-    protected function logStart()
+    protected function logStart($message)
     {
-        $this->eventMessages = 'START';
-        file_put_contents($this->statusFileName, $this->eventMessages);
+        $this->eventMessages = $message;
+        file_put_contents($this->logFileName, $this->eventMessages);
     }
 
-    public function performBulkIndexExport($fileName, $limit = 0)
+    public function performBulkIndexExport($dataFileName, $logFileName, $limit = 0)
     {
-        $this->statusFileName = $fileName. '.txt';
-        $this->logStart();
+        $this->logFileName = $logFileName;
+        $this->logStart(__('Start exporting'));
 
         $json = '';
         $this->cacheInstallationParameters();
@@ -497,45 +510,46 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // Write the JSON data to a file.
         $fileSize = number_format(strlen($json) / MB_BYTES, 2);
-        $this->logEvent(__('Write data to %s (%s MB)', $fileName, $fileSize));
-        file_put_contents($fileName, "[$json]");
+        $this->logEvent(__('Write data to %s (%s MB)', $dataFileName, $fileSize));
+        file_put_contents($dataFileName, "[$json]");
 
         return $this->status;
     }
 
-    public function performBulkIndexImport($filename, $deleteExistingIndex)
+    public function performBulkIndexImport($dataFileName, $logFileName, $deleteExistingIndex)
     {
-        $this->logEvent(__('Begin bulk import'));
+        $this->logFileName = $logFileName;
+        $this->logStart(__('Start importing'));
 
-        // Verify that the import file exists.
-        if (!file_exists($filename))
-        {
-            $this->logError(__("File %s was not found", $filename));
-            return $this->status;
-        }
-
-        // Delete the existing index if requested.
-        if ($deleteExistingIndex)
-        {
-            if (!$this->createNewIndex())
-            {
-                return $this->status;
-            }
-        }
-
-        // Read the index file into an array of AvantElasticsearchDocument objects.
-        $this->batchDocuments = json_decode(file_get_contents($filename), false);
-        $this->batchDocumentsCount = count($this->batchDocuments);
-
-        // Build a list of document sizes.
-        foreach ($this->batchDocuments as $document)
-        {
-            $this->batchDocumentsSizes[] = strlen(json_encode($document));
-        }
-
-        // Perform the actual indexing.
-        $this->logEvent(__('Begin indexing %s documents', $this->batchDocumentsCount));
-        $this->performBulkIndexImportBatches();
+//        // Verify that the import file exists.
+//        if (!file_exists($filename))
+//        {
+//            $this->logError(__("File %s was not found", $filename));
+//            return $this->status;
+//        }
+//
+//        // Delete the existing index if requested.
+//        if ($deleteExistingIndex)
+//        {
+//            if (!$this->createNewIndex())
+//            {
+//                return $this->status;
+//            }
+//        }
+//
+//        // Read the index file into an array of AvantElasticsearchDocument objects.
+//        $this->batchDocuments = json_decode(file_get_contents($filename), false);
+//        $this->batchDocumentsCount = count($this->batchDocuments);
+//
+//        // Build a list of document sizes.
+//        foreach ($this->batchDocuments as $document)
+//        {
+//            $this->batchDocumentsSizes[] = strlen(json_encode($document));
+//        }
+//
+//        // Perform the actual indexing.
+//        $this->logEvent(__('Begin indexing %s documents', $this->batchDocumentsCount));
+//        $this->performBulkIndexImportBatches();
 
         return $this->status;
     }

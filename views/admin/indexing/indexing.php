@@ -1,122 +1,70 @@
 <?php
 
 $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-$fileDefault =  date('md') . '-' . ElasticsearchConfig::getOptionValueForContributorId();
-$fileName = isset($_REQUEST['file']) ? $_REQUEST['file'] : $fileDefault;
-$filePath = $avantElasticsearchIndexBuilder->getIndexDataFilename($fileName);
-$url = WEB_ROOT . '/admin/elasticsearch/indexing';
-
 
 if (AvantCommon::isAjaxRequest())
 {
-    ini_set('max_execution_time', 1200);
+    // This page just got called to handle an asynchronous Ajax request. Execute the request synchronously,
+    // waiting here until it completes (when handleAjaxRequest returns). When ths page returns,  the request's
+    // success function will execute in the browser (or its error function if something went wrong).
+    // Give the request plenty of time to execute since it can take several minutes.
+    ini_set('max_execution_time', 10 * 60);
     $avantElasticsearchIndexBuilder->handleAjaxRequest();
     return;
 }
 
-$status['events'] = array();
+$pageTitle = __('Elasticsearch Indexing');
+echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 
+// Initialize the action options.
+$options = array(
+    'none' => 'No Action',
+    'export_all' => 'Export all items from Omeka',
+    'export_some' => 'Export 100 items from Omeka',
+    'import_update' =>'Import into existing index',
+    'import_new' => 'Import into new index'
+    );
+
+// Warn if this session is running in the debugger because simultaneous Ajax requests won't work while debugging.
+if (isset($_COOKIE['XDEBUG_SESSION']))
+{
+    echo '<div class="health-report-error">XDEBUG_SESSION in progress. Simultaneous Ajax requests will not work properly.<br/>';
+    echo '<a href="http://localhost/omeka-2.6/?XDEBUG_SESSION_STOP" target="_blank">Click here to stop debugging</a>';
+    echo '</div>';
+}
+
+// Display the cluster health.
 $avantElasticsearchClient = new AvantElasticsearchClient();
-$avantElasticsearchDocument = new AvantElasticsearchDocument(null);
-
 $health = $avantElasticsearchClient->getHealth();
 $healthReport = $health['message'];
 $healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error') . '"';
+echo "<div$healthReportClass>$healthReport</div>";
 
+// Display whether the server supports PDF searching.
+$avantElasticsearchDocument = new AvantElasticsearchDocument(null);
 $pdfToTextIsSupported = $avantElasticsearchDocument->pdfSearchingIsSupported();
 $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'error') . '"';
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
-
-$pageTitle = __('Elasticsearch Indexing');
-$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : 'none';
-
-if (isset($_REQUEST['new']) && $_REQUEST['new'] == 'true')
-{
-    // This is a dangerous action, so make sure the admin really wants to destroy the current index.
-    $options['import_new'] = 'Import into new index';
-}
-else
-{
-    $options = array(
-        'none' => 'No Action',
-        'export_all' => 'Export all items from Omeka',
-        'export_some' => 'Export 100 items from Omeka',
-        'import_update' =>'Import into existing index (add &new=true to the query string to create a new index)'
-    );
-}
-
-$mem1 = memory_get_usage() / MB_BYTES;
-$errorMessage = '';
-
-echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
-
-if (isset($_COOKIE['XDEBUG_SESSION']))
-{
-    echo '<div class="health-report-error">YOU ARE DEBUGGING</div>';
-}
-echo "<div$healthReportClass>$healthReport</div>";
 echo "<div$pdfReportClass>$pdfSupportReport</div>";
 
+// Display the action radio buttons and the Start button.
 if ($avantElasticsearchClient->ready())
 {
+    $filePrefix =  date('md') . '-' . ElasticsearchConfig::getOptionValueForContributorId();
     echo "<hr/>";
     echo '<div class="indexing-radio-buttons">';
     echo $this->formRadio('action', 'none', null, $options);
     echo '</div>';
-    echo '<div>File: ' . $this->formText('file', $fileName, array('size' => '12', 'id' => 'file')). '</div>';
+    echo '<div>File: ' . $this->formText('file', $filePrefix, array('size' => '12', 'id' => 'file')). '</div>';
     echo "<button id='start-button'>Start</button>";
     echo '<div id="status-area"></div>';
 }
-else
-{
-    $action = 'none';
-}
-
-$eventsMessages = '';
-
-if ($action != 'none')
-{
-    $hasError = isset($status['error']);
-    $errorMessage = $hasError ? $status['error'] : '';
-    foreach ($status['events'] as $eventMessage)
-    {
-        $eventsMessages .= $eventMessage . '<br/>';
-    }
-}
-
-$executionTime = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
-
-if ($action != 'none')
-{
-    echo "<div class='health-report-ok'>$eventsMessages</div>";
-    if (empty($errorMessage))
-    {
-        echo '<hr/>';
-        echo "<div class='health-report-ok'>SUCCESS</div>";
-    }
-    else
-    {
-        echo "<div class='health-report-error'>$errorMessage</div>";
-    }
-    echo '<hr/>';
-    echo "<div>$options[$action]</br>Execution time: $executionTime seconds</div>";
-}
-
-$mem2 = memory_get_usage() / MB_BYTES;
-$used = $mem2 - $mem1;
-$peak = memory_get_peak_usage() /  MB_BYTES;
-echo "<hr/>";
-echo '<div>';
-if ($action != 'none')
-{
-    echo 'Memory used: ' . number_format($used, 2) . ' MB</br>';
-    echo 'Peak usage: ' . number_format($peak, 2) . ' MB</br>';
-}
-echo "File name: $filePath";
-echo '</div>';
-
 echo foot();
+
+// Form the URL for this page which is the same page that satisfies the Ajax requests.
+$url = WEB_ROOT . '/admin/elasticsearch/indexing';
 ?>
+
 <script type="text/javascript">
     jQuery(document).ready(function ()
     {
@@ -140,23 +88,31 @@ echo foot();
         {
             enableStartButton(false);
 
+            // Set up the handlers that respond to radio button and Start button clicks.
             action.change(function (e)
             {
                 // The admin has selected a different radio button.
                 var checkedButton = jQuery("input[name='action']:checked");
                 selectedAction = checkedButton.val();
+                if (selectedAction === 'import_new')
+                {
+                    if (!confirm("Are you sure you want to create a new index?"))
+                        return;
+                }
                 enableStartButton(selectedAction !== 'none');
             });
 
-            startButton.on("click", function ()
+            startButton.on("click", function()
             {
+                if (!confirm("The current index will be deleted. Are you sure?"))
+                    return;
                 startIndexing();
             });
         }
 
         function reportProgress()
         {
-            // Call back to the server to get the status of the indexing action.
+            // Call back to the server (this page) to get the status of the indexing action.
             // The server returns the complete status since the action began, not just what has since transpired.
             jQuery.ajax(
                 url,
@@ -194,8 +150,8 @@ echo foot();
             statusArea.html('');
             progressTimer = setTimeout(reportProgress, 1000);
 
-            // Call back to the server to initiate the indexing action. This can take several minutes to complete.
-            // In the meantime, the reportProgress function is called periodically to get the status of the action.
+            // Call back to the server (this page) to initiate the indexing action which can take several minutes.
+            // While waiting, the reportProgress function is called on a timer to get the status of the action.
             jQuery.ajax(
                 url,
                 {
