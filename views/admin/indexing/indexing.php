@@ -71,12 +71,6 @@ else
 {
     $operation = 'none';
 }
-?>
-<div id="dialog" title="Indexing">
-    <div class="progress-label">Begin indexing...</div>
-    <div id="progressbar"></div>
-</div>
-<?php
 
 $eventsMessages = '';
 
@@ -123,35 +117,67 @@ echo '</div>';
 
 echo foot();
 ?>
-<style>
-    #progressbar {
-        margin-top: 20px;
-    }
-
-    .progress-label {
-        font-weight: bold;
-        text-shadow: 1px 1px 0 #fff;
-    }
-
-    .ui-dialog-titlebar-close {
-        display: none;
-    }
-</style>
 <script type="text/javascript">
     jQuery(document).ready(function ()
     {
+        var fileName = jQuery("#file").val();
         var startButton = jQuery("#start-button").button();
         var statusArea = jQuery("#status-area");
         var selectedOperation = 'none';
         var url = '<?php echo $url; ?>';
         var progressCount = 0;
         var done = false;
+        var progressTimer;
 
         enableStartButton(false);
+        initialize();
 
         function enableStartButton(enable)
         {
             startButton.button("option", {disabled: !enable});
+        }
+
+        function initialize()
+        {
+            jQuery("input[name='operation']").change(function (e)
+            {
+                // The admin has selected a different radio button.
+                var checkedButton = jQuery("input[name='operation']:checked");
+                selectedOperation = checkedButton.val();
+                enableStartButton(selectedOperation !== 'none');
+            });
+
+            startButton.on("click", function ()
+            {
+                startIndexing();
+            });
+        }
+
+        function progress()
+        {
+            jQuery.ajax(
+                url,
+                {
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'progress',
+                        file_name: fileName
+                    },
+                    success: function (data)
+                    {
+                        showStatus(data);
+                        if (!done)
+                        {
+                            progressTimer = setTimeout(progress, 3000);
+                        }
+                    },
+                    error: function (request, status, error)
+                    {
+                        alert('AJAX ERROR on progress' + ' >>> ' + error);
+                    }
+                }
+            );
         }
 
         function showStatus(status)
@@ -159,129 +185,32 @@ echo foot();
             statusArea.html(status);
         }
 
-        jQuery("input[name='operation']").change(function (e)
+        function startIndexing()
         {
-            // The admin has selected a different radio button.
-            var checkedButton = jQuery("input[name='operation']:checked");
-            selectedOperation = checkedButton.val();
-            enableStartButton(selectedOperation !== 'none');
-        });
-
-        jQuery(function () {
-            var fileName = jQuery("#file").val();
-
-            var progressTimer,
-                progressbar = jQuery("#progressbar"),
-                progressLabel = jQuery(".progress-label"),
-                dialogButtons = [{
-                    text: "Cancel Download",
-                    click: closeDownload
-                }],
-                dialog = jQuery("#dialog").dialog({
-                    autoOpen: false,
-                    closeOnEscape: false,
-                    resizable: false,
-                    buttons: dialogButtons,
-                    open: function ()
-                    {
-                        progressTimer = setTimeout(progress, 2000);
+            enableStartButton(false);
+            progressTimer = setTimeout(progress, 1000);
+            statusArea.html('');
+            
+            jQuery.ajax(
+                url,
+                {
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: selectedOperation,
+                        file_name: fileName
                     },
-                    beforeClose: function () {
-                        startButton.button("option", {
-                            disabled: false,
-                            label: "Start"
-                        });
+                    success: function (data) {
+                        done = true;
+                        showStatus(data);
+                        enableStartButton(true);
+                    },
+                    error: function (request, status, error) {
+                        alert('AJAX ERROR on ' + selectedOperation + ' >>> ' + error);
                     }
-                }),
-                downloadButton = jQuery("#start-button")
-                    .button()
-                    .on("click", function () {
-                        startButton.button("option", {
-                            disabled: true
-                        });
-                        //dialog.dialog("open");
-                        progressCount = 0;
-                        progressTimer = setTimeout(progress, 1000);
-                        statusArea.html('Starting...');
-                        jQuery.ajax(
-                            url,
-                            {
-                                method: 'POST',
-                                dataType: 'json',
-                                data: {
-                                    action: selectedOperation,
-                                    file_name: fileName
-                                },
-                                success: function (data)
-                                {
-                                    done = true;
-                                    showStatus(data);
-                                    enableStartButton(true);
-                                },
-                                error: function (request, status, error)
-                                {
-                                    alert('AJAX ERROR on ' + selectedOperation + ' >>> ' + error);
-                                }
-                            }
-                        );
-                    });
-
-            progressbar.progressbar({
-                value: false,
-                change: function () {
-                    progressLabel.text("Current Progress: " + progressbar.progressbar("value") + "%");
-                },
-                complete: function () {
-                    progressLabel.text("Complete!");
-                    dialog.dialog("option", "buttons", [{
-                        text: "Close",
-                        click: closeDownload
-                    }]);
-                    jQuery(".ui-dialog button").last().trigger("focus");
                 }
-            });
-
-            function progress()
-            {
-                progressCount++;
-                console.log('Called progress ' + progressCount);
-                jQuery.ajax(
-                    url,
-                    {
-                        method: 'POST',
-                        dataType: 'json',
-                        data: {
-                            action: 'progress',
-                            file_name: fileName
-                        },
-                        success: function (data)
-                        {
-                            console.log('progress responded');
-                            showStatus(data);
-                            if (!done)
-                            {
-                                progressTimer = setTimeout(progress, 3000);
-                            }
-                        },
-                        error: function (request, status, error)
-                        {
-                            alert('AJAX ERROR on progress' + ' >>> ' + error);
-                        }
-                    }
-                );
-            }
-
-            function closeDownload() {
-                clearTimeout(progressTimer);
-                dialog
-                    .dialog("option", "buttons", dialogButtons)
-                    .dialog("close");
-                progressbar.progressbar("value", false);
-                progressLabel
-                    .text("Starting download...");
-                downloadButton.trigger("focus");
-            }
-        });
+            );
+        }
     });
 </script>
 
