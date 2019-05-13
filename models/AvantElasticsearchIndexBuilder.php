@@ -10,7 +10,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $batchDocumentsCount;
     protected $batchDocumentsSizes = array();
     protected $batchDocumentsTotalSize;
+    protected $eventMessages;
     protected $status;
+    protected $statusFileName;
 
     public function __construct()
     {
@@ -340,11 +342,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $action = isset($_POST['action']) ? $_POST['action'] : 0;
         $fileName = isset($_POST['file_name']) ? $_POST['file_name'] : 'xxx';
         $filePath = $this->getIndexDataFilename($fileName);
-        $status['events'] = array();
-        $status['message'] = '';
-        $status['error'] = '';
-        $status['events'][] = 'E1';
-        $status['events'][] = 'E2';
+        $statusText = 'ABC';
 
         try
         {
@@ -353,7 +351,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'export_all':
                 case 'export_some':
                     $limit = $action == 'export_all' ? 0 : 100;
-                    $status = $this->performBulkIndexExport($filePath, $limit);
+                    //$status = $this->performBulkIndexExport($filePath, $limit);
+                    $this->performBulkIndexExport($filePath, $limit);
+                    $statusText = file_get_contents($filePath . '.txt');
                     break;
 
                 case 'import_new':
@@ -363,21 +363,21 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     break;
 
                 case 'progress':
-                    //$progress = rand (0, 99);
-                    $progress = intval(file_get_contents($filePath . '.txt'));
-                    $status['progress'] = $progress;
+                    $statusText = file_get_contents($filePath . '.txt');
+                    //$status = $this->status;
+                    //$status['progress'] = $progress;
                     break;
 
                 default:
-                    $status['error'] = 'Unexpected action: ' . $action;
+                    $statusText = 'Unexpected action: ' . $action;
             }
         }
         catch (Exception $e)
         {
-            $status['error'] = $e->getMessage();
+            $statusText = $e->getMessage();
         }
 
-        $response = json_encode($status);
+        $response = json_encode($statusText);
         echo $response;
     }
 
@@ -394,19 +394,30 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function logEvent($eventMessage)
     {
         $this->status['events'][] = $eventMessage;
+        $this->eventMessages .= '<BR/>' . $eventMessage;
+        file_put_contents($this->statusFileName, $this->eventMessages);
+    }
+
+    protected function logStart()
+    {
+        $this->eventMessages = 'START';
+        file_put_contents($this->statusFileName, $this->eventMessages);
     }
 
     public function performBulkIndexExport($fileName, $limit = 0)
     {
+        $this->statusFileName = $fileName. '.txt';
+        $this->logStart();
+
         $json = '';
         $this->cacheInstallationParameters();
 
-        file_put_contents($fileName . '.txt', 10);
-
         // Get all the items for this installation.
+        $this->logEvent(__('Fetch items from SQL database'));
         $items = $this->fetchAllItems();
 
         // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
+        $this->logEvent(__('Fetch element texts from SQL database'));
         $files = $this->fetchAllFiles();
         $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems();
 
@@ -423,7 +434,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         for ($index = 0; $index < $itemsCount; $index++)
         {
-            file_put_contents($fileName . '.txt', intval(($index / $itemsCount) * 100));
+            if ($index % 500 == 0)
+            {
+                $this->logEvent(__('Exporting items %s - %s', $index + 1, $index + 500));
+            }
 
             $itemId = $items[$index]->id;
 
@@ -484,7 +498,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->logEvent(__('Write data to %s (%s MB)', $fileName, $fileSize));
         file_put_contents($fileName, "[$json]");
 
-        file_put_contents($fileName . '.txt', 100);
         return $this->status;
     }
 

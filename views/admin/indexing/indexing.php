@@ -145,6 +145,7 @@ echo foot();
         var selectedOperation = 'none';
         var url = '<?php echo $url; ?>';
         var progressCount = 0;
+        var done = false;
 
         enableStartButton(false);
 
@@ -155,17 +156,7 @@ echo foot();
 
         function showStatus(status)
         {
-            var error  = typeof status.error === 'undefined' ? '' : status.error;
-            var message  = typeof status.message === 'undefined' ? '' : status.message;
-            var eventMessage = '';
-            var eventCount =  typeof status.events === 'undefined' ? 0 : status.events.length;
-
-            for (i = 0; i < eventCount; i++)
-            {
-                eventMessage += status.events[i];
-                eventMessage += '<br/>';
-            }
-            statusArea.html(eventMessage);
+            statusArea.html(status);
         }
 
         jQuery("input[name='operation']").change(function (e)
@@ -193,7 +184,7 @@ echo foot();
                     buttons: dialogButtons,
                     open: function ()
                     {
-                        progressTimer = setTimeout(progress, 0);
+                        progressTimer = setTimeout(progress, 2000);
                     },
                     beforeClose: function () {
                         startButton.button("option", {
@@ -206,11 +197,12 @@ echo foot();
                     .button()
                     .on("click", function () {
                         startButton.button("option", {
-                            disabled: true,
-                            label: "Indexing..."
+                            disabled: true
                         });
-                        dialog.dialog("open");
-                        statusArea.html('ZZZZZ');
+                        //dialog.dialog("open");
+                        progressCount = 0;
+                        progressTimer = setTimeout(progress, 1000);
+                        statusArea.html('Starting...');
                         jQuery.ajax(
                             url,
                             {
@@ -222,7 +214,9 @@ echo foot();
                                 },
                                 success: function (data)
                                 {
+                                    done = true;
                                     showStatus(data);
+                                    enableStartButton(true);
                                 },
                                 error: function (request, status, error)
                                 {
@@ -262,15 +256,11 @@ echo foot();
                         },
                         success: function (data)
                         {
-                            var percent = data.progress;
-                            console.log('Percent = ' + percent);
-                            if (percent > 0)
+                            console.log('progress responded');
+                            showStatus(data);
+                            if (!done)
                             {
-                                progressbar.progressbar("value", percent);
-                            }
-                            if (percent <= 99)
-                            {
-                                progressTimer = setTimeout(progress, 1000);
+                                progressTimer = setTimeout(progress, 3000);
                             }
                         },
                         error: function (request, status, error)
