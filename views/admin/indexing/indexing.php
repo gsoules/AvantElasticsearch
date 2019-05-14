@@ -18,7 +18,6 @@ echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 
 // Initialize the action options.
 $options = array(
-    'none' => 'No Action',
     'export_all' => 'Export all items from Omeka',
     'export_some' => 'Export 100 items from Omeka',
     'import_existing' =>'Import into existing index',
@@ -50,10 +49,13 @@ echo "<div$pdfReportClass>$pdfSupportReport</div>";
 // Display the action radio buttons and the Start button.
 if ($avantElasticsearchClient->ready())
 {
-    $filePrefix =  date('md') . '-' . ElasticsearchConfig::getOptionValueForContributorId();
+    $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
+    $indexingId =  date('md') . '-' . $contributorId;
+    $indexName =  $contributorId;
     echo "<hr/>";
-    echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', 'none', null, $options) . '</div>';
-    echo '<div>File: ' . $this->formText('file', $filePrefix, array('size' => '12', 'id' => 'file')). '</div>';
+    echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', 'export_all', null, $options) . '</div>';
+    echo '<div><span style="display:inline-block;width:80px;">Index Name: </span><span>' . $this->formText(null, $indexName, array('size' => '12', 'id' => 'index-name')) . '</span></div>';
+    echo '<div><span style="display:inline-block;width:80px;">Indexing ID: </span><span>' . $this->formText(null, $indexingId, array('size' => '12', 'id' => 'indexing-id')) . '</span></div>';
     echo "<button id='start-button'>Start</button>";
     echo '<div id="status-area"></div>';
 }
@@ -67,8 +69,9 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
     jQuery(document).ready(function ()
     {
         var action = jQuery("input[name='action']");
-        var actionCompleted = false;
-        var fileName = jQuery("#file").val();
+        var actionInProgress = false;
+        var indexingId = jQuery("#indexing-id").val();
+        var indexingName = jQuery("#index-name").val();
         var progressCount = 0;
         var progressTimer;
         var selectedAction = 'none';
@@ -85,15 +88,12 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
         function initialize()
         {
-            enableStartButton(false);
-
             // Set up the handlers that respond to radio button and Start button clicks.
             action.change(function (e)
             {
                 // The admin has selected a different radio button.
                 var checkedButton = jQuery("input[name='action']:checked");
                 selectedAction = checkedButton.val();
-                enableStartButton(selectedAction !== 'none');
             });
 
             startButton.on("click", function()
@@ -109,7 +109,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
         function reportProgress()
         {
-            if (actionCompleted)
+            if (!actionInProgress)
                 return;
 
             console.log('reportProgress ' + ++progressCount);
@@ -123,12 +123,12 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     dataType: 'json',
                     data: {
                         action: 'progress',
-                        file_name: fileName
+                        indexing_id: indexingId
                     },
                     success: function (data)
                     {
                         showStatus(data);
-                        if (!actionCompleted)
+                        if (actionInProgress)
                         {
                             progressTimer = setTimeout(reportProgress, 2000);
                         }
@@ -148,9 +148,9 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
         function startIndexing()
         {
+            actionInProgress = true;
             enableStartButton(false);
             statusArea.html('');
-            actionCompleted = false;
 
             // Initiate periodic calls back to the server to get the status of the indexing action.
             progressCount = 0;
@@ -165,11 +165,12 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     dataType: 'json',
                     data: {
                         action: selectedAction,
-                        file_name: fileName
+                        index_name: indexingName,
+                        indexing_id: indexingId
                     },
                     success: function (data)
                     {
-                        actionCompleted = true;
+                        actionInProgress = false;
                         showStatus(data);
                         enableStartButton(true);
                     },
