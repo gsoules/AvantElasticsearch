@@ -368,6 +368,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
                 default:
                     $statusText = 'Unexpected action: ' . $action;
+                    $response = json_encode($statusText);
+                    echo $response;
+                    return;
             }
         }
         catch (Exception $e)

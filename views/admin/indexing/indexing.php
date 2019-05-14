@@ -21,7 +21,7 @@ $options = array(
     'none' => 'No Action',
     'export_all' => 'Export all items from Omeka',
     'export_some' => 'Export 100 items from Omeka',
-    'import_update' =>'Import into existing index',
+    'import_existing' =>'Import into existing index',
     'import_new' => 'Import into new index'
     );
 
@@ -52,9 +52,7 @@ if ($avantElasticsearchClient->ready())
 {
     $filePrefix =  date('md') . '-' . ElasticsearchConfig::getOptionValueForContributorId();
     echo "<hr/>";
-    echo '<div class="indexing-radio-buttons">';
-    echo $this->formRadio('action', 'none', null, $options);
-    echo '</div>';
+    echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', 'none', null, $options) . '</div>';
     echo '<div>File: ' . $this->formText('file', $filePrefix, array('size' => '12', 'id' => 'file')). '</div>';
     echo "<button id='start-button'>Start</button>";
     echo '<div id="status-area"></div>';
@@ -71,6 +69,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
         var action = jQuery("input[name='action']");
         var actionCompleted = false;
         var fileName = jQuery("#file").val();
+        var progressCount = 0;
         var progressTimer;
         var selectedAction = 'none';
         var startButton = jQuery("#start-button").button();
@@ -94,24 +93,27 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                 // The admin has selected a different radio button.
                 var checkedButton = jQuery("input[name='action']:checked");
                 selectedAction = checkedButton.val();
-                if (selectedAction === 'import_new')
-                {
-                    if (!confirm("Are you sure you want to create a new index?"))
-                        return;
-                }
                 enableStartButton(selectedAction !== 'none');
             });
 
             startButton.on("click", function()
             {
-                if (!confirm("The current index will be deleted. Are you sure?"))
-                    return;
+                if (selectedAction === 'import_new')
+                {
+                    if (!confirm('Are you sure you want to create a new index?\n\nThe current index will be DELETED.'))
+                        return;
+                }
                 startIndexing();
             });
         }
 
         function reportProgress()
         {
+            if (actionCompleted)
+                return;
+
+            console.log('reportProgress ' + ++progressCount);
+
             // Call back to the server (this page) to get the status of the indexing action.
             // The server returns the complete status since the action began, not just what has since transpired.
             jQuery.ajax(
@@ -128,7 +130,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                         showStatus(data);
                         if (!actionCompleted)
                         {
-                            progressTimer = setTimeout(reportProgress, 3000);
+                            progressTimer = setTimeout(reportProgress, 2000);
                         }
                     },
                     error: function (request, status, error)
@@ -148,6 +150,10 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
         {
             enableStartButton(false);
             statusArea.html('');
+            actionCompleted = false;
+
+            // Initiate periodic calls back to the server to get the status of the indexing action.
+            progressCount = 0;
             progressTimer = setTimeout(reportProgress, 1000);
 
             // Call back to the server (this page) to initiate the indexing action which can take several minutes.
