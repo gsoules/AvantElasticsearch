@@ -7,6 +7,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         parent::__construct();
 
+        // TO-DO: Set this dynamically based on which index is to be used for querying.
+        $this->setIndexName('omeka');
+
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
@@ -121,7 +124,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         $params = [
-            'index' => $this->getElasticsearchIndexName(),
+            'index' => $this->getIndexName(),
             'from' => $offset,
             'size' => $limit,
             'body' => $body
@@ -136,7 +139,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // The Elasticsearch documentation also says that performance is better when false.
 
         $params = [
-            'index' => 'omeka',
+            'index' => $this->getIndexName(),
             'body' => [
                 '_source' => [
                     'suggestions', 'item.title'
@@ -164,7 +167,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     public function constructTermAggregationsQueryParams($fieldName)
     {
         $params = [
-            'index' => 'omeka',
+            'index' => $this->getIndexName(),
             'body' => [
                 'size' => 0,
                 'aggregations' => [

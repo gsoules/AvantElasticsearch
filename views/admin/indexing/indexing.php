@@ -40,7 +40,7 @@ $healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error')
 echo "<div$healthReportClass>$healthReport</div>";
 
 // Display whether the server supports PDF searching.
-$avantElasticsearchDocument = new AvantElasticsearchDocument(null);
+$avantElasticsearchDocument = new AvantElasticsearchDocument();
 $pdfToTextIsSupported = $avantElasticsearchDocument->pdfSearchingIsSupported();
 $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'error') . '"';
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
@@ -53,7 +53,7 @@ if ($avantElasticsearchClient->ready())
     $indexingId =  date('md') . '-' . $contributorId;
     $indexName =  $contributorId;
     echo "<hr/>";
-    echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', 'export_all', null, $options) . '</div>';
+    echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', null, null, $options) . '</div>';
     echo '<div><span style="display:inline-block;width:80px;">Index Name: </span><span>' . $this->formText(null, $indexName, array('size' => '12', 'id' => 'index-name')) . '</span></div>';
     echo '<div><span style="display:inline-block;width:80px;">Indexing ID: </span><span>' . $this->formText(null, $indexingId, array('size' => '12', 'id' => 'indexing-id')) . '</span></div>';
     echo "<button id='start-button'>Start</button>";
@@ -68,15 +68,16 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 <script type="text/javascript">
     jQuery(document).ready(function ()
     {
-        var action = jQuery("input[name='action']");
-        var actionInProgress = false;
-        var indexingId = jQuery("#indexing-id").val();
-        var indexingName = jQuery("#index-name").val();
-        var progressCount = 0;
-        var progressTimer;
-        var selectedAction = 'none';
+        var actionButtons = jQuery("input[name='action']");
         var startButton = jQuery("#start-button").button();
         var statusArea = jQuery("#status-area");
+
+        var actionInProgress = false;
+        var indexingId = '';
+        var indexingName = '';
+        var progressCount = 0;
+        var progressTimer;
+        var selectedAction = '';
         var url = '<?php echo $url; ?>';
 
         initialize();
@@ -89,7 +90,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
         function initialize()
         {
             // Set up the handlers that respond to radio button and Start button clicks.
-            action.change(function (e)
+            actionButtons.change(function (e)
             {
                 // The admin has selected a different radio button.
                 var checkedButton = jQuery("input[name='action']:checked");
@@ -149,8 +150,11 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
         function startIndexing()
         {
             actionInProgress = true;
-            enableStartButton(false);
             statusArea.html('');
+            indexingId = jQuery("#indexing-id").val();
+            indexingName = jQuery("#index-name").val();
+
+            enableStartButton(false);
 
             // Initiate periodic calls back to the server to get the status of the indexing action.
             progressCount = 0;

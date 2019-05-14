@@ -27,12 +27,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $facetData = [];
     protected $htmlFields = [];
 
-    public function __construct($documentId)
+    public function __construct($indexName = '', $documentId = 0)
     {
         parent::__construct();
 
+        $this->setIndexName($indexName);
         $this->id = $documentId;
-        $this->index = $this->getElasticsearchIndexName();
+        $this->index = $indexName;
         $this->type = $this->getDocumentMappingType();
     }
 

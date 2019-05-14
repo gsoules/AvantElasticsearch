@@ -7,7 +7,7 @@ define('MB_BYTES', 1024 * 1024);
 
 class AvantElasticsearch
 {
-    protected $documentIndexName;
+    private $indexName;
     protected $indexOnlyPublicElements = true;
     
     // Used for caching and therefore should not be accessed directly by subclasses.
@@ -15,7 +15,6 @@ class AvantElasticsearch
 
     public function __construct()
     {
-        $this->documentIndexName = $this->getElasticsearchIndexName();
     }
 
     public function convertElementNameToElasticsearchFieldName($elementName)
@@ -38,11 +37,6 @@ class AvantElasticsearch
     public function getDocumentMappingType()
     {
         return '_doc';
-    }
-
-    public function getElasticsearchIndexName()
-    {
-        return 'omeka';
     }
 
     public function getDocumentIdForItem($identifier)
@@ -139,6 +133,16 @@ class AvantElasticsearch
         }
 
         return $this->elementsForIndex;
+    }
+
+    public function getIndexName()
+    {
+        return $this->indexName;
+    }
+
+    public function setIndexName($name)
+    {
+        $this->indexName = $name;
     }
 
     public function isJson($string)

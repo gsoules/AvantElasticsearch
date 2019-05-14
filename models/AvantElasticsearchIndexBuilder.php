@@ -30,7 +30,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $params = [
             'id' => $document->id,
-            'index' => $this->documentIndexName,
+            'index' => $this->getIndexName(),
             'type' => $document->type,
             'body' => $document->body
         ];
@@ -73,7 +73,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $actionsAndMetadata = [
                 'index' => [
-                    '_index' => $document->index,
+                    '_index' => $this->getIndexName(),
                     '_type'  => $document->type,
                 ]
             ];
@@ -90,7 +90,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($identifier);
-        $document = new AvantElasticsearchDocument($documentId);
+        $document = new AvantElasticsearchDocument($this->getIndexName(), $documentId);
 
         // Provide the document with data that has been cached here by the index builder to improve performance.
         $document->setInstallationParameters($this->installation);
@@ -116,7 +116,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if (!$this->avantElasticsearchClient->createIndex($params))
         {
-            $this->logWriteClientError();
+            $this->logClientError();
             return false;
         }
 
@@ -125,27 +125,25 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function createNewIndex()
     {
-        // TO-DO: Get the index name from configuration instead of hard-coded.
-        $indexName = 'omeka';
-
-        $params = ['index' => $this->documentIndexName];
+        $indexName = $this->getIndexName();
+        $params = ['index' => $indexName];
         if ($this->avantElasticsearchClient->deleteIndex($params))
         {
-            $this->logWriteEvent(__('Deleted index: %s', $indexName));
+            $this->logEvent(__('Deleted index: %s', $indexName));
         }
         else
         {
-            $this->logWriteClientError();
+            $this->logClientError();
             return false;
         }
 
         if ($this->createIndex($indexName))
         {
-            $this->logWriteEvent(__('Created new index: %s', $indexName));
+            $this->logEvent(__('Created new index: %s', $indexName));
         }
         else
         {
-            $this->logWriteClientError();
+            $this->logClientError();
             return false;
         }
 
@@ -167,7 +165,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $params = [
             'id' => $document->id,
-            'index' => $this->documentIndexName,
+            'index' => $this->getIndexName(),
             'type' => $document->type
         ];
 
@@ -382,7 +380,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     break;
 
                 case 'progress':
-                    $response = $this->logReadEvents($indexingId);
+                    $response = $this->readLog($indexingId);
                     break;
 
                 default:
@@ -401,10 +399,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $memoryEnd = memory_get_usage() / MB_BYTES;
             $memoryUsed = $memoryEnd - $memoryStart;
             $peakMemoryUsage = memory_get_peak_usage() /  MB_BYTES;
-            $this->logWriteEvent(__('Memory used: %s MB', number_format($memoryUsed, 2)));
-            $this->logWriteEvent(__('Peak usage: %s MB', number_format($peakMemoryUsage, 2)));
-            $this->logWriteEvent(__('Execution time: %s seconds', $executionSeconds));
-            $response = $this->logReadEvents($indexingId);
+            $this->logEvent(__('Memory used: %s MB', number_format($memoryUsed, 2)));
+            $this->logEvent(__('Peak usage: %s MB', number_format($peakMemoryUsage, 2)));
+            $this->logEvent(__('Execution time: %s seconds', $executionSeconds));
+            $response = $this->readLog($indexingId);
         }
 
         $response = json_encode($response);
@@ -413,53 +411,41 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function logCreateNew()
     {
-        // Create an empty log file.
-        file_put_contents($this->getIndexingLogFileName($this->indexingId), '');
+        // Create a new log file (overwrite an existing log file with the same name).
+        file_put_contents($this->getIndexingLogFileName($this->indexingId), date("Y-m-d H:i:s"));
     }
 
-    protected function logWriteClientError()
+    protected function logClientError()
     {
-        $this->logWriteError($this->avantElasticsearchClient->getLastError());
+        $this->logError($this->avantElasticsearchClient->getLastError());
     }
 
-    protected function logWriteError($errorMessage)
+    protected function logError($errorMessage)
     {
-        $this->logWriteEvent("<span class='health-report-error'>$errorMessage</span>");
+        $this->logEvent("<span class='health-report-error'>$errorMessage</span>");
     }
 
-    protected function logWriteEvent($eventMessage)
+    protected function logEvent($eventMessage)
     {
-        $event =  $eventMessage . '<BR/>';
+        $event =  '<BR/>' . $eventMessage;
         file_put_contents($this->getIndexingLogFileName($this->indexingId), $event, FILE_APPEND);
-    }
-
-    protected function logReadEvents($indexingId)
-    {
-        // The indexing Id gets passed because this method is called in response to an Ajax request for progress.
-        // Because the caller is running in a different instance of AvantElasticsearchIndexBuilder than the instance
-        // which is performing indexing, the caller's $this->indexingId class variable is not set for this method to
-        // use. All of the other log methods are for writing, and all are called only by the instance doing the
-        // indexing and that instance sets $this->indexingId when indexing first begins. Thus, the log write methods
-        // don't need the indexing Id parameter.
-        $logFileName = $this->getIndexingLogFileName($indexingId);
-        return file_get_contents($logFileName);
     }
 
     public function performBulkIndexExport($indexName, $indexingId, $limit = 0)
     {
         $this->indexingId = $indexingId;
         $this->logCreateNew();
-        $this->logWriteEvent(__('Start exporting'));
+        $this->logEvent(__('Start exporting'));
 
         $json = '';
         $this->cacheInstallationParameters();
 
         // Get all the items for this installation.
-        $this->logWriteEvent(__('Fetch items from SQL database'));
+        $this->logEvent(__('Fetch items from SQL database'));
         $items = $this->fetchAllItems();
 
         // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
-        $this->logWriteEvent(__('Fetch element texts from SQL database'));
+        $this->logEvent(__('Fetch element texts from SQL database'));
         $files = $this->fetchAllFiles();
         $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems();
 
@@ -472,7 +458,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $identifierElementId = ItemMetadata::getIdentifierElementId();
 
-        $this->logWriteEvent(__('Begin exporting %s items', $itemsCount));
+        $this->logEvent(__('Begin exporting %s items', $itemsCount));
 
         for ($index = 0; $index < $itemsCount; $index++)
         {
@@ -480,7 +466,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             if ($index % $logInterval == 0)
             {
                 $last = min($itemsCount, $index + $logInterval);
-                $this->logWriteEvent(__('Exporting items %s - %s', $index + 1, $last));
+                $this->logEvent(__('Exporting items %s - %s', $index + 1, $last));
             }
 
             $itemId = $items[$index]->id;
@@ -530,55 +516,58 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         // Report statistics.
-        $this->logWriteEvent(__('Export complete. %s items totaling %s MB', $itemsCount, number_format($documentSizeTotal / MB_BYTES, 2)));
-        $this->logWriteEvent(__('File Attachments:'));
+        $this->logEvent(__('Export complete. %s items totaling %s MB', $itemsCount, number_format($documentSizeTotal / MB_BYTES, 2)));
+        $this->logEvent(__('File Attachments:'));
         foreach ($fileStats as $key => $fileStat)
         {
-            $this->logWriteEvent(__('%s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
+            $this->logEvent(__('%s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
         }
 
         // Write the JSON data to a file.
         $fileSize = number_format(strlen($json) / MB_BYTES, 2);
         $dataFileName = $this->getIndexingDataFileName($this->indexingId);
-        $this->logWriteEvent(__('Write data to %s (%s MB)', $dataFileName, $fileSize));
+        $this->logEvent(__('Write data to %s (%s MB)', $dataFileName, $fileSize));
         file_put_contents($dataFileName, "[$json]");
     }
 
     public function performBulkIndexImport($indexName, $indexingId, $deleteExistingIndex)
     {
+        $this->setIndexName($indexName);
         $this->indexingId = $indexingId;
         $this->logCreateNew();
-        $this->logWriteEvent(__('Start importing'));
+        $this->logEvent(__('Start importing'));
 
-//        // Verify that the import file exists.
-//        if (!file_exists($fileName))
-//        {
-//            $this->logError(__("File %s was not found", $fileName));
-//            return;
-//        }
-//
-//        // Delete the existing index if requested.
-//        if ($deleteExistingIndex)
-//        {
-//            if (!$this->createNewIndex())
-//            {
-//                return;
-//            }
-//        }
-//
-//        // Read the index file into an array of AvantElasticsearchDocument objects.
-//        $this->batchDocuments = json_decode(file_get_contents($fileName), false);
-//        $this->batchDocumentsCount = count($this->batchDocuments);
-//
-//        // Build a list of document sizes.
-//        foreach ($this->batchDocuments as $document)
-//        {
-//            $this->batchDocumentsSizes[] = strlen(json_encode($document));
-//        }
-//
-//        // Perform the actual indexing.
-//        $this->logEvent(__('Begin indexing %s documents', $this->batchDocumentsCount));
-//        $this->performBulkIndexImportBatches();
+        $dataFileName = $this->getIndexingDataFileName($indexingId);
+
+        // Verify that the import file exists.
+        if (!file_exists($dataFileName))
+        {
+            $this->logError(__("File %s was not found", $dataFileName));
+            return;
+        }
+
+        // Delete the existing index if requested.
+        if ($deleteExistingIndex)
+        {
+            if (!$this->createNewIndex())
+            {
+                return;
+            }
+        }
+
+        // Read the index file into an array of AvantElasticsearchDocument objects.
+        $this->batchDocuments = json_decode(file_get_contents($dataFileName), false);
+        $this->batchDocumentsCount = count($this->batchDocuments);
+
+        // Build a list of document sizes.
+        foreach ($this->batchDocuments as $document)
+        {
+            $this->batchDocumentsSizes[] = strlen(json_encode($document));
+        }
+
+        // Perform the actual indexing.
+        $this->logEvent(__('Begin indexing %s documents', $this->batchDocumentsCount));
+        $this->performBulkIndexImportBatches();
     }
 
     protected function performBulkIndexImportBatches()
@@ -619,13 +608,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $this->batchDocumentsTotalSize += $batchSize;
             $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
-            $this->logWriteEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start, $end, $batchSizeMb));
+            $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start, $end, $batchSizeMb));
 
             // Perform the actual indexing on this batch of documents.
             $documentBatchParams = $this->createDocumentBatchParams($start, $end);
             if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
             {
-                $this->logWriteClientError();
+                $this->logClientError();
                 return;
             }
 
@@ -634,6 +623,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         $totalSizeMb = number_format($this->batchDocumentsTotalSize / MB_BYTES, 2);
-        $this->logWriteEvent(__("%s documents indexed (%s MB)", $this->batchDocumentsCount, $totalSizeMb));
+        $this->logEvent(__("%s documents indexed (%s MB)", $this->batchDocumentsCount, $totalSizeMb));
+    }
+
+    protected function readLog($indexingId)
+    {
+        // The indexing Id gets passed because this method is called in response to an Ajax request for progress.
+        // Because the caller is running in a different instance of AvantElasticsearchIndexBuilder than the instance
+        // which is performing indexing, the caller's $this->indexingId class variable is not set for this method to
+        // use. All of the other log methods are for writing, and all are called only by the instance doing the
+        // indexing and that instance sets $this->indexingId when indexing first begins. Thus, the log write methods
+        // don't need the indexing Id parameter.
+        $logFileName = $this->getIndexingLogFileName($indexingId);
+        return file_get_contents($logFileName);
     }
 }
