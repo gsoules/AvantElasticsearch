@@ -40,8 +40,7 @@ $healthReportClass = ' class="health-report-' . ($health['ok'] ? 'ok' : 'error')
 echo "<div$healthReportClass>$healthReport</div>";
 
 // Display whether the server supports PDF searching.
-$avantElasticsearchDocument = new AvantElasticsearchDocument();
-$pdfToTextIsSupported = $avantElasticsearchDocument->pdfSearchingIsSupported();
+$pdfToTextIsSupported = AvantElasticsearchDocument::pdfSearchingIsSupported();
 $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'error') . '"';
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
 echo "<div$pdfReportClass>$pdfSupportReport</div>";

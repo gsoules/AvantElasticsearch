@@ -27,7 +27,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $facetData = [];
     protected $htmlFields = [];
 
-    public function __construct($indexName = '', $documentId = 0)
+    public function __construct($indexName, $documentId)
     {
         parent::__construct();
 
@@ -319,7 +319,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $itemImageUrl;
     }
 
-    public function extractTextFromPdf($filepath)
+    public static function extractTextFromPdf($filepath)
     {
         $path = escapeshellarg($filepath);
 
@@ -407,7 +407,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 }
             }
 
-            $text = $this->extractTextFromPdf($filepath);
+            $text = self::extractTextFromPdf($filepath);
 
             if (!is_string($text))
             {
@@ -461,10 +461,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $urlData;
     }
 
-    public function pdfSearchingIsSupported()
+    public static function pdfSearchingIsSupported()
     {
         $path = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'pdftotext-test.pdf';
-        $pdfText = $this->extractTextFromPdf($path);
+        $pdfText = self::extractTextFromPdf($path);
         $pdfSearchingIsSupported = !empty($pdfText);
         return $pdfSearchingIsSupported;
     }
