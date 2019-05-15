@@ -53,17 +53,46 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     {
         if ($this->AvantSearchUsesElasticsearch() || get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))
         {
+            $item = $args['record'];
+
+            // Delete the item from the shared index.
             $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-            $avantElasticsearchIndexBuilder->deleteItemFromIndex($args['record']);
+            $avantElasticsearchIndexBuilder->setIndexName('omeka');
+            $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+
+            // Delete the item from the contributor's index.
+//            $avantElasticsearchIndexBuilder->setIndexName(<contributor-id>);
+//            $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
         }
     }
 
     public function hookAfterSaveItem($args)
     {
+        // This method is called when the admin either saves an existing item or adds a new item to the Omeka database.
+
         if ($this->AvantSearchUsesElasticsearch() || get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))
         {
+            $item = $args['record'];
+
             $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-            $avantElasticsearchIndexBuilder->addItemToIndex($args['record']);
+            $avantElasticsearchIndexBuilder->setIndexName('omeka');
+            if ($item->public)
+            {
+                // Save or add the item to the shared index.
+                $avantElasticsearchIndexBuilder->addItemToIndex($item);
+            }
+            else
+            {
+                // Attempt to delete this item from the shared index in case it was public and just got saved as
+                // not public. If the item was already not public, then it won't be in the shared index and the
+                // delete will fail, but that's okay.
+                $okIfMissing = true;
+                $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $okIfMissing);
+            }
+
+            // Save or add the item to the contributor's  index.
+//            $avantElasticsearchIndexBuilder->setIndexName(<contributor-id>);
+//            $avantElasticsearchIndexBuilder->addItemToIndex($item);
         }
     }
 
