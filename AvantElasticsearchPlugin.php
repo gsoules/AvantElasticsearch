@@ -51,18 +51,27 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookAfterDeleteItem($args)
     {
-        if ($this->AvantSearchUsesElasticsearch() || get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))
+        $sharingPublicItems = get_option(ElasticsearchConfig::OPTION_ES_SHARE);
+        if ($this->AvantSearchUsesElasticsearch() || $sharingPublicItems)
         {
             $item = $args['record'];
+            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
 
             // Delete the item from the shared index.
-            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-            $avantElasticsearchIndexBuilder->setIndexName('omeka');
-            $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+            if ($sharingPublicItems)
+            {
+                $sharedIndexName = $avantElasticsearchIndexBuilder->getIndexNameForSharing();
+                $avantElasticsearchIndexBuilder->setIndexName($sharedIndexName);
+                $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+            }
 
-            // Delete the item from the contributor's index.
-//            $avantElasticsearchIndexBuilder->setIndexName(<contributor-id>);
-//            $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+            // Delete the item from the contributor's index. See comments in hookAfterSaveItem re empty index name.
+            $contributorIndexName = ElasticsearchConfig::getOptionValueForContributorId();
+            if (!empty($contributorIndexName))
+            {
+                $avantElasticsearchIndexBuilder->setIndexName($contributorIndexName);
+//              $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+            }
         }
     }
 
@@ -70,29 +79,40 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     {
         // This method is called when the admin either saves an existing item or adds a new item to the Omeka database.
 
-        if ($this->AvantSearchUsesElasticsearch() || get_option(ElasticsearchConfig::OPTION_ES_STANDALONE))
+        $sharingPublicItems = get_option(ElasticsearchConfig::OPTION_ES_SHARE);
+        if ($this->AvantSearchUsesElasticsearch() || $sharingPublicItems)
         {
             $item = $args['record'];
-
             $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-            $avantElasticsearchIndexBuilder->setIndexName('omeka');
-            if ($item->public)
+
+            if ($sharingPublicItems)
             {
-                // Save or add the item to the shared index.
-                $avantElasticsearchIndexBuilder->addItemToIndex($item);
-            }
-            else
-            {
-                // Attempt to delete this item from the shared index in case it was public and just got saved as
-                // not public. If the item was already not public, then it won't be in the shared index and the
-                // delete will fail, but that's okay.
-                $okIfMissing = true;
-                $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $okIfMissing);
+                $sharedIndexName = $avantElasticsearchIndexBuilder->getIndexNameForSharing();
+                $avantElasticsearchIndexBuilder->setIndexName($sharedIndexName);
+                if ($item->public)
+                {
+                    // Save or add the item to the shared index.
+                    $avantElasticsearchIndexBuilder->addItemToIndex($item);
+                }
+                else
+                {
+                    // Attempt to delete this item from the shared index in case it was public and just got saved as
+                    // not public. If the item was already not public, then it won't be in the shared index and the
+                    // delete will fail, but that's okay.
+                    $okIfMissing = true;
+                    $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $okIfMissing);
+                }
             }
 
-            // Save or add the item to the contributor's  index.
-//            $avantElasticsearchIndexBuilder->setIndexName(<contributor-id>);
-//            $avantElasticsearchIndexBuilder->addItemToIndex($item);
+            // Save or add the item to the contributor's index. A blank contributor index name means that this site
+            // does not contribute any data to the shared site and does not use Elasticsearch to index its
+            // own data. This would be the case for a sharing-only site that exists only to search other collections.
+            $contributorIndexName = ElasticsearchConfig::getOptionValueForContributorId();
+            if (!empty($contributorIndexName))
+            {
+                $avantElasticsearchIndexBuilder->setIndexName($contributorIndexName);
+//              $avantElasticsearchIndexBuilder->addItemToIndex($item);
+            }
         }
     }
 

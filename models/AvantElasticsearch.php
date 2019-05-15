@@ -140,6 +140,17 @@ class AvantElasticsearch
         return $this->indexName;
     }
 
+    public function getIndexNameForContributor()
+    {
+        $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
+        return $contributorId;
+    }
+
+    public function getIndexNameForSharing()
+    {
+        return 'omeka';
+    }
+
     public function setIndexName($name)
     {
         $this->indexName = $name;

@@ -7,9 +7,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         parent::__construct();
 
-        // TO-DO: Set this dynamically based on which index is to be used for querying.
-        $this->setIndexName('omeka');
-
+        $this->setIndexName($this->getIndexName());
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
