@@ -7,7 +7,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         parent::__construct();
 
-        $this->setIndexName($this->getIndexName());
+        $this->setIndexName($this->getIndexNameForQuery());
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 

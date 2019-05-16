@@ -15,6 +15,9 @@ class AvantElasticsearch
 
     public function __construct()
     {
+        // Set the index name to an empty string rather than null. This way, an attempt to query Elasticsearch with no
+        // index will cause an exception. If the index is null, Elasticsearch apparently queries all of the indexes.
+        $this->indexName = '';
     }
 
     public function convertElementNameToElasticsearchFieldName($elementName)
@@ -86,7 +89,7 @@ class AvantElasticsearch
                 }
             }
         }
-        return $message;
+        return get_class($e) . '<br/>' . $message;
     }
 
     public function getElementsUsedByThisInstallation($public = true)
@@ -137,6 +140,7 @@ class AvantElasticsearch
 
     public function getIndexName()
     {
+        // Return the name of the index that is currently set for this object.
         return $this->indexName;
     }
 
@@ -146,9 +150,26 @@ class AvantElasticsearch
         return $contributorId;
     }
 
+    public function getIndexNameForQuery()
+    {
+        $showAll = isset($_COOKIE['SEARCH-ALL']) ? $_COOKIE['SEARCH-ALL'] == 'true' : false;
+        // check for all=on
+        // check for always sharing (no contributor)
+        // check for never sharing (share option not checked in config)
+        if ($showAll)
+            $indexName = $this->getIndexNameForSharing();
+        else
+            $indexName = $this->getIndexNameForContributor();
+
+        return $indexName;
+    }
+
     public function getIndexNameForSharing()
     {
-        return 'omeka';
+        $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
+        $configuration = new Zend_Config_Ini($configFile, 'config');
+        $sharedIndexName = $configuration->shared_index_name;
+        return $sharedIndexName;
     }
 
     public function setIndexName($name)
