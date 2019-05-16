@@ -51,7 +51,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookAfterDeleteItem($args)
     {
-        $sharingPublicItems = get_option(ElasticsearchConfig::OPTION_ES_SHARE);
+        $sharingPublicItems = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE);
         if ($this->AvantSearchUsesElasticsearch() || $sharingPublicItems)
         {
             $item = $args['record'];
@@ -79,7 +79,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
     {
         // This method is called when the admin either saves an existing item or adds a new item to the Omeka database.
 
-        $sharingPublicItems = get_option(ElasticsearchConfig::OPTION_ES_SHARE);
+        $sharingPublicItems = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE);
         if ($this->AvantSearchUsesElasticsearch() || $sharingPublicItems)
         {
             $item = $args['record'];
