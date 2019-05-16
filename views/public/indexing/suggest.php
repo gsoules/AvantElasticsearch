@@ -1,5 +1,9 @@
 <?php
+    // Get the text to show suggestions for.
     $prefix = isset($_REQUEST['term']) ? $_REQUEST['term'] : '';
+
+    // Determine whether the user is searching all sites.
+    $searchAll = isset($_REQUEST['all']) ? (bool)$_REQUEST['all'] : false;
 
     // Specify how many suggestions to return.
     $maxRequests = 7;
@@ -11,15 +15,7 @@
         return '';
     }
 
-    // Determine if the user is searching all sites.
-    $showAll = isset($_COOKIE['SEARCH-ALL']) ? $_COOKIE['SEARCH-ALL'] == 'true' : false;
-
     $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
-    if ($showAll)
-        $indexName = $avantElasticsearchQueryBuilder->getIndexNameForSharing();
-    else
-        $indexName = $avantElasticsearchQueryBuilder->getIndexNameForContributor();
-    $avantElasticsearchQueryBuilder->setIndexName($indexName);
     $avantElasticsearchSuggest = new AvantElasticsearchSuggest();
 
     $prefix = $avantElasticsearchSuggest->stripPunctuation($prefix);
@@ -45,12 +41,12 @@
     // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.
     $titles = array_unique($titles);
 
-    // Create an array of title/link pairs so that when the user chooses a suggestion they are effectively
-    // clicking a link to search for their selection.
+    // Create an array of title/link pairs so that when the user chooses a suggestion they are effectively clicking
+    // a link to search for their selection (as opposed to filling the search textbox with the suggestion text).
     foreach ($titles as $title)
     {
         $value = url('find?query=' . urlencode($title));
-        if ($showAll)
+        if ($searchAll)
         {
             $value .= '&all=on';
         }

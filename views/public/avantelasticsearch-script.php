@@ -1,30 +1,45 @@
 <script type="text/javascript">
 jQuery(document).ready(function()
 {
-    jQuery( function()
-    {
-        var searchAllCheckbox = jQuery('#all');
-        searchAllCheckbox.change(function (e)
-        {
-            var checked = searchAllCheckbox.is(":checked");
-            Cookies.set('SEARCH-ALL', checked, {expires: 7});
-        });
+    var searchAllCheckbox = jQuery('#all');
+    var suggestUrl = '<?php echo url('/elasticsearch/suggest'); ?>';
 
-        jQuery( "#query" ).autocomplete(
+    function searchAllIsChecked()
+    {
+        return searchAllCheckbox.is(":checked");
+    }
+
+    searchAllCheckbox.change(function (e)
+    {
+        Cookies.set('SEARCH-ALL', searchAllIsChecked(), {expires: 7});
+    });
+
+    jQuery( "#query" ).autocomplete(
+    {
+        source: function(request, response) {
+            jQuery.ajax({
+                url: suggestUrl,
+                dataType: "json",
+                data: {
+                    term : request.term,
+                    all : searchAllIsChecked() ? 1 : 0
+                },
+                success: function(data) {
+                    response(data);
+                }
+            });
+        },
+        select: function (e, ui)
         {
-            source: '<?php echo url('/elasticsearch/suggest'); ?>',
-            select: function (e, ui)
-            {
-                var query = ui.item.value;
-                window.location.href = ui.item.value;
-                return false;
-            },
-            focus: function (event, ui)
-            {
-                // Prevent the text of the item being hovered over from appearing in the search box.
-                return false;
-            }
-        });
+            var query = ui.item.value;
+            window.location.href = ui.item.value;
+            return false;
+        },
+        focus: function (event, ui)
+        {
+            // Prevent the text of the item being hovered over from appearing in the search box.
+            return false;
+        }
     });
 });
 </script>
