@@ -311,6 +311,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemFieldTexts;
     }
 
+    public function getElasticsearchFilesDirectoryName()
+    {
+        return FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch';
+    }
+
     protected function getIndexingDataFileName($indexingId)
     {
         return $this->getIndexingFileNamePrefix($indexingId) . '.json';
@@ -324,7 +329,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function getIndexingFileNamePrefix($indexingId)
     {
-        return FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $indexingId;
+        return $this->getElasticsearchFilesDirectoryName() . DIRECTORY_SEPARATOR . $indexingId;
     }
 
     protected function getItemFieldTexts($item)

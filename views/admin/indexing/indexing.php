@@ -27,7 +27,7 @@ $options = array(
 // Warn if this session is running in the debugger because simultaneous Ajax requests won't work while debugging.
 if (isset($_COOKIE['XDEBUG_SESSION']))
 {
-    echo '<div class="health-report-error">XDEBUG_SESSION in progress. Simultaneous Ajax requests will not work properly.<br/>';
+    echo '<div class="health-report-error">XDEBUG_SESSION in progress. Indexing status will not be reported in real-time.<br/>';
     echo '<a href="http://localhost/omeka-2.6/?XDEBUG_SESSION_STOP" target="_blank">Click here to stop debugging</a>';
     echo '</div>';
 }
@@ -45,8 +45,16 @@ $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'er
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
 echo "<div$pdfReportClass>$pdfSupportReport</div>";
 
+// Warn if the elasticsearch files directory does not exist.
+$esDirectoryName = $avantElasticsearchIndexBuilder->getElasticsearchFilesDirectoryName();
+$esDirectoryExists = file_exists($esDirectoryName);
+if (!$esDirectoryExists)
+{
+    echo '<div class="health-report-error">' . __("Elasticsearch folder '%s' is missing.", $esDirectoryName) . '</div>';
+}
+
 // Display the action radio buttons and the Start button.
-if ($avantElasticsearchClient->ready())
+if ($esDirectoryExists && $avantElasticsearchClient->ready())
 {
     $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
     $indexingId =  date('md') . '-' . $contributorId;
