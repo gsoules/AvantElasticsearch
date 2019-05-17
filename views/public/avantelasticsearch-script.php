@@ -22,7 +22,7 @@ jQuery(document).ready(function()
                 dataType: "json",
                 data: {
                     term : request.term,
-                    all : searchAllIsChecked() ? 1 : 0
+                    all : searchAllIsChecked() ? 'on' : 'off'
                 },
                 success: function(data) {
                     response(data);

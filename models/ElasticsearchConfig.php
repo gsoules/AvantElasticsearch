@@ -1,12 +1,13 @@
 <?php
 
 define('CONFIG_LABEL_ES_HOST', __('Host'));
-define('CONFIG_LABEL_ES_KEY', __('Key'));
 define('CONFIG_LABEL_ES_CONTRIBUTOR', __('Contributor'));
 define('CONFIG_LABEL_ES_CONTRIBTUOR_ID', __('Contributor Id'));
+define('CONFIG_LABEL_ES_KEY', __('Key'));
+define('CONFIG_LABEL_ES_LOCAL', __('Local Index'));
 define('CONFIG_LABEL_ES_REGION', __('Region'));
 define('CONFIG_LABEL_ES_SECRET', __('Secret'));
-define('CONFIG_LABEL_ES_SHARE', __('Share'));
+define('CONFIG_LABEL_ES_SHARE', __('Shared Index'));
 
 class ElasticsearchConfig extends ConfigOptions
 {
@@ -14,6 +15,7 @@ class ElasticsearchConfig extends ConfigOptions
     const OPTION_ES_CONTRIBUTOR_ID = 'avantelasticsearch_es_contributor_id';
     const OPTION_ES_HOST = 'avantelasticsearch_es_host';
     const OPTION_ES_KEY = 'avantelasticsearch_es_key';
+    const OPTION_ES_LOCAL = 'avantelasticsearch_es_local';
     const OPTION_ES_REGION = 'avantelasticsearch_es_region';
     const OPTION_ES_SECRET = 'avantelasticsearch_es_secret';
     const OPTION_ES_SHARE = 'avantelasticsearch_es_share';
@@ -57,6 +59,7 @@ class ElasticsearchConfig extends ConfigOptions
         self::saveOptionDataForRegion();
         self::saveOptionDataForSecret();
 
+        set_option(self::OPTION_ES_LOCAL, intval($_POST[self::OPTION_ES_LOCAL]));
         set_option(self::OPTION_ES_SHARE, intval($_POST[self::OPTION_ES_SHARE]));
     }
 
@@ -70,14 +73,11 @@ class ElasticsearchConfig extends ConfigOptions
         $optionName = self::OPTION_ES_CONTRIBUTOR_ID;
         $optionLabel = CONFIG_LABEL_ES_CONTRIBTUOR_ID;
         $value = self::getOptionText($optionName);
-        if (!empty($alue))
-        {
-            $value = strtolower($value);
-            self::errorIfEmpty($value, $optionName, $optionLabel);
-            $strippedValue = preg_replace('/[^a-z]/', '', $value);
-            $hasInvalidCharacters = $strippedValue != $value;
-            self::errorIf(strlen($value) < 3 || strlen($value) > 6 || $hasInvalidCharacters, $optionLabel, __('The value does not satisfy the rules for a contributor Id'));
-        }
+        $value = strtolower($value);
+        self::errorIfEmpty($value, $optionName, $optionLabel);
+        $strippedValue = preg_replace('/[^a-z]/', '', $value);
+        $hasInvalidCharacters = $strippedValue != $value;
+        self::errorIf(strlen($value) < 3 || strlen($value) > 6 || $hasInvalidCharacters, $optionLabel, __('The value does not satisfy the rules for a contributor Id'));
         set_option($optionName, $value);
     }
 

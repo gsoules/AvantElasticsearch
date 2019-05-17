@@ -8,7 +8,6 @@ define('MB_BYTES', 1024 * 1024);
 class AvantElasticsearch
 {
     protected $indexOnlyPublicElements = true;
-    protected $searchAll = null;
 
     // Should only be accessed via a getter or setter.
     private $indexName;
@@ -141,64 +140,22 @@ class AvantElasticsearch
         return $this->elementsForIndex;
     }
 
-    public function getIndexName()
+    public function getNameOfActiveIndex()
     {
         // Return the name of the index that is currently set for this object.
         return $this->indexName;
     }
 
-    public function getIndexNameForContributor()
+    public static function getNameOfLocalIndex()
     {
-        $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
-        return $contributorId;
+       return ElasticsearchConfig::getOptionValueForContributorId();
     }
 
-    public function getIndexNameForSharing()
+    public static function getNameOfSharedIndex()
     {
         $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
         $configuration = new Zend_Config_Ini($configFile, 'config');
-        $sharedIndexName = $configuration->shared_index_name;
-        return $sharedIndexName;
-    }
-
-    public function getSearchAll()
-    {
-        if (!isset($this->searchAll))
-        {
-            // Sharing turned off means only search the contributor index.
-            $searchAllNever = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE) == false;
-
-            // No contributor index means only search the shared index.
-            $searchAllAlways = empty($this->getIndexNameForContributor());
-
-            // all=on in the query string means search the shared index unless sharing is turned off.
-            $searchAllArg = isset($_REQUEST['all']) ? $_REQUEST['all'] == 'on' : false;
-
-            // The search-all cookie applies when there's nothing on the query string. This will apply when someone
-            // comes back to the site and the search-all checkbox has been automatically checked, but the user has
-            // not yet done a search and so there are no arguments in the query string.
-            $searchAllCookie = isset($_COOKIE['SEARCH-ALL']) ? $_COOKIE['SEARCH-ALL'] == 'true' : false;
-
-            // If none of the above apply, default to only searching the contributor index.
-            $this->searchAll = false;
-
-            // Test the conditions in precedence order.
-            if ($searchAllNever)
-                $this->searchAll = false;
-            else if ($searchAllAlways)
-                $this->searchAll = true;
-            else if ($searchAllArg)
-                $this->searchAll = $searchAllArg;
-            else if ($searchAllCookie)
-                $this->searchAll = $searchAllCookie;
-        }
-
-        return $this->searchAll;
-    }
-
-    public function setIndexName($name)
-    {
-        $this->indexName = $name;
+        return $configuration->shared_index_name;
     }
 
     public function isJson($string)
@@ -207,4 +164,55 @@ class AvantElasticsearch
         return (json_last_error() == JSON_ERROR_NONE);
     }
 
+    public function setIndexName($name)
+    {
+        $this->indexName = $name;
+    }
+
+    public static function useSharedIndexForQueries()
+    {
+        // Determine if queries should be performed on the shared index. If not, the local index will be used.
+
+        // Determine which indexes are enabled.
+        $sharedIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE) == true;
+        $localIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_LOCAL) == true;
+
+        // Test all conditions in precedence order, returning when a condition is true.
+        if (!($sharedIndexIsEnabled || $localIndexIsEnabled))
+        {
+            // Both indexes are disabled. This condition is meaningful when the AvantElasticsearch plugin is installed
+            // for the purpose of exporting the local data to a file, but the installation is still using SQL search.
+            // Normally this method would not get called in that situation, except during development/debugging, in
+            // which case the default is to search only the shared index since a local index might not yet exist.
+            $useSharedIndex = true;
+        }
+        else if (!$sharedIndexIsEnabled)
+        {
+            // Search the local index because the shared index is disabled.
+            $useSharedIndex = false;
+        }
+        else if (!$localIndexIsEnabled)
+        {
+            // Search the shared index because the local index is disabled.
+            $useSharedIndex = true;
+        }
+        else if (isset($_REQUEST['all']))
+        {
+            // all=on in the query string means search the shared index.
+            $useSharedIndex = $_REQUEST['all'] == 'on';
+        }
+        else if (isset($_COOKIE['SEARCH-ALL']))
+        {
+            // The the cookie is used when both indexes are enabled and there's no query string arg. This
+            // happens when someone comes back to the site after previously visiting and dropping the cookie.
+            $useSharedIndex = $_COOKIE['SEARCH-ALL'] == 'true';
+        }
+        else
+        {
+            // Both indexes are enabled, but there is no query string arg or cookie. Default to searching the local index.
+            $useSharedIndex = false;
+        }
+
+        return $useSharedIndex;
+    }
 }

@@ -2,9 +2,6 @@
     // Get the text to show suggestions for.
     $prefix = isset($_REQUEST['term']) ? $_REQUEST['term'] : '';
 
-    // Determine whether the user is searching all sites.
-    $searchAll = isset($_REQUEST['all']) ? (bool)$_REQUEST['all'] : false;
-
     // Specify how many suggestions to return.
     $maxRequests = 7;
 
@@ -40,14 +37,17 @@
 
     // Remove any duplicates. It's safer to do it here than by using the Elasticsearch skip_duplicates option.
     $titles = array_unique($titles);
+    $usingSharedIndex = $avantElasticsearchQueryBuilder->isUsingSharedIndex();
 
     // Create an array of title/link pairs so that when the user chooses a suggestion they are effectively clicking
     // a link to search for their selection (as opposed to filling the search textbox with the suggestion text).
     foreach ($titles as $title)
     {
         $value = url('find?query=' . urlencode($title));
-        if ($searchAll)
+        if ($usingSharedIndex)
         {
+            // Add a query string arg to indicate that this link is for the shared index. Without the arg, we'd
+            // have to rely on cookies to know, but a user could have cookies disabled,
             $value .= '&all=on';
         }
         $suggestions[] = (object) array('label' => $title, 'value' => $value);

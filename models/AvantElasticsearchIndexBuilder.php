@@ -30,7 +30,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $params = [
             'id' => $document->id,
-            'index' => $this->getIndexName(),
+            'index' => $this->getNameOfActiveIndex(),
             'type' => $document->type,
             'body' => $document->body
         ];
@@ -73,7 +73,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $actionsAndMetadata = [
                 'index' => [
-                    '_index' => $this->getIndexName(),
+                    '_index' => $this->getNameOfActiveIndex(),
                     '_type'  => $document->type,
                 ]
             ];
@@ -90,7 +90,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($identifier);
-        $document = new AvantElasticsearchDocument($this->getIndexName(), $documentId);
+        $document = new AvantElasticsearchDocument($this->getNameOfActiveIndex(), $documentId);
 
         // Provide the document with data that has been cached here by the index builder to improve performance.
         $document->setInstallationParameters($this->installation);
@@ -125,7 +125,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function createNewIndex()
     {
-        $indexName = $this->getIndexName();
+        $indexName = $this->getNameOfActiveIndex();
         $params = ['index' => $indexName];
         if ($this->avantElasticsearchClient->deleteIndex($params))
         {
@@ -161,11 +161,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         $documentId = $this->getDocumentIdForItem($identifier);
-        $document = new AvantElasticsearchDocument($this->getIndexName(), $documentId);
+        $document = new AvantElasticsearchDocument($this->getNameOfActiveIndex(), $documentId);
 
         $params = [
             'id' => $document->id,
-            'index' => $this->getIndexName(),
+            'index' => $this->getNameOfActiveIndex(),
             'type' => $document->type
         ];
 

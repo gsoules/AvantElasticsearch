@@ -51,6 +51,8 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookAfterDeleteItem($args)
     {
+
+
         $sharingPublicItems = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE);
         if ($this->AvantSearchUsesElasticsearch() || $sharingPublicItems)
         {
@@ -60,7 +62,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
             // Delete the item from the shared index.
             if ($sharingPublicItems)
             {
-                $sharedIndexName = $avantElasticsearchIndexBuilder->getIndexNameForSharing();
+                $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
                 $avantElasticsearchIndexBuilder->setIndexName($sharedIndexName);
                 $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
             }
@@ -87,7 +89,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
             if ($sharingPublicItems)
             {
-                $sharedIndexName = $avantElasticsearchIndexBuilder->getIndexNameForSharing();
+                $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
                 $avantElasticsearchIndexBuilder->setIndexName($sharedIndexName);
                 if ($item->public)
                 {
@@ -104,7 +106,7 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
                 }
             }
 
-            // Save or add the item to the contributor's index. A blank contributor index name means that this site
+            // Save or add the item to the local index. A blank contributor index name means that this site
             // does not contribute any data to the shared site and does not use Elasticsearch to index its
             // own data. This would be the case for a sharing-only site that exists only to search other collections.
             $contributorIndexName = ElasticsearchConfig::getOptionValueForContributorId();

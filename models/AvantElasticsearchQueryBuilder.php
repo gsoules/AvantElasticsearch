@@ -2,12 +2,14 @@
 class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 {
     protected $avantElasticsearchFacets;
+    protected $usingSharedIndex;
 
     public function __construct()
     {
         parent::__construct();
 
-        $indexName = $this->getSearchAll() ? $this->getIndexNameForSharing() : $this->getIndexNameForContributor();
+        $this->usingSharedIndex = AvantElasticsearch::useSharedIndexForQueries();
+        $indexName = $this->usingSharedIndex ? self::getNameOfSharedIndex() : self::getNameOfLocalIndex();
         $this->setIndexName($indexName);
 
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
@@ -105,7 +107,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         if (!$commingled)
         {
-            // Until support is in place for private contributor indexes, filter the results to only show those
+            // Until support is in place for searching the local index, filter the results to only show those
             // contributed by this installation.
             $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
             $filters[] = array('term' => ['item.contributor-id' => $contributorId]);
@@ -124,7 +126,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         $params = [
-            'index' => $this->getIndexName(),
+            'index' => $this->getNameOfActiveIndex(),
             'from' => $offset,
             'size' => $limit,
             'body' => $body
@@ -139,7 +141,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // The Elasticsearch documentation also says that performance is better when false.
 
         $params = [
-            'index' => $this->getIndexName(),
+            'index' => $this->getNameOfActiveIndex(),
             'body' => [
                 '_source' => [
                     'suggestions', 'item.title'
@@ -167,7 +169,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     public function constructTermAggregationsQueryParams($fieldName)
     {
         $params = [
-            'index' => $this->getIndexName(),
+            'index' => $this->getNameOfActiveIndex(),
             'body' => [
                 'size' => 0,
                 'aggregations' => [
@@ -193,5 +195,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     public function getFacetDefinitions()
     {
         return $this->avantElasticsearchFacets->getFacetDefinitions();
+    }
+
+    public function isUsingSharedIndex()
+    {
+        return $this->usingSharedIndex;
     }
 }

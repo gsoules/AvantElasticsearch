@@ -7,6 +7,10 @@ $host = ElasticsearchConfig::getOptionValueForHost();
 $key = ElasticsearchConfig::getOptionValueForKey();
 $region = ElasticsearchConfig::getOptionValueForRegion();
 $secret = ElasticsearchConfig::getOptionValueForSecret();
+
+$localIndexName = AvantElasticsearch::getNameOfLocalIndex();
+$sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
+
 $healthOk = false;
 
 $avantElasticserachClient = new AvantElasticsearchClient();
@@ -97,10 +101,20 @@ $healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '
 
 <div class="field">
     <div class="two columns alpha">
+        <label><?php echo CONFIG_LABEL_ES_LOCAL; ?></label>
+    </div>
+    <div class="inputs five columns omega">
+        <p class="explanation"><?php echo __("Enable shared index '%s'", $sharedIndexName); ?></p>
+        <?php echo $view->formCheckbox(ElasticsearchConfig::OPTION_ES_LOCAL, true, array('checked' => (boolean)get_option(ElasticsearchConfig::OPTION_ES_LOCAL))); ?>
+    </div>
+</div>
+
+<div class="field">
+    <div class="two columns alpha">
         <label><?php echo CONFIG_LABEL_ES_SHARE; ?></label>
     </div>
     <div class="inputs five columns omega">
-        <p class="explanation"><?php echo __('Share public items with other Digital Archive sites'); ?></p>
+        <p class="explanation"><?php echo __("Enable local index '%s'", $localIndexName); ?></p>
         <?php echo $view->formCheckbox(ElasticsearchConfig::OPTION_ES_SHARE, true, array('checked' => (boolean)get_option(ElasticsearchConfig::OPTION_ES_SHARE))); ?>
     </div>
 </div>
