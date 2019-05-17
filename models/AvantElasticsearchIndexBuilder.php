@@ -238,7 +238,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $items;
     }
 
-    protected function fetchFieldTextsForAllItems($public = true)
+    protected function fetchFieldTextsForAllItems($firstItemId, $lastItemId, $public = true)
     {
         // This method gets all element texts for all items in the database. It returns them as an array of item-field-texts.
         // * Each item-field-texts contains an array of field-texts, one for each of the item's elements.
@@ -275,7 +275,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 INNER JOIN
                   {$db->prefix}items AS items ON items.id = record_id
                 WHERE
-                  record_type = 'Item' 
+                  record_type = 'Item' AND record_id >= $firstItemId AND record_id <= $lastItemId
             ";
 
             if ($public)
@@ -380,14 +380,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'export-all':
                 case 'export-some':
                     $indexingAction = true;
-                    $limit = $action == 'export_all' ? 0 : 100;
+                    $limit = $action == 'export-all' ? 0 : 100;
                     $this->performBulkIndexExport($indexingId, $indexingOperation, $limit);
                     break;
 
                 case 'import-new':
                 case 'import-existing':
                     $indexingAction = true;
-                    $deleteExistingIndex = $action == 'import_new';
+                    $deleteExistingIndex = $action == 'import-new';
                     $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
                     break;
 
@@ -458,9 +458,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $items = $this->fetchAllItems();
 
         // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
-        $this->logEvent(__('Fetch element texts from SQL database'));
+        $this->logEvent(__('Fetch file information from SQL database'));
         $files = $this->fetchAllFiles();
-        $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems();
 
         $fileStats = array();
         $documentSizeTotal = 0;
@@ -473,13 +472,20 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $this->logEvent(__('Begin exporting %s items', $itemsCount));
 
+        $firstItemId = 0;
+        $lastItemId = 0;
+
         for ($index = 0; $index < $itemsCount; $index++)
         {
-            $logInterval = 1000;
-            if ($index % $logInterval == 0)
+            $chunkSize = 1000;
+            if ($index % $chunkSize == 0)
             {
-                $last = min($itemsCount, $index + $logInterval);
-                $this->logEvent(__('Exporting items %s - %s', $index + 1, $last));
+                $firstItemId = $index;
+                $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
+                $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
+
+                // Get all the field texts for this chunk
+                $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems($items[$firstItemId]->id, $items[$lastItemId]->id);
             }
 
             $itemId = $items[$index]->id;
