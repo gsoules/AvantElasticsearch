@@ -99,14 +99,14 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
                 }
                 else
                 {
-                    // Attempt to delete this non-public item from the shared index. It's an 'attempt' because we don't
-                    // know if the item is in the shared index, but if it is, it needs to get deleted. This logic
-                    // handles the case where the items was public, but the admin just unchecked the public box and
-                    // just now saved the item. When they save an item that is already non-public, the delete will fail
-                    // because the item is not in the shared index, but that's okay because we are telling the delete
-                    // method to ignore the error that will result from trying to delete a non-existent item.
-                    $okIfMissing = true;
-                    $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $okIfMissing);
+                    if ($args['insert'] == false)
+                    {
+                        // This non-public item is being saved. Attempt to delete it from the shared index. It's an
+                        // 'attempt' because we don't know if the item is in the shared index, but if it is, it needs to
+                        // get deleted. This logic handles the case where the items was public, but the admin just now
+                        // unchecked the public box and saved the item. If that's not the case, the delete has no effect.
+                        $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+                    }
                 }
             }
 

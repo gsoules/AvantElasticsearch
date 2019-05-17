@@ -150,7 +150,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return true;
     }
 
-    public function deleteItemFromIndex($item, $okayIfMissing = false)
+    public function deleteItemFromIndex($item)
     {
         $identifier = ItemMetadata::getItemIdentifier($item);
 
@@ -173,9 +173,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         {
             $errorMessage = $this->avantElasticsearchClient->getLastError();
             $className = get_class($this->avantElasticsearchClient->getLastException());
-            if ($className != 'Elasticsearch\Common\Exceptions\Missing404Exception' || !$okayIfMissing)
+            if ($className != 'Elasticsearch\Common\Exceptions\Missing404Exception')
             {
-                // TO-DO: Report this error to the user or log it and email it to the admin.
+                // TO-DO: Report this error to the user or silently log it and email it to the admin.
                 throw new Exception($errorMessage);
             }
         }
