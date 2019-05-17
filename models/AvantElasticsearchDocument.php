@@ -60,7 +60,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected function catentateElementTexts($fieldTexts)
     {
         // Get the element's text and catentate them into a single string separate by EOL breaks.
-        // Though Elasticsearch supports mulitple field values stored in arrays, it does not support
+        // Though Elasticsearch supports multiple field values stored in arrays, it does not support
         // sorting based on the first value as is required by AvantSearch when a user sorts by column.
         // By catenating the values, sorting will work as desired.
 
@@ -69,7 +69,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             if (!empty($catenatedText))
             {
-                $catenatedText .= PHP_EOL;
+                $catenatedText .= ES_DOCUMENT_EOL;
             }
             $catenatedText .= $fieldText['text'];
         }

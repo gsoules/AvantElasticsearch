@@ -3,6 +3,12 @@
 require __DIR__ . '/../vendor/autoload.php';
 use Elasticsearch\ClientBuilder;
 
+// Use this constant as newline character when creating and reading an Elasticsearch document. Don't use PHP_EOL
+// because its value differs between Linux (\n) and Windows (\r\n). The difference should not matter in production
+// which is Linux, but it's a problem during development when using both platforms because if you create the document
+// on one platform, you can't read it correctly on the other.
+define ('ES_DOCUMENT_EOL', "\n");
+
 define('MB_BYTES', 1024 * 1024);
 
 class AvantElasticsearch
