@@ -43,14 +43,18 @@
     // a link to search for their selection (as opposed to filling the search textbox with the suggestion text).
     foreach ($titles as $title)
     {
-        $value = url('find?query=' . urlencode($title));
+        // Some items have multiple titles, but suggest only the first.
+        $parts = explode(ES_DOCUMENT_EOL, $title);
+        $firstTitle = $parts[0];
+
+        $value = url('find?query=' . urlencode($firstTitle));
         if ($usingSharedIndex)
         {
             // Add a query string arg to indicate that this link is for the shared index. Without the arg, we'd
             // have to rely on cookies to know, but a user could have cookies disabled,
             $value .= '&all=on';
         }
-        $suggestions[] = (object) array('label' => $title, 'value' => $value);
+        $suggestions[] = (object) array('label' => $firstTitle, 'value' => $value);
     }
 
     // Return the suggestions as JSON in response to the autocomplete request.
