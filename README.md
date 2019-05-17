@@ -13,10 +13,11 @@ knowledge of the following Omeka elements and how they are used in these install
 * Address
 * Date
 
-This AvantElaticsearch plugin works only with Elasticsearch on AWS, but could be adapted by someone
-else for another application.
+This AvantElaticsearch plugin works only with Elasticsearch on Amazon Web Services (AWS).
 
 The host Linux OS must have pdftotext installed.
+
+The Omeka files folder must contain a directory named 'elasticsearch'.
 
 ## Installation
 
