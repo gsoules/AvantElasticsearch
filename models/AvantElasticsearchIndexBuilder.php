@@ -11,6 +11,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $batchDocumentsSizes = array();
     protected $batchDocumentsTotalSize;
     protected $indexingId;
+    protected $indexingOperation;
 
     public function __construct()
     {
@@ -312,17 +313,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function getIndexingDataFileName($indexingId)
     {
-        return $this->getIndexingFileNamePrefix($indexingId) . 'json';
+        return $this->getIndexingFileNamePrefix($indexingId) . '.json';
     }
 
-    protected function getIndexingLogFileName($indexingId)
+    protected function getIndexingLogFileName($indexingId, $indexingOperation)
     {
-        return $this->getIndexingFileNamePrefix($indexingId) . 'log';
+        $fileName = $this->getIndexingFileNamePrefix($indexingId) . '-' . $indexingOperation . '.html';
+        return $fileName;
     }
 
     protected function getIndexingFileNamePrefix($indexingId)
     {
-        return FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $indexingId . '.';
+        return FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch' . DIRECTORY_SEPARATOR . $indexingId;
     }
 
     protected function getItemFieldTexts($item)
@@ -360,6 +362,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $action = isset($_POST['action']) ? $_POST['action'] : 'NO ACTION PROVIDED';
         $indexingId = isset($_POST['indexing_id']) ? $_POST['indexing_id'] : '';
         $indexName = isset($_POST['index_name']) ? $_POST['index_name'] : '';
+        $indexingOperation = isset($_POST['operation']) ? $_POST['operation'] : '';
         $indexingAction = false;
         $response = '';
 
@@ -369,22 +372,22 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         {
             switch ($action)
             {
-                case 'export_all':
-                case 'export_some':
+                case 'export-all':
+                case 'export-some':
                     $indexingAction = true;
                     $limit = $action == 'export_all' ? 0 : 100;
-                    $this->performBulkIndexExport($indexName, $indexingId, $limit);
+                    $this->performBulkIndexExport($indexingId, $indexingOperation, $limit);
                     break;
 
-                case 'import_new':
-                case 'import_existing':
+                case 'import-new':
+                case 'import-existing':
                     $indexingAction = true;
                     $deleteExistingIndex = $action == 'import_new';
-                    $this->performBulkIndexImport($indexName, $indexingId, $deleteExistingIndex);
+                    $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
                     break;
 
                 case 'progress':
-                    $response = $this->readLog($indexingId);
+                    $response = $this->readLog($indexingId, $indexingOperation);
                     break;
 
                 default:
@@ -406,7 +409,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $this->logEvent(__('Memory used: %s MB', number_format($memoryUsed, 2)));
             $this->logEvent(__('Peak usage: %s MB', number_format($peakMemoryUsage, 2)));
             $this->logEvent(__('Execution time: %s seconds', $executionSeconds));
-            $response = $this->readLog($indexingId);
+            $response = $this->readLog($indexingId, $indexingOperation);
         }
 
         $response = json_encode($response);
@@ -416,7 +419,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function logCreateNew()
     {
         // Create a new log file (overwrite an existing log file with the same name).
-        file_put_contents($this->getIndexingLogFileName($this->indexingId), date("Y-m-d H:i:s"));
+        file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), date("Y-m-d H:i:s"));
     }
 
     protected function logClientError()
@@ -426,18 +429,19 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function logError($errorMessage)
     {
-        $this->logEvent("<span class='health-report-error'>$errorMessage</span>");
+        $this->logEvent("<span class='indexing-error'>$errorMessage</span>");
     }
 
     protected function logEvent($eventMessage)
     {
         $event =  '<BR/>' . $eventMessage;
-        file_put_contents($this->getIndexingLogFileName($this->indexingId), $event, FILE_APPEND);
+        file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), $event, FILE_APPEND);
     }
 
-    public function performBulkIndexExport($indexName, $indexingId, $limit = 0)
+    public function performBulkIndexExport($indexingId, $indexingOperation, $limit = 0)
     {
         $this->indexingId = $indexingId;
+        $this->indexingOperation = $indexingOperation;
         $this->logCreateNew();
         $this->logEvent(__('Start exporting'));
 
@@ -534,10 +538,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         file_put_contents($dataFileName, "[$json]");
     }
 
-    public function performBulkIndexImport($indexName, $indexingId, $deleteExistingIndex)
+    public function performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex)
     {
         $this->setIndexName($indexName);
         $this->indexingId = $indexingId;
+        $this->indexingOperation = $indexingOperation;
         $this->logCreateNew();
         $this->logEvent(__('Start importing'));
 
@@ -630,7 +635,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->logEvent(__("%s documents indexed (%s MB)", $this->batchDocumentsCount, $totalSizeMb));
     }
 
-    protected function readLog($indexingId)
+    protected function readLog($indexingId, $indexingOperation)
     {
         // The indexing Id gets passed because this method is called in response to an Ajax request for progress.
         // Because the caller is running in a different instance of AvantElasticsearchIndexBuilder than the instance
@@ -638,7 +643,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // use. All of the other log methods are for writing, and all are called only by the instance doing the
         // indexing and that instance sets $this->indexingId when indexing first begins. Thus, the log write methods
         // don't need the indexing Id parameter.
-        $logFileName = $this->getIndexingLogFileName($indexingId);
+        $logFileName = $this->getIndexingLogFileName($indexingId, $indexingOperation);
         return file_get_contents($logFileName);
     }
 }

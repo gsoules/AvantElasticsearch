@@ -224,7 +224,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
                     if ($errorCount <= $maxErrorsShown)
                     {
                         $errorsReported++;
-                        if ($errorCount > 0)
+                        if ($errorCount > 1)
                             $errorMessage .= '<br/>';
                         $errorMessage .= $this->convertElasticsearchErrorToMessage($id, $error);
                     }

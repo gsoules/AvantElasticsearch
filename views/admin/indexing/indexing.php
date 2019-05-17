@@ -18,10 +18,10 @@ echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 
 // Initialize the action options.
 $options = array(
-    'export_all' => 'Export all items from Omeka',
-    'export_some' => 'Export 100 items from Omeka',
-    'import_existing' =>'Import into existing index',
-    'import_new' => 'Import into new index'
+    'export-all' => 'Export all items from Omeka',
+    'export-some' => 'Export 100 items from Omeka',
+    'import-existing' =>'Import into existing index',
+    'import-new' => 'Import into new index'
     );
 
 // Warn if this session is running in the debugger because simultaneous Ajax requests won't work while debugging.
@@ -53,8 +53,8 @@ if ($avantElasticsearchClient->ready())
     $indexName =  $contributorId;
     echo "<hr/>";
     echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', null, null, $options) . '</div>';
-    echo '<div><span style="display:inline-block;width:80px;">Index Name: </span><span>' . $this->formText(null, $indexName, array('size' => '12', 'id' => 'index-name')) . '</span></div>';
     echo '<div><span style="display:inline-block;width:80px;">Indexing ID: </span><span>' . $this->formText(null, $indexingId, array('size' => '12', 'id' => 'indexing-id')) . '</span></div>';
+    echo '<div id="index-name-fields"><span style="display:inline-block;width:80px;">Index Name: </span><span>' . $this->formText(null, $indexName, array('size' => '12', 'id' => 'index-name')) . '</span></div>';
     echo "<button id='start-button'>Start</button>";
     echo '<div id="status-area"></div>';
 }
@@ -68,12 +68,14 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
     jQuery(document).ready(function ()
     {
         var actionButtons = jQuery("input[name='action']");
+        var indexNameFields = jQuery("#index-name-fields");
         var startButton = jQuery("#start-button").button();
         var statusArea = jQuery("#status-area");
 
         var actionInProgress = false;
         var indexingId = '';
         var indexingName = '';
+        var indexingOperation = '';
         var progressCount = 0;
         var progressTimer;
         var selectedAction = '';
@@ -88,12 +90,25 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
         function initialize()
         {
+            indexNameFields.hide();
+
             // Set up the handlers that respond to radio button and Start button clicks.
             actionButtons.change(function (e)
             {
                 // The admin has selected a different radio button.
                 var checkedButton = jQuery("input[name='action']:checked");
                 selectedAction = checkedButton.val();
+
+                if (selectedAction.startsWith('export'))
+                {
+                    indexingOperation = 'export';
+                    indexNameFields.hide();
+                }
+                else
+                {
+                    indexNameFields.show();
+                    indexingOperation = 'import';
+                }
             });
 
             startButton.on("click", function()
@@ -123,7 +138,8 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     dataType: 'json',
                     data: {
                         action: 'progress',
-                        indexing_id: indexingId
+                        indexing_id: indexingId,
+                        operation: indexingOperation
                     },
                     success: function (data)
                     {
@@ -169,7 +185,8 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     data: {
                         action: selectedAction,
                         index_name: indexingName,
-                        indexing_id: indexingId
+                        indexing_id: indexingId,
+                        operation: indexingOperation
                     },
                     success: function (data)
                     {
