@@ -15,7 +15,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     // Cached data.
     private $installation;
-    private $itemFilesData;
 
     /* @var $avantElasticsearchFacets AvantElasticsearchFacets */
     protected $avantElasticsearchFacets;
@@ -43,20 +42,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->type = $this->getDocumentMappingType();
     }
 
-    protected function addItemDataToDocumentBody($itemId, $isPublic)
+    protected function addItemDataToDocumentBody($itemData)
     {
         if (!empty($this->htmlFields))
             $this->setField('html-fields', $this->htmlFields);
 
-        $urlData = $this->getItemUrlData($itemId);
+        $urlData = $this->getItemUrlData($itemData);
         $this->setField('url', $urlData);
 
-        $pdfData = $this->getItemPdfData();
+        $pdfData = $this->getItemPdfData($itemData);
         if (!empty($pdfData))
             $this->setField('pdf', $pdfData);
 
-        $itemData = $this->getItemData($itemId, $this->titleString, $isPublic);
-        $this->setField('item', $itemData);
+        $itemAttributes = $this->getItemAttributes($itemData, $this->titleString);
+        $this->setField('item', $itemAttributes);
 
         $this->setField('element', $this->elementData);
         $this->setField('sort', $this->sortData);
@@ -82,12 +81,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $catenatedText;
     }
 
-    public function copyItemElementValuesToDocument($itemData, $itemFilesData)
+    public function copyItemElementValuesToDocument($itemData)
     {
         $itemId = $itemData['id'];
         $itemFieldTexts = $itemData['field_texts'];
-
-        $this->itemFilesData = $itemFilesData;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
@@ -99,7 +96,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createSuggestionsData();
         $this->createTagData($itemId);
 
-        $this->addItemDataToDocumentBody($itemId,  $itemData['public']);
+        $this->addItemDataToDocumentBody($itemData);
     }
 
     protected function createAddressElementSortData($elasticsearchFieldName, $fieldText)
@@ -311,13 +308,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function getImageUrl($itemId, $thumbnail)
+    protected function getImageUrl($itemData, $thumbnail)
     {
-        $itemImageUrl = $this->getItemImageFileUrl($thumbnail);
+        $itemImageUrl = $this->getItemImageFileUrl($itemData, $thumbnail);
 
         if (empty($itemImageUrl))
         {
-            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemId);
+            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['id']);
             if (!empty($coverImageIdentifier))
             {
                 $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
@@ -341,29 +338,26 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $pdfText;
     }
 
-    protected function getItemData($itemId, $titleString, $isPublic)
+    protected function getItemAttributes($itemData, $titleString)
     {
-        $itemData = array(
-            'id' => $itemId,
+        $itemAttributes = array(
+            'id' => $itemData['id'],
             'title' => $titleString,
-            'public' => (bool)$isPublic,
-            'file-count' => count($this->itemFilesData),
+            'public' => (bool)$itemData['public'],
+            'file-count' => count($itemData['files_data']),
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
         );
-        return $itemData;
+        return $itemAttributes;
     }
 
-    protected function getItemImageFileUrl($thumbnail)
+    protected function getItemImageFileUrl($itemData, $thumbnail)
     {
-        // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFilesData
-        // which allows this method to get called multiple times without having to fetch the files array each time.
-        // This improvement saves a significant amount of time when indexing all items.
-
         $url = '';
 
         // Get the data for the item's first file. It's the only one we're interested in as the item's image file.
-        $fileData = empty($this->itemFilesData) ? null : $this->itemFilesData[0];
+        $itemFilesData = $itemData['files_data'];
+        $fileData = empty($itemFilesData) ? null : $itemFilesData[0];
 
         if (!empty($fileData) && $fileData['has_derivative_image'])
         {
@@ -395,7 +389,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $webPath;
     }
 
-    protected function getItemPdfData()
+    protected function getItemPdfData($itemData)
     {
         $pdfMimeTypes = array(
             'application/pdf',
@@ -411,7 +405,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $fileNames = array();
         $filePaths = array();
 
-        foreach ($this->itemFilesData as $fileData)
+        foreach ($itemData['files_data'] as $fileData)
         {
             if (!in_array($fileData['mime_type'], $pdfMimeTypes))
             {
@@ -472,13 +466,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return FILES_DIR . DIRECTORY_SEPARATOR . $directory . DIRECTORY_SEPARATOR . $filename;
     }
 
-    protected function getItemUrlData($itemId)
+    protected function getItemUrlData($itemData)
     {
-        $itemPath = $this->installation['item_path'] . $itemId;
+        $itemPath = $this->installation['item_path'] . $itemData['id'];
         $serverUrl = $this->installation['server_url'];
         $itemUrl = $serverUrl . $itemPath;
-        $thumbUrl = $this->getImageUrl($itemId, true);
-        $imageUrl = $this->getImageUrl($itemId, false);
+        $thumbUrl = $this->getImageUrl($itemData, true);
+        $imageUrl = $this->getImageUrl($itemData, false);
 
         $urlData = array(
             'item' => $itemUrl,

@@ -31,7 +31,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['fields_texts'] = $itemFieldTexts;
         $itemData['files_data'] = $itemFilesData;
         $itemData['public'] = $itemFilesData;
-        $document = $this->createDocumentFromItemMetadata($itemData, $itemFilesData);
+        $document = $this->createDocumentFromItemMetadata($itemData);
 
         $params = [
             'id' => $document->id,
@@ -92,7 +92,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createDocumentFromItemMetadata($itemData, $itemFilesData)
+    public function createDocumentFromItemMetadata($itemData)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($itemData['identifier']);
@@ -106,7 +106,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($itemData, $itemFilesData);
+        $document->copyItemElementValuesToDocument($itemData);
 
         return $document;
     }
@@ -422,7 +422,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'export-all':
                 case 'export-some':
                     $indexingAction = true;
-                    $limit = $action == 'export-all' ? 0 : 2;
+                    $limit = $action == 'export-all' ? 0 : 100;
                     $this->performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit);
                     break;
 
@@ -578,7 +578,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemData['identifier'] = $itemFieldTexts[$identifierElementId][0]['text'];
             $itemData['field_texts'] = $itemFieldTexts;
             $itemData['files_data'] = $itemFilesData;
-            $document = $this->createDocumentFromItemMetadata($itemData, $itemFilesData);
+            $document = $this->createDocumentFromItemMetadata($itemData);
 
             // Determine the size of the document in bytes. This is for reporting purposes only.
             $documentJson = json_encode($document);
