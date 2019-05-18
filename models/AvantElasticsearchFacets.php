@@ -309,9 +309,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions['contributor']['sort'] = false;
 
         // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
-        // IMPORTANT: If you want to use tags, see performance comment in AvantElasticsearchDocument::createTagData().
         $this->createFacet('tag', 'Tags');
-        $this->facetDefinitions['tag']['not_used'] = true;
+        //$this->facetDefinitions['tag']['not_used'] = true;
     }
 
     public function editQueryStringToAddFacetArg($facetToAddGroup, $facetToAddValue, $isRoot)
@@ -518,7 +517,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             if ($facetDefinition['not_used'])
             {
-                // This facet is for future use and not currently being displayed.
+                // This facet is not currently being displayed.
                 continue;
             }
 

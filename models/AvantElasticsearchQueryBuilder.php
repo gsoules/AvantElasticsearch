@@ -33,18 +33,12 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $source = [
             'element.*',
             'item.*',
+            'tags',
             'html-fields',
             'pdf.file-name',
             'pdf.file-url',
             'url.*'
         ];
-
-        // Get tags back from the query, but only if they are being used.
-        $facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
-        if ($facetDefinitions['tag']['not_used'] == false)
-        {
-            $source[] = 'tags';
-        }
 
         // Highlighting the query will return.
         $highlight =
@@ -73,10 +67,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'analyzer' => "english",
                 'operator' => "and",
                 'fields' => [
-                    "title^5",
+                    "item.title^5",
                     "element.title^15",
                     "element.identifier^2",
                     "element.*",
+                    "tags",
                     "pdf.text-*"
                 ]
             ]

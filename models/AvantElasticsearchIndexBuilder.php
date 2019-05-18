@@ -27,9 +27,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $identifier = ItemMetadata::getItemIdentifier($item);
         $itemFieldTexts = $this->getItemFieldTexts($item);
         $itemFilesData =  $this->getItemFilesData($item);
+        $itemTagsData = $this->getItemTagsData($item);
         $itemData['identifier'] = $identifier;
         $itemData['fields_texts'] = $itemFieldTexts;
         $itemData['files_data'] = $itemFilesData;
+        $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $itemFilesData;
         $document = $this->createDocumentFromItemMetadata($itemData);
 
@@ -334,6 +336,43 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemFieldTexts;
     }
 
+    protected function fetchTagsData()
+    {
+        try
+        {
+            $db = get_db();
+            $table = "{$db->prefix}records_tags";
+
+            $sql = "
+                SELECT
+                  record_id,
+                  name
+                FROM
+                  $table
+                INNER JOIN
+                  {$db->prefix}tags AS tags ON tags.id = tag_id
+                ORDER BY
+                  record_id
+            ";
+
+            $tags = $db->query($sql)->fetchAll();
+        }
+        catch (Exception $e)
+        {
+            $tags = array();
+        }
+
+        // Create an array indexed by item Id where each element contains an array of that
+        // items tags. This will make it possible to very quickly find an items tags.
+        $itemTagsData = array();
+        foreach ($tags as $tag)
+        {
+            $itemTagsData[$tag['record_id']][] = $tag['name'];
+        }
+
+        return $itemTagsData;
+    }
+
     public function getElasticsearchFilesDirectoryName()
     {
         return FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch';
@@ -393,6 +432,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $itemFilesData;
+    }
+
+    protected function getItemTagsData($item)
+    {
+        $tagsData = array();
+        foreach ($item->getTags() as $tag)
+        {
+            $tagsData[] = $tag->name;
+        }
+        return $tagsData;
     }
 
     function handleAjaxRequest()
@@ -510,10 +559,19 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // Get the files data for all items so that each document won't do a SQL query to get its item's file data.
         $this->logEvent(__('Fetch file data from SQL database'));
-        $files = $this->fetchFilesData();
-        if (empty($files))
+        $filesData = $this->fetchFilesData();
+        if (empty($filesData))
         {
             $this->logError('Failed to fetch file data from SQL database');
+            return;
+        }
+
+        // Get the tags for all items so that each document won't do a SQL query to get its item's tags.
+        $this->logEvent(__('Fetch tag data from SQL database'));
+        $tagsData = $this->fetchTagsData();
+        if (empty($tagsData))
+        {
+            $this->logError('Failed to fetch tag data from SQL database');
             return;
         }
 
@@ -553,9 +611,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             // Get the files data for the current item.
             $itemFilesData = array();
-            if (isset($files[$itemId]))
+            if (isset($filesData[$itemId]))
             {
-                $itemFilesData = $files[$itemId];
+                $itemFilesData = $filesData[$itemId];
+            }
+
+            // Get the tags data for the current item.
+            $itemTagsData = array();
+            if (isset($tagsData[$itemId]))
+            {
+                $itemTagsData = $tagsData[$itemId];
             }
 
             // Get statistics for this item's files. This is for reporting purposes only.
@@ -578,6 +643,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemData['identifier'] = $itemFieldTexts[$identifierElementId][0]['text'];
             $itemData['field_texts'] = $itemFieldTexts;
             $itemData['files_data'] = $itemFilesData;
+            $itemData['tags_data'] = $itemTagsData;
             $document = $this->createDocumentFromItemMetadata($itemData);
 
             // Determine the size of the document in bytes. This is for reporting purposes only.
@@ -592,9 +658,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             // Tell PHP it can garbage-collect these objects. Experiments showed that this reduced
             // peak memory usage by 15% when exporting 10,000 items.
             unset($itemsData[$index]);
-            if (isset($files[$itemId]))
+            if (isset($filesData[$itemId]))
             {
-                unset($files[$itemId]);
+                unset($filesData[$itemId]);
             }
             unset($document);
         }

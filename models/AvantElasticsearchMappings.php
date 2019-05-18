@@ -3,14 +3,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 {
     protected $properties = array();
 
-    protected function addAnalyzerFieldToMappingProperties($fieldName)
-    {
-        $this->properties[$fieldName] = [
-            'type' => 'text',
-            'analyzer' => 'english'
-        ];
-    }
-
     protected function addBooleanFieldToMappingProperties($fieldName)
     {
         $this->properties[$fieldName] = [
@@ -104,11 +96,12 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             }
         }
 
-        // Analyzer fields. These are text fields for full-text search, but don't need to also be keyword fields.
-        // Note that the 'title' field is a copy of the 'element.title' field. This one uses the English analyzer
-        // and the other doesn't in order to get the best possible search results on title content.
-        $this->addAnalyzerFieldToMappingProperties('element.description');
-        $this->addAnalyzerFieldToMappingProperties('item.title');
+        // Text fields. These are text fields for full-text search, but don't need to also be keyword fields.
+        // Note that the 'item.title' field is a copy of the 'element.title' field. This one uses the English
+        // analyzer and the other doesn't in order to get the best possible search results on title content.
+        $this->addTextFieldToMappingProperties('element.description');
+        $this->addTextFieldToMappingProperties('item.title');
+        $this->addTextFieldToMappingProperties('tags');
 
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
@@ -141,7 +134,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('sort.place');
         $this->addKeywordFieldToMappingProperties('sort.subject');
         $this->addKeywordFieldToMappingProperties('sort.type');
-        $this->addKeywordFieldToMappingProperties('tags');
         $this->addKeywordFieldToMappingProperties('url.image');
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');

@@ -94,7 +94,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createFacetDataForContributor();
         $this->createSpecialFieldsData($itemFieldTexts);
         $this->createSuggestionsData();
-        $this->createTagData($itemId);
+        $this->createTagData($itemData);
 
         $this->addItemDataToDocumentBody($itemData);
     }
@@ -286,25 +286,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createTagData($itemId)
+    protected function createTagData($itemData)
     {
-        if (!$this->facetDefinitions['tag']['not_used'])
+        $tagsData = $itemData['tags_data'];
+        if (!empty($tagsData))
         {
-            // TO-DO: Optimize indexing of tags to reduce export time.
-            // Replace the SQL calls to getItemFromId and getTags with a single fetch in preformBulkIndexExport
-            // as is done for items, files, and element texts. But this can wait until tags are being used.
-            $item = ItemMetadata::getItemFromId($itemId);
-            $tags = array();
-            foreach ($item->getTags() as $tag)
-            {
-                $tags[] = $tag->name;
-            }
-
-            if (!empty($tags))
-            {
-                $this->facetData['tag'] = $tags;
-                $this->setField('tags', $tags);
-            }
+            $this->facetData['tag'] = $tagsData;
+            $this->setField('tags', $tagsData);
         }
     }
 

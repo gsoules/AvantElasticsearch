@@ -98,6 +98,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
         function initialize()
         {
+            enableStartButton(false);
             indexNameFields.hide();
 
             // Set up the handlers that respond to radio button and Start button clicks.
@@ -117,6 +118,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     indexNameFields.show();
                     indexingOperation = 'import';
                 }
+                enableStartButton(true);
             });
 
             startButton.on("click", function()
