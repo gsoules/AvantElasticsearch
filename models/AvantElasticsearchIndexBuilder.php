@@ -215,21 +215,48 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $files;
     }
 
-    protected function fetchAllItems($public = true)
+    protected function fetchItems($public = true)
     {
+//        try
+//        {
+//            $db = get_db();
+//            $table = $db->getTable('Item');
+//            $select = $table->getSelect();
+//            $select->order('items.id ASC');
+//
+//            if ($public)
+//            {
+//                $select->where('items.public = 1');
+//            }
+//
+//            $items1 = $table->fetchObjects($select);
+//        }
+//        catch (Exception $e)
+//        {
+//            $items1 = array();
+//        }
+
         try
         {
             $db = get_db();
-            $table = $db->getTable('Item');
-            $select = $table->getSelect();
-            $select->order('items.id ASC');
+            $table = "{$db->prefix}items";
+
+            $sql = "
+                SELECT
+                  id,
+                  public
+                FROM
+                  $table
+            ";
 
             if ($public)
             {
-                $select->where('items.public = 1');
+                $sql .= " WHERE public = 1";
             }
 
-            $items = $table->fetchObjects($select);
+            $sql .=  " ORDER BY id";
+
+            $items = $db->query($sql)->fetchAll();
         }
         catch (Exception $e)
         {
@@ -407,13 +434,17 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if ($indexingAction)
         {
-            $executionSeconds = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
             $memoryEnd = memory_get_usage() / MB_BYTES;
             $memoryUsed = $memoryEnd - $memoryStart;
-            $peakMemoryUsage = memory_get_peak_usage() /  MB_BYTES;
             $this->logEvent(__('Memory used: %s MB', number_format($memoryUsed, 2)));
+
+            $peakMemoryUsage = memory_get_peak_usage() /  MB_BYTES;
             $this->logEvent(__('Peak usage: %s MB', number_format($peakMemoryUsage, 2)));
-            $this->logEvent(__('Execution time: %s seconds', $executionSeconds));
+
+            $executionSeconds = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
+            $time = $executionSeconds == 0 ? '< 1 second' : "$executionSeconds seconds";
+            $this->logEvent(__('Execution time: %s', $time));
+
             $response = $this->readLog($indexingId, $indexingOperation);
         }
 
@@ -455,7 +486,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // Get all the items for this installation.
         $this->logEvent(__('Fetch items from SQL database'));
-        $items = $this->fetchAllItems();
+        $items = $this->fetchItems();
+        if (empty($items))
+        {
+            $this->logError('Failed to read items from SQL database');
+            return;
+        }
 
         // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
         $this->logEvent(__('Fetch file information from SQL database'));
@@ -484,11 +520,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
                 $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
 
-                // Get all the field texts for this chunk
-                $fieldTextsForAllItems = $this->fetchFieldTextsForAllItems($items[$firstItemId]->id, $items[$lastItemId]->id);
+                // Get all the field texts for this chunk of items.
+                $itemFieldTextsForChunk = $this->fetchFieldTextsForAllItems($items[$firstItemId]['id'], $items[$lastItemId]['id']);
             }
 
-            $itemId = $items[$index]->id;
+            $itemData = $items[$index];
+            $itemId = $itemData['id'];
 
             $itemFiles = array();
             if (isset($files[$itemId]))
@@ -511,10 +548,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
 
             // Create a document for the item.
-            $item = $items[$index];
-            $fieldTextsForItem = $fieldTextsForAllItems[$itemId];
-            $identifier = $fieldTextsForItem[$identifierElementId][0]['text'];
-            $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $fieldTextsForItem, $itemFiles, $item->public);
+            $itemFieldsTexts = $itemFieldTextsForChunk[$itemId];
+            $identifier = $itemFieldsTexts[$identifierElementId][0]['text'];
+            $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $itemFieldsTexts, $itemFiles, $itemData['public']);
 
             // Determine the size of the document in bytes.
             $documentJson = json_encode($document);
