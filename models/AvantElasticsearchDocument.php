@@ -1,4 +1,10 @@
 <?php
+
+define ('IMAGE_FILE_TYPE_FULLSIZE', "fullsize");
+define ('IMAGE_FILE_TYPE_ORIGINAL', "original");
+define ('IMAGE_FILE_TYPE_THUMBNAIL', "thumbnails");
+
+
 class AvantElasticsearchDocument extends AvantElasticsearch
 {
     // These need to be public so that objects of this class can be JSON encoded/decoded.
@@ -356,20 +362,30 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($fileData) && $fileData['has_derivative_image'])
         {
             $supportedImageMimeTypes = AvantCommon::supportedImageMimeTypes();
-            $url = $this->getItemFileWebPath($fileData, $thumbnail ? 'thumbnail' : 'original');
+            $url = $this->getItemImageFileWebPath($fileData, $thumbnail ? IMAGE_FILE_TYPE_THUMBNAIL : IMAGE_FILE_TYPE_ORIGINAL);
 
             if (!in_array($fileData['mime_type'], $supportedImageMimeTypes))
             {
                 // The original image is not a jpg (it's probably a pdf) so return its derivative image instead.
-                $url = $this->getItemFileWebPath($fileData, $thumbnail ? 'thumbnail' : 'fullsize');
+                $url = $this->getItemImageFileWebPath($fileData, $thumbnail ? IMAGE_FILE_TYPE_THUMBNAIL : IMAGE_FILE_TYPE_FULLSIZE);
             }
         }
         return $url;
     }
 
-    protected function getItemFileWebPath($fileData, $fileType)
+    protected function getItemImageFileWebPath($fileData, $imageFileType)
     {
-        $webPath = $this->installation['server_url'] . $this->installation['files_path'] . DIRECTORY_SEPARATOR . $fileType . DIRECTORY_SEPARATOR . $fileData['filename'];
+        $filePath = $this->installation['server_url'] . $this->installation['files_path'];
+        $fileName = $fileData['filename'];
+        
+        if ($imageFileType != IMAGE_FILE_TYPE_ORIGINAL)
+        {
+            // A path to a derivative image is being requested. Change the file name extension to 'jpg'.
+            $position = strrpos($fileName, '.');
+            $fileName = substr($fileName, 0, $position);
+            $fileName .= '.jpg';
+        }
+        $webPath = $filePath . DIRECTORY_SEPARATOR . $imageFileType . DIRECTORY_SEPARATOR . $fileName;
         return $webPath;
     }
 
@@ -429,7 +445,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Record the PDF's text and its file name in parallel arrays so we know which file contains which text.
             $pdfTexts[] = $text;
             $fileNames[] = $fileData['original_filename'];
-            $filePaths[] = $this->getItemFileWebPath($fileData, 'original');
+            $filePaths[] = $this->getItemImageFileWebPath($fileData, IMAGE_FILE_TYPE_ORIGINAL);
         }
 
         if (!empty($pdfTexts) && !empty($fileNames))
