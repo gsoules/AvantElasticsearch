@@ -310,7 +310,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function getImageUrl($itemId, $thumbnail)
     {
-        $itemImageUrl = $this->getItemFileUrl($thumbnail);
+        $itemImageUrl = $this->getItemImageFileUrl($thumbnail);
 
         if (empty($itemImageUrl))
         {
@@ -351,14 +351,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $itemData;
     }
 
-    protected function getItemFileUrl($thumbnail)
+    protected function getItemImageFileUrl($thumbnail)
     {
         // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFilesData
         // which allows this method to get called multiple times without having to fetch the files array each time.
         // This improvement saves a significant amount of time when indexing all items.
 
         $url = '';
+
+        // Get the data for the item's first file. It's the only one we're interested in as the item's image file.
         $fileData = empty($this->itemFilesData) ? null : $this->itemFilesData[0];
+
         if (!empty($fileData) && $fileData['has_derivative_image'])
         {
             $supportedImageMimeTypes = AvantCommon::supportedImageMimeTypes();

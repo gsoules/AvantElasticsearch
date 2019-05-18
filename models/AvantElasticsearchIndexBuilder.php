@@ -26,8 +26,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $identifier = ItemMetadata::getItemIdentifier($item);
         $itemFieldTexts = $this->getItemFieldTexts($item);
-        $itemFiles = $item->Files;
-        $document = $this->createDocumentFromItemMetadata($item->id, $identifier, $itemFieldTexts, $itemFiles, $item->public);
+        $itemFilesData =  $this->getItemFilesData($item);
+        $document = $this->createDocumentFromItemMetadata($item->id, $identifier, $itemFieldTexts, $itemFilesData, $item->public);
 
         $params = [
             'id' => $document->id,
@@ -372,6 +372,25 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $fieldTexts;
     }
 
+    protected function getItemFilesData($item)
+    {
+        $itemId = $item->id;
+        $itemFiles = $item->Files;
+        $itemFilesData = array();
+
+        foreach ($itemFiles as $file)
+        {
+            $fileData['size'] = $file->size;
+            $fileData['has_derivative_image'] = $file->hasThumbnail();
+            $fileData['mime_type'] = $file->mime_type;
+            $fileData['filename'] = $file->filename;
+            $fileData['original_filename'] = $file->original_filename;
+            $itemFilesData[] = $fileData;
+        }
+
+        return $itemFilesData;
+    }
+
     function handleAjaxRequest()
     {
         // This method is called in response to Ajax requests from the client. It is called just once for
@@ -473,7 +492,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->logCreateNew();
         $this->logEvent(__('Start exporting'));
 
-        $json = '';
         $this->cacheInstallationParameters();
 
         // Get all the items for this installation.
@@ -485,7 +503,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             return;
         }
 
-        // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
+        // Get the files data for all items so that each document won't do a SQL query to get its item's file data.
         $this->logEvent(__('Fetch file data from SQL database'));
         $files = $this->fetchFilesData();
         if (empty($files))
@@ -494,8 +512,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             return;
         }
 
+        // Initialize variables used in the loop below.
+        $json = '';
         $fileStats = array();
         $documentSizeTotal = 0;
+        $itemFieldTextsForChunk = array();
 
         // The limit is only used during development so that we don't always have
         // to index all the items. It serves no purpose in a production environment
@@ -504,12 +525,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $identifierElementId = ItemMetadata::getIdentifierElementId();
 
         $this->logEvent(__('Begin exporting %s items', $itemsCount));
-
-        $firstItemId = 0;
-        $lastItemId = 0;
-
         for ($index = 0; $index < $itemsCount; $index++)
         {
+            // Get field texts for a chunk of items. Chunking uses a fraction of the memory necessary to get all texts.
             $chunkSize = 1000;
             if ($index % $chunkSize == 0)
             {
@@ -517,7 +535,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
                 $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
 
-                // Get all the field texts for this chunk of items.
                 $itemFieldTextsForChunk = $this->fetchFieldTextsForAllItems($itemsData[$firstItemId]['id'], $itemsData[$lastItemId]['id']);
                 if (empty($itemFieldTextsForChunk))
                 {
@@ -529,12 +546,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemData = $itemsData[$index];
             $itemId = $itemData['id'];
 
+            // Get the files data for the current item.
             $itemFilesData = array();
             if (isset($files[$itemId]))
             {
                 $itemFilesData = $files[$itemId];
             }
 
+            // Get statistics for this item's files. This is for reporting purposes only.
             foreach ($itemFilesData as $itemFileData)
             {
                 $count = 1;
@@ -549,12 +568,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $fileStats[$mimeType]['size'] = $size;
             }
 
-            // Create a document for the item.
+            // Create a document for this item.
             $itemFieldsTexts = $itemFieldTextsForChunk[$itemId];
             $identifier = $itemFieldsTexts[$identifierElementId][0]['text'];
             $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $itemFieldsTexts, $itemFilesData, $itemData['public']);
 
-            // Determine the size of the document in bytes.
+            // Determine the size of the document in bytes. This is for reporting purposes only.
             $documentJson = json_encode($document);
             $documentSize = strlen($documentJson);
             $documentSizeTotal += $documentSize;
@@ -563,7 +582,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $separator = $index > 0 ? ',' : '';
             $json .= $separator . $documentJson;
 
-            // Let PHP know that it can garbage-collect these objects.
+            // Tell PHP it can garbage-collect these objects. Experiments showed that this reduced
+            // peak memory usage by 15% when exporting 10,000 items.
             unset($itemsData[$index]);
             if (isset($files[$itemId]))
             {
