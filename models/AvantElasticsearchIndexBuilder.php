@@ -59,6 +59,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->installation['contributor'] = ElasticsearchConfig::getOptionValueForContributor();
         $this->installation['contributor-id'] = ElasticsearchConfig::getOptionValueForContributorId();
         $this->installation['item_path'] = public_url('items/show/');
+        $this->installation['files_path'] = public_url('files');
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
@@ -87,7 +88,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createDocumentFromItemMetadata($itemId, $identifier, $itemFieldTexts, $itemFiles, $isPublic)
+    public function createDocumentFromItemMetadata($itemId, $identifier, $itemFieldTexts, $itemFilesData, $isPublic)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($identifier);
@@ -101,7 +102,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFiles, $isPublic);
+        $document->copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFilesData, $isPublic);
 
         return $document;
     }
@@ -182,60 +183,52 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
     }
 
-    protected function fetchAllFiles($public = true)
+    protected function fetchFilesData($public = true)
     {
         try
         {
             $db = get_db();
-            $table = $db->getTable('File');
-            $select = $table->getSelect();
-            $select->order('files.item_id ASC');
+            $table = "{$db->prefix}files";
+
+            $sql = "
+                SELECT
+                  item_id,
+                  size,
+                  has_derivative_image,
+                  mime_type,
+                  filename,
+                  original_filename
+                FROM
+                  $table
+                INNER JOIN
+                  {$db->prefix}items AS items ON items.id = item_id
+            ";
 
             if ($public)
             {
-                // Note that a get of the Files table automatically joins with the Items table and so the
-                // WHERE clause below works even though this code does not explicitly join the two tables.
-                $select->where('items.public = 1');
+                $sql .= " WHERE items.public = 1";
             }
-            $files = $table->fetchObjects($select);
 
-            // Create an array indexed by item Id where each element contains an array of that
-            // item's files. This will make it possible to very quickly find an item's files.
-            $itemFiles = array();
-            foreach ($files as $file)
-            {
-                $itemFiles[$file->item_id][] = $file;
-            }
-            return $itemFiles;
+            $files = $db->query($sql)->fetchAll();
         }
         catch (Exception $e)
         {
             $files = array();
         }
-        return $files;
+
+        // Create an array indexed by item Id where each element contains an array of that
+        // items files. This will make it possible to very quickly find an items files.
+        $itemFilesData = array();
+        foreach ($files as $file)
+        {
+            $itemFilesData[$file['item_id']][] = $file;
+        }
+
+        return $itemFilesData;
     }
 
-    protected function fetchItems($public = true)
+    protected function fetchItemsData($public = true)
     {
-//        try
-//        {
-//            $db = get_db();
-//            $table = $db->getTable('Item');
-//            $select = $table->getSelect();
-//            $select->order('items.id ASC');
-//
-//            if ($public)
-//            {
-//                $select->where('items.public = 1');
-//            }
-//
-//            $items1 = $table->fetchObjects($select);
-//        }
-//        catch (Exception $e)
-//        {
-//            $items1 = array();
-//        }
-
         try
         {
             $db = get_db();
@@ -314,8 +307,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            // TO-DO: Report exception
-            $itemFieldTexts = null;
+            $itemFieldTexts = array();
         }
 
         foreach ($results as $index => $result)
@@ -485,24 +477,29 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->cacheInstallationParameters();
 
         // Get all the items for this installation.
-        $this->logEvent(__('Fetch items from SQL database'));
-        $items = $this->fetchItems();
-        if (empty($items))
+        $this->logEvent(__('Fetch items data from SQL database'));
+        $itemsData = $this->fetchItemsData();
+        if (empty($itemsData))
         {
-            $this->logError('Failed to read items from SQL database');
+            $this->logError('Failed to fetch items data from SQL database');
             return;
         }
 
         // Get the entire Files table once so that each document won't have to do a SQL query to get its item's files.
-        $this->logEvent(__('Fetch file information from SQL database'));
-        $files = $this->fetchAllFiles();
+        $this->logEvent(__('Fetch file data from SQL database'));
+        $files = $this->fetchFilesData();
+        if (empty($files))
+        {
+            $this->logError('Failed to fetch file data from SQL database');
+            return;
+        }
 
         $fileStats = array();
         $documentSizeTotal = 0;
 
         // The limit is only used during development so that we don't always have
         // to index all the items. It serves no purpose in a production environment
-        $itemsCount = $limit == 0 ? count($items) : $limit;
+        $itemsCount = $limit == 0 ? count($itemsData) : $limit;
 
         $identifierElementId = ItemMetadata::getIdentifierElementId();
 
@@ -521,23 +518,28 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
 
                 // Get all the field texts for this chunk of items.
-                $itemFieldTextsForChunk = $this->fetchFieldTextsForAllItems($items[$firstItemId]['id'], $items[$lastItemId]['id']);
+                $itemFieldTextsForChunk = $this->fetchFieldTextsForAllItems($itemsData[$firstItemId]['id'], $itemsData[$lastItemId]['id']);
+                if (empty($itemFieldTextsForChunk))
+                {
+                    $this->logError('Failed to fetch element texts from SQL database');
+                    return;
+                }
             }
 
-            $itemData = $items[$index];
+            $itemData = $itemsData[$index];
             $itemId = $itemData['id'];
 
-            $itemFiles = array();
+            $itemFilesData = array();
             if (isset($files[$itemId]))
             {
-                $itemFiles = $files[$itemId];
+                $itemFilesData = $files[$itemId];
             }
 
-            foreach ($itemFiles as $itemFile)
+            foreach ($itemFilesData as $itemFileData)
             {
                 $count = 1;
-                $size = $itemFile->size;
-                $mimeType = $itemFile->mime_type;
+                $size = $itemFileData['size'];
+                $mimeType = $itemFileData['mime_type'];
                 if (isset($fileStats[$mimeType]))
                 {
                     $count += $fileStats[$mimeType]['count'];
@@ -550,7 +552,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             // Create a document for the item.
             $itemFieldsTexts = $itemFieldTextsForChunk[$itemId];
             $identifier = $itemFieldsTexts[$identifierElementId][0]['text'];
-            $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $itemFieldsTexts, $itemFiles, $itemData['public']);
+            $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $itemFieldsTexts, $itemFilesData, $itemData['public']);
 
             // Determine the size of the document in bytes.
             $documentJson = json_encode($document);
@@ -562,7 +564,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $json .= $separator . $documentJson;
 
             // Let PHP know that it can garbage-collect these objects.
-            unset($items[$index]);
+            unset($itemsData[$index]);
             if (isset($files[$itemId]))
             {
                 unset($files[$itemId]);

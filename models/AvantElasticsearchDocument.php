@@ -9,7 +9,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     // Cached data.
     private $installation;
-    private $itemFiles;
+    private $itemFilesData;
 
     /* @var $avantElasticsearchFacets AvantElasticsearchFacets */
     protected $avantElasticsearchFacets;
@@ -76,9 +76,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $catenatedText;
     }
 
-    public function copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFiles, $isPublic)
+    public function copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFilesData, $isPublic)
     {
-        $this->itemFiles = $itemFiles;
+        $this->itemFilesData = $itemFilesData;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
@@ -338,7 +338,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'id' => $itemId,
             'title' => $titleString,
             'public' => (bool)$isPublic,
-            'file-count' => count($this->itemFiles),
+            'file-count' => count($this->itemFilesData),
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
         );
@@ -347,24 +347,30 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function getItemFileUrl($thumbnail)
     {
-        // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFiles
+        // This method is faster than ItemPreview::getItemFileUrl because it uses the cached $this->itemFilesData
         // which allows this method to get called multiple times without having to fetch the files array each time.
         // This improvement saves a significant amount of time when indexing all items.
 
         $url = '';
-        $file = empty($this->itemFiles) ? null : $this->itemFiles[0];
-        if (!empty($file) && $file->hasThumbnail())
+        $fileData = empty($this->itemFilesData) ? null : $this->itemFilesData[0];
+        if (!empty($fileData) && $fileData['has_derivative_image'])
         {
             $supportedImageMimeTypes = AvantCommon::supportedImageMimeTypes();
-            $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'original');
+            $url = $this->getItemFileWebPath($fileData, $thumbnail ? 'thumbnail' : 'original');
 
-            if (!in_array($file->mime_type, $supportedImageMimeTypes))
+            if (!in_array($fileData['mime_type'], $supportedImageMimeTypes))
             {
                 // The original image is not a jpg (it's probably a pdf) so return its derivative image instead.
-                $url = $file->getWebPath($thumbnail ? 'thumbnail' : 'fullsize');
+                $url = $this->getItemFileWebPath($fileData, $thumbnail ? 'thumbnail' : 'fullsize');
             }
         }
         return $url;
+    }
+
+    protected function getItemFileWebPath($fileData, $fileType)
+    {
+        $webPath = $this->installation['server_url'] . $this->installation['files_path'] . DIRECTORY_SEPARATOR . $fileType . DIRECTORY_SEPARATOR . $fileData['filename'];
+        return $webPath;
     }
 
     protected function getItemPdfData()
@@ -383,16 +389,16 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $fileNames = array();
         $filePaths = array();
 
-        foreach ($this->itemFiles as $file)
+        foreach ($this->itemFilesData as $fileData)
         {
-            if (!in_array($file->mime_type, $pdfMimeTypes))
+            if (!in_array($fileData['mime_type'], $pdfMimeTypes))
             {
                 // This is not a PDF file.
                 continue;
             }
 
             // Attempt to extract the PDF file's text.
-            $fileName = $file->filename;
+            $fileName = $fileData['filename'];
             $filepath = $this->getItemPdfFilepath('original', $fileName);
             if (!file_exists($filepath))
             {
@@ -422,8 +428,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
             // Record the PDF's text and its file name in parallel arrays so we know which file contains which text.
             $pdfTexts[] = $text;
-            $fileNames[] = $file->original_filename;
-            $filePaths[] = $file->getWebPath('original');
+            $fileNames[] = $fileData['original_filename'];
+            $filePaths[] = $this->getItemFileWebPath($fileData, 'original');
         }
 
         if (!empty($pdfTexts) && !empty($fileNames))
