@@ -27,7 +27,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $identifier = ItemMetadata::getItemIdentifier($item);
         $itemFieldTexts = $this->getItemFieldTexts($item);
         $itemFilesData =  $this->getItemFilesData($item);
-        $document = $this->createDocumentFromItemMetadata($item->id, $identifier, $itemFieldTexts, $itemFilesData, $item->public);
+        $itemData['identifier'] = $identifier;
+        $itemData['fields_texts'] = $itemFieldTexts;
+        $itemData['files_data'] = $itemFilesData;
+        $itemData['public'] = $itemFilesData;
+        $document = $this->createDocumentFromItemMetadata($itemData, $itemFilesData);
 
         $params = [
             'id' => $document->id,
@@ -88,10 +92,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createDocumentFromItemMetadata($itemId, $identifier, $itemFieldTexts, $itemFilesData, $isPublic)
+    public function createDocumentFromItemMetadata($itemData, $itemFilesData)
     {
         // Create a new document.
-        $documentId = $this->getDocumentIdForItem($identifier);
+        $documentId = $this->getDocumentIdForItem($itemData['identifier']);
         $document = new AvantElasticsearchDocument($this->getNameOfActiveIndex(), $documentId);
 
         // Provide the document with data that has been cached here by the index builder to improve performance.
@@ -102,7 +106,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFilesData, $isPublic);
+        $document->copyItemElementValuesToDocument($itemData, $itemFilesData);
 
         return $document;
     }
@@ -418,8 +422,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'export-all':
                 case 'export-some':
                     $indexingAction = true;
-                    $limit = $action == 'export-all' ? 0 : 100;
-                    $this->performBulkIndexExport($indexingId, $indexingOperation, $limit);
+                    $limit = $action == 'export-all' ? 0 : 2;
+                    $this->performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit);
                     break;
 
                 case 'import-new':
@@ -485,8 +489,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), $event, FILE_APPEND);
     }
 
-    public function performBulkIndexExport($indexingId, $indexingOperation, $limit = 0)
+    public function performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit = 0)
     {
+        $this->setIndexName($indexName);
         $this->indexingId = $indexingId;
         $this->indexingOperation = $indexingOperation;
         $this->logCreateNew();
@@ -569,9 +574,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
 
             // Create a document for this item.
-            $itemFieldsTexts = $itemFieldTextsForChunk[$itemId];
-            $identifier = $itemFieldsTexts[$identifierElementId][0]['text'];
-            $document = $this->createDocumentFromItemMetadata($itemId, $identifier, $itemFieldsTexts, $itemFilesData, $itemData['public']);
+            $itemFieldTexts = $itemFieldTextsForChunk[$itemId];
+            $itemData['identifier'] = $itemFieldTexts[$identifierElementId][0]['text'];
+            $itemData['field_texts'] = $itemFieldTexts;
+            $itemData['files_data'] = $itemFilesData;
+            $document = $this->createDocumentFromItemMetadata($itemData, $itemFilesData);
 
             // Determine the size of the document in bytes. This is for reporting purposes only.
             $documentJson = json_encode($document);
@@ -655,7 +662,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $end = 0;
         $last = $this->batchDocumentsCount - 1;
 
-        while ($start < $last)
+        while ($start <= $last)
         {
             $batchSize = 0;
             $limitReached = false;
@@ -686,7 +693,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             $this->batchDocumentsTotalSize += $batchSize;
             $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
-            $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start, $end, $batchSizeMb));
+            $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start + 1, $end + 1, $batchSizeMb));
 
             // Perform the actual indexing on this batch of documents.
             $documentBatchParams = $this->createDocumentBatchParams($start, $end);

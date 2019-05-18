@@ -82,8 +82,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $catenatedText;
     }
 
-    public function copyItemElementValuesToDocument($itemId, $itemFieldTexts, $itemFilesData, $isPublic)
+    public function copyItemElementValuesToDocument($itemData, $itemFilesData)
     {
+        $itemId = $itemData['id'];
+        $itemFieldTexts = $itemData['field_texts'];
+
         $this->itemFilesData = $itemFilesData;
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
@@ -96,7 +99,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createSuggestionsData();
         $this->createTagData($itemId);
 
-        $this->addItemDataToDocumentBody($itemId, $isPublic);
+        $this->addItemDataToDocumentBody($itemId,  $itemData['public']);
     }
 
     protected function createAddressElementSortData($elasticsearchFieldName, $fieldText)
