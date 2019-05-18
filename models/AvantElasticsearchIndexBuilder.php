@@ -10,8 +10,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $batchDocumentsCount;
     protected $batchDocumentsSizes = array();
     protected $batchDocumentsTotalSize;
+    protected $document;
+    protected $fileStats;
+    protected $json;
     protected $indexingId;
     protected $indexingOperation;
+    protected $sqlFieldTextsData;
+    protected $sqlFilesData;
+    protected $sqlItemsData;
+    protected $sqlTagsData;
 
     public function __construct()
     {
@@ -69,6 +76,24 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
+    }
+
+    protected function compileItemFilesStats(array $itemFilesData)
+    {
+        // Gather statistics for this item's files. This is for reporting purposes only.
+        foreach ($itemFilesData as $itemFileData)
+        {
+            $count = 1;
+            $size = $itemFileData['size'];
+            $mimeType = $itemFileData['mime_type'];
+            if (isset($this->fileStats[$mimeType]))
+            {
+                $count += $this->fileStats[$mimeType]['count'];
+                $size += $this->fileStats[$mimeType]['size'];
+            }
+            $this->fileStats[$mimeType]['count'] = $count;
+            $this->fileStats[$mimeType]['size'] = $size;
+        }
     }
 
     public function createDocumentBatchParams($start, $end)
@@ -131,6 +156,36 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return true;
     }
 
+    protected function createItemData($index, $identifierElementId)
+    {
+        $itemData = $this->sqlItemsData[$index];
+        $itemId = $itemData['id'];
+
+        // Get the files data for the current item.
+        $itemFilesData = array();
+        if (isset($this->sqlFilesData[$itemId]))
+        {
+            $itemFilesData = $this->sqlFilesData[$itemId];
+        }
+        $this->compileItemFilesStats($itemFilesData);
+
+        // Get the tags data for the current item.
+        $itemTagsData = array();
+        if (isset($this->sqlTagsData[$itemId]))
+        {
+            $itemTagsData = $this->sqlTagsData[$itemId];
+        }
+
+        $itemFieldTexts = $this->sqlFieldTextsData[$itemId];
+
+        // Create a document for this item.
+        $itemData['identifier'] = $itemFieldTexts[$identifierElementId][0]['text'];
+        $itemData['field_texts'] = $itemFieldTexts;
+        $itemData['files_data'] = $itemFilesData;
+        $itemData['tags_data'] = $itemTagsData;
+        return $itemData;
+    }
+
     protected function createNewIndex()
     {
         $indexName = $this->getNameOfActiveIndex();
@@ -187,6 +242,63 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 throw new Exception($errorMessage);
             }
         }
+    }
+
+    protected function fetchDataFromSqlDatabase()
+    {
+        // This method performs a small number of SQL queries to obtain large amounts of data all at once.
+        // This saves having to make thousands of calls to SQL server as would be required if SQL queries
+        // were used for each document to be exported.
+
+        // Get all the items for this installation.
+        $this->logEvent(__('Fetch items data from SQL database'));
+        $this->sqlItemsData = $this->fetchItemsData();
+        if (empty($this->sqlItemsData))
+        {
+            $this->logError('Failed to fetch items data from SQL database');
+            return false;
+        }
+
+        // Get the files data for all items so that each document won't do a SQL query to get its item's file data.
+        $this->logEvent(__('Fetch file data from SQL database'));
+        $this->sqlFilesData = $this->fetchFilesData();
+        if (empty($this->sqlFilesData))
+        {
+            $this->logError('Failed to fetch file data from SQL database');
+            return false;
+        }
+
+        // Get the tags for all items so that each document won't do a SQL query to get its item's tags.
+        $this->logEvent(__('Fetch tag data from SQL database'));
+        $this->sqlTagsData = $this->fetchTagsData();
+        if (empty($this->sqlTagsData))
+        {
+            $this->logError('Failed to fetch tag data from SQL database');
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function fetchFieldTextsDataFromSqlDatabase($index, $itemsCount)
+    {
+        // Get field texts for a chunk of items. Chunking uses a fraction of the memory necessary to get all texts.
+        $chunkSize = 1000;
+        if ($index % $chunkSize == 0)
+        {
+            $firstItemId = $index;
+            $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
+            $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
+
+            $this->sqlFieldTextsData = $this->fetchFieldTextsForRangeOfItems($this->sqlItemsData[$firstItemId]['id'], $this->sqlItemsData[$lastItemId]['id']);
+            if (empty($this->sqlFieldTextsData))
+            {
+                $this->logError('Failed to fetch field texts from SQL database');
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function fetchFilesData($public = true)
@@ -264,7 +376,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $items;
     }
 
-    protected function fetchFieldTextsForAllItems($firstItemId, $lastItemId, $public = true)
+    protected function fetchFieldTextsForRangeOfItems($firstItemId, $lastItemId, $public = true)
     {
         // This method gets all element texts for all items in the database. It returns them as an array of item-field-texts.
         // * Each item-field-texts contains an array of field-texts, one for each of the item's elements.
@@ -373,6 +485,17 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemTagsData;
     }
 
+    protected function freeSqlData($itemId, $index)
+    {
+        // Tell PHP it can garbage-collect these objects. This reduces peak memory usage by 15% on export of 10,000 items.
+        unset($this->sqlItemsData[$index]);
+        if (isset($this->sqlFilesData[$itemId]))
+        {
+            unset($this->sqlFilesData[$itemId]);
+        }
+        unset($this->document);
+    }
+
     public function getElasticsearchFilesDirectoryName()
     {
         return FILES_DIR . DIRECTORY_SEPARATOR . 'elasticsearch';
@@ -471,6 +594,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'export-all':
                 case 'export-some':
                     $indexingAction = true;
+                    // The limit is used only during development to reduce the number of items exported when debugging.
                     $limit = $action == 'export-all' ? 0 : 100;
                     $this->performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit);
                     break;
@@ -516,6 +640,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         echo $response;
     }
 
+    protected function initializeIndexingOperation($indexName, $indexingId, $indexingOperation)
+    {
+        $this->setIndexName($indexName);
+        $this->indexingId = $indexingId;
+        $this->indexingOperation = $indexingOperation;
+        $this->logCreateNew();
+        $this->logEvent(__('Start %s', $indexingOperation));
+    }
+
     protected function logCreateNew()
     {
         // Create a new log file (overwrite an existing log file with the same name).
@@ -540,154 +673,37 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit = 0)
     {
-        $this->setIndexName($indexName);
-        $this->indexingId = $indexingId;
-        $this->indexingOperation = $indexingOperation;
-        $this->logCreateNew();
-        $this->logEvent(__('Start exporting'));
-
+        $this->initializeIndexingOperation($indexName, $indexingId, $indexingOperation);
         $this->cacheInstallationParameters();
 
-        // Get all the items for this installation.
-        $this->logEvent(__('Fetch items data from SQL database'));
-        $itemsData = $this->fetchItemsData();
-        if (empty($itemsData))
-        {
-            $this->logError('Failed to fetch items data from SQL database');
+        if (!$this->fetchDataFromSqlDatabase())
             return;
-        }
 
-        // Get the files data for all items so that each document won't do a SQL query to get its item's file data.
-        $this->logEvent(__('Fetch file data from SQL database'));
-        $filesData = $this->fetchFilesData();
-        if (empty($filesData))
-        {
-            $this->logError('Failed to fetch file data from SQL database');
-            return;
-        }
-
-        // Get the tags for all items so that each document won't do a SQL query to get its item's tags.
-        $this->logEvent(__('Fetch tag data from SQL database'));
-        $tagsData = $this->fetchTagsData();
-        if (empty($tagsData))
-        {
-            $this->logError('Failed to fetch tag data from SQL database');
-            return;
-        }
-
-        // Initialize variables used in the loop below.
-        $json = '';
-        $fileStats = array();
-        $documentSizeTotal = 0;
-        $itemFieldTextsForChunk = array();
-
-        // The limit is only used during development so that we don't always have
-        // to index all the items. It serves no purpose in a production environment
-        $itemsCount = $limit == 0 ? count($itemsData) : $limit;
-
+        $itemsCount = $limit == 0 ? count($this->sqlItemsData) : $limit;
+        $this->json = '';
+        $this->fileStats = array();
         $identifierElementId = ItemMetadata::getIdentifierElementId();
 
         $this->logEvent(__('Begin exporting %s items', $itemsCount));
         for ($index = 0; $index < $itemsCount; $index++)
         {
-            // Get field texts for a chunk of items. Chunking uses a fraction of the memory necessary to get all texts.
-            $chunkSize = 1000;
-            if ($index % $chunkSize == 0)
-            {
-                $firstItemId = $index;
-                $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
-                $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
+            if (!$this->fetchFieldTextsDataFromSqlDatabase($index, $itemsCount))
+                return;
 
-                $itemFieldTextsForChunk = $this->fetchFieldTextsForAllItems($itemsData[$firstItemId]['id'], $itemsData[$lastItemId]['id']);
-                if (empty($itemFieldTextsForChunk))
-                {
-                    $this->logError('Failed to fetch element texts from SQL database');
-                    return;
-                }
-            }
-
-            $itemData = $itemsData[$index];
-            $itemId = $itemData['id'];
-
-            // Get the files data for the current item.
-            $itemFilesData = array();
-            if (isset($filesData[$itemId]))
-            {
-                $itemFilesData = $filesData[$itemId];
-            }
-
-            // Get the tags data for the current item.
-            $itemTagsData = array();
-            if (isset($tagsData[$itemId]))
-            {
-                $itemTagsData = $tagsData[$itemId];
-            }
-
-            // Get statistics for this item's files. This is for reporting purposes only.
-            foreach ($itemFilesData as $itemFileData)
-            {
-                $count = 1;
-                $size = $itemFileData['size'];
-                $mimeType = $itemFileData['mime_type'];
-                if (isset($fileStats[$mimeType]))
-                {
-                    $count += $fileStats[$mimeType]['count'];
-                    $size += $fileStats[$mimeType]['size'];
-                }
-                $fileStats[$mimeType]['count'] = $count;
-                $fileStats[$mimeType]['size'] = $size;
-            }
-
-            // Create a document for this item.
-            $itemFieldTexts = $itemFieldTextsForChunk[$itemId];
-            $itemData['identifier'] = $itemFieldTexts[$identifierElementId][0]['text'];
-            $itemData['field_texts'] = $itemFieldTexts;
-            $itemData['files_data'] = $itemFilesData;
-            $itemData['tags_data'] = $itemTagsData;
-            $document = $this->createDocumentFromItemMetadata($itemData);
-
-            // Determine the size of the document in bytes. This is for reporting purposes only.
-            $documentJson = json_encode($document);
-            $documentSize = strlen($documentJson);
-            $documentSizeTotal += $documentSize;
-
-            // Write the document as an object to the JSON array, separating each object by a comma.
-            $separator = $index > 0 ? ',' : '';
-            $json .= $separator . $documentJson;
-
-            // Tell PHP it can garbage-collect these objects. Experiments showed that this reduced
-            // peak memory usage by 15% when exporting 10,000 items.
-            unset($itemsData[$index]);
-            if (isset($filesData[$itemId]))
-            {
-                unset($filesData[$itemId]);
-            }
-            unset($document);
+            // Create an Elasticsearch document for this item and encode it as JSON.
+            $itemData = $this->createItemData($index, $identifierElementId);
+            $this->document = $this->createDocumentFromItemMetadata($itemData);
+            $this->writeDocumentToJsonData($index);
+            $this->freeSqlData($itemData['id'], $index);
         }
 
-        // Report statistics.
-        $this->logEvent(__('Export complete. %s items totaling %s MB', $itemsCount, number_format($documentSizeTotal / MB_BYTES, 2)));
-        $this->logEvent(__('File Attachments:'));
-        foreach ($fileStats as $key => $fileStat)
-        {
-            $this->logEvent(__('%s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
-        }
-
-        // Write the JSON data to a file.
-        $fileSize = number_format(strlen($json) / MB_BYTES, 2);
-        $dataFileName = $this->getIndexingDataFileName($this->indexingId);
-        $this->logEvent(__('Write data to %s (%s MB)', $dataFileName, $fileSize));
-        file_put_contents($dataFileName, "[$json]");
+        $this->reportExportStatistics($itemsCount);
+        $this->writeJsonDataToFile();
     }
 
     public function performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex)
     {
-        $this->setIndexName($indexName);
-        $this->indexingId = $indexingId;
-        $this->indexingOperation = $indexingOperation;
-        $this->logCreateNew();
-        $this->logEvent(__('Start importing'));
-
+        $this->initializeIndexingOperation($indexName, $indexingId, $indexingOperation);
         $dataFileName = $this->getIndexingDataFileName($indexingId);
 
         // Verify that the import file exists.
@@ -787,5 +803,36 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // don't need the indexing Id parameter.
         $logFileName = $this->getIndexingLogFileName($indexingId, $indexingOperation);
         return file_get_contents($logFileName);
+    }
+
+    /**
+     * @param $itemsCount
+     */
+    protected function reportExportStatistics($itemsCount)
+    {
+        $this->logEvent(__('Export complete. %s items', $itemsCount));
+        $this->logEvent(__('File Attachments:'));
+        foreach ($this->fileStats as $key => $fileStat)
+        {
+            $this->logEvent(__('%s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
+        }
+    }
+
+    protected function writeDocumentToJsonData($index)
+    {
+        // Write the document as an object to the JSON array, separating each object by a comma.
+        $documentJson = json_encode($this->document);
+        $separator = $index > 0 ? ',' : '';
+        $this->json .= $separator . $documentJson;
+    }
+
+    protected function writeJsonDataToFile()
+    {
+        $fileSize = number_format(strlen($this->json) / MB_BYTES, 2);
+        $dataFileName = $this->getIndexingDataFileName($this->indexingId);
+        $logFileName = $this->getIndexingLogFileName($this->indexingId, $this->indexingOperation);
+        $this->logEvent(__('Write data to %s (%s MB)', $dataFileName, $fileSize));
+        $this->logEvent(__('Write this log to %s', $logFileName));
+        file_put_contents($dataFileName, "[$this->json]");
     }
 }
