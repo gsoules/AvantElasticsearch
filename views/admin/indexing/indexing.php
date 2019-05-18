@@ -121,7 +121,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
             startButton.on("click", function()
             {
-                if (selectedAction === 'import_new')
+                if (selectedAction === 'import-new')
                 {
                     if (!confirm('Are you sure you want to create a new index?\n\nThe current index will be DELETED.'))
                         return;
