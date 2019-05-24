@@ -169,6 +169,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
         function showStatus(status)
         {
+            status = status.replace(/(\r\n|\n|\r)/gm, '<BR/>');
             statusArea.html(status);
         }
 

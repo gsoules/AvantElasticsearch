@@ -36,10 +36,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemFilesData =  $this->getItemFilesData($item);
         $itemTagsData = $this->getItemTagsData($item);
         $itemData['identifier'] = $identifier;
-        $itemData['fields_texts'] = $itemFieldTexts;
+        $itemData['field_texts'] = $itemFieldTexts;
         $itemData['files_data'] = $itemFilesData;
         $itemData['tags_data'] = $itemTagsData;
-        $itemData['public'] = $itemFilesData;
+        $itemData['public'] = $item->public;
         $document = $this->createDocumentFromItemMetadata($itemData);
 
         $params = [
@@ -508,7 +508,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function getIndexingLogFileName($indexingId, $indexingOperation)
     {
-        $fileName = $this->getIndexingFileNamePrefix($indexingId) . '-' . $indexingOperation . '.html';
+        $fileName = $this->getIndexingFileNamePrefix($indexingId) . '-' . $indexingOperation . '.log';
         return $fileName;
     }
 
@@ -667,7 +667,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function logEvent($eventMessage)
     {
-        $event =  '<BR/>' . $eventMessage;
+        $event =  PHP_EOL . $eventMessage;
         file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), $event, FILE_APPEND);
     }
 
