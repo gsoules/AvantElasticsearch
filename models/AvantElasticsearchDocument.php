@@ -302,7 +302,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (empty($itemImageUrl))
         {
-            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['id']);
+            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['identifier']);
             if (!empty($coverImageIdentifier))
             {
                 $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
