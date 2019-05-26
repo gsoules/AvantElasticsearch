@@ -289,6 +289,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
         catch (Exception $e)
         {
             $this->recordException($e);
+            if (strpos($this->rootCauseReason, 'No mapping found') === 0)
+            {
+                // This should only happen if someone manually edited the sort argument in the query string.
+                $this->lastError = __('Invalid sort column specified');
+            }
             return null;
         }
     }
