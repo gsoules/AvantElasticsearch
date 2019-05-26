@@ -14,6 +14,7 @@ define('MB_BYTES', 1024 * 1024);
 class AvantElasticsearch
 {
     protected $indexOnlyPublicElements = true;
+    protected $rootCauseReason = '';
 
     // Should only be accessed via a getter or setter.
     private $indexName;
@@ -74,9 +75,9 @@ class AvantElasticsearch
                 {
                     $error = $jsonMessage->error;
                     $rootCause = $error->root_cause;
-                    $rootCauseReason = $rootCause[0]->reason;
+                    $this->rootCauseReason = $rootCause[0]->reason;
                     $errorReason = $error->reason;
-                    $message = "Type: $error->type<br/>Reason: $errorReason<br/>Root cause: $rootCauseReason";
+                    $message = "Type: $error->type<br/>Reason: $errorReason<br/>Root cause: $this->rootCauseReason";
                 }
                 else if (isset($jsonMessage->message))
                 {
