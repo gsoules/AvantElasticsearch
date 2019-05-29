@@ -302,7 +302,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (empty($itemImageUrl))
         {
-            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['identifier']);
+            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['id']);
             if (!empty($coverImageIdentifier))
             {
                 $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
@@ -462,11 +462,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $thumbUrl = $this->getImageUrl($itemData, true);
         $imageUrl = $this->getImageUrl($itemData, false);
 
-        $urlData = array(
-            'item' => $itemUrl,
-            'thumb' => $thumbUrl,
-            'image' => $imageUrl
-        );
+        $urlData['item'] = $itemUrl;
+        if (!empty($thumbUrl))
+        {
+            $urlData['thumb'] = $thumbUrl;
+            $urlData['image'] = $imageUrl;
+        }
 
         return $urlData;
     }
