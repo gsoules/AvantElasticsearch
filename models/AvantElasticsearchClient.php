@@ -292,7 +292,8 @@ class AvantElasticsearchClient extends AvantElasticsearch
             if (strpos($this->rootCauseReason, 'No mapping found') === 0)
             {
                 // This should only happen if someone manually edited the sort argument in the query string.
-                $this->lastError = __('Invalid sort column specified');
+                $column = array_keys($params["body"]["sort"][0])[0];
+                $this->lastError = __("Invalid sort column '%s' specified", $column);
             }
             return null;
         }
