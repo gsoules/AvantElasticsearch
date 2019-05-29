@@ -35,11 +35,11 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
-    protected function addTextFieldToMappingProperties($fieldName)
+    protected function addTextFieldToMappingProperties($fieldName, $analyzer = 'english')
     {
         $this->properties[$fieldName] = [
             'type' => 'text',
-            'analyzer' => 'english'
+            'analyzer' => $analyzer
         ];
     }
 
@@ -68,20 +68,16 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // Also make a keywordOnlyFields list for the same purpose.
         $textOnlyFields = array(
             'address',
+            'description',
             'identifier',
             'place',
             'subject',
+            'title',
             'type'
         );
 
         foreach ($elements as $elementName)
         {
-            if ($elementName == 'Description')
-            {
-                // The text field is added separately below because it uses a different analyzer.
-                continue;
-            }
-
             // Create a text and keyword mapping for item elements. The text fields is needed to allow full-text
             // search of the field. The keyword mapping is necessary for sorting.
             $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
@@ -96,12 +92,12 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             }
         }
 
-        // Text fields. These are text fields for full-text search, but don't need to also be keyword fields.
-        // Note that the 'item.title' field is a copy of the 'element.title' field. This one uses the English
-        // analyzer and the other doesn't in order to get the best possible search results on title content.
-        $this->addTextFieldToMappingProperties('element.description');
-        $this->addTextFieldToMappingProperties('item.title');
+        // Tags are not an element, so add a fields for them.
         $this->addTextFieldToMappingProperties('tags');
+
+        // The 'item.title' field is a copy of the 'element.title' field. This one uses the standard analyzer
+        // whereas element.title uses the english analyzer. This yields the best possible search results on title content.
+        $this->addTextFieldToMappingProperties('item.title', 'standard');
 
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
