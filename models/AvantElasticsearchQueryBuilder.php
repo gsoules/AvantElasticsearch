@@ -67,8 +67,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'analyzer' => "english",
                 'operator' => "and",
                 'fields' => [
-                    "item.title^5",
-                    "element.title^15",
+                    "item.title^15",
+                    "element.title^10",
                     "element.identifier^2",
                     "element.*",
                     "tags",
@@ -81,7 +81,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             "match" => [
                 "element.type" => [
                     "query" => "reference",
-                    "boost" => 10
+                    "boost" => 2
                 ]
             ]
         ];
@@ -106,6 +106,18 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             // contributed by this installation.
             $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
             $filters[] = array('term' => ['item.contributor-id' => $contributorId]);
+
+            if ($options['public'])
+            {
+                // Filter results to only contain public items.
+                $filters[] = array('term' => ['item.public' => true]);
+            }
+        }
+
+        if ($options['files'])
+        {
+            // Filter results to only contain items that have a file attached and thus have an image.
+            $filters[] = array('exists' => ['field' => "url.image"]);
         }
 
         if (count($filters) > 0)
