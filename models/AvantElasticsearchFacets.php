@@ -379,7 +379,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($leafEntries as $index => $leafEntry)
             {
                 if ($leafEntry['action'] == 'hide')
-                    return $html;
+                    continue;
 
                 $facetApplied = $leafEntry['action'] == 'remove' ? true : $facetApplied;
                 if ($this->entryHasNoFilteringEffect($leafEntry))
@@ -811,10 +811,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     }
                 }
 
-                $leafFacetNamePretty = str_replace(',', ', ', $leafFacetName);
                 $groupName = $this->facetDefinitions[$leafFacetGroup]['name'];
-                $filterBarFacets[$groupName]['name'][] = $leafFacetNamePretty;
-
                 $facetToRemoveRootPath = $leafFacetName;
                 $parts = explode(',', $facetToRemoveRootPath);
                 $facetToRemoveName = $parts[count($parts) - 1];
@@ -848,7 +845,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 if (!$skipThisRoot)
                 {
                     // It's okay to add this root since none of its leaf facets are applied.
-                    $filterBarFacets[$groupName]['name'][] = $rootFacetName;
                     $resetLink = $this->emitHtmlLinkForRemoveFilter($rootFacetGroup, $rootFacetName, $rootFacetName, true);
                     $filterBarFacets[$groupName]['reset'][] = $resetLink;
                 }
@@ -860,10 +856,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if (count($filterBarFacets) >= 2)
         {
             $resetLink = $this->emitHtmlForResetLink($query);
-            $filterBarFacets[__('Clear all')] = [
-                'name' => [__('zzz')],
-                'reset' => [$resetLink]
-            ];
+            $filterBarFacets[__('Clear all')] = ['reset' => [$resetLink]];
         }
 
         return $filterBarFacets;
@@ -952,8 +945,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         }
                         else
                         {
-                            // Make the leaf visible by changing its action from 'hide' to 'add'.
-                            $actionKind = 'add';
+                            // Make the leaf visible unless it has the same name as the root.
+                            if ($leaf['root'] == $leaf['name'])
+                                $actionKind = 'hide';
+                            else
+                                $actionKind = 'add';
                         }
                         $this->facetsTable[$rootFacetGroup][$facetIndex]['leafs'][$index]['action'] = $actionKind;
                     }
