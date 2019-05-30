@@ -469,7 +469,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $terms = isset($query['query']) ? $query['query'] : '';
         $queryString = "query=" . urlencode($terms);
         $resetUrl = $this->findUrl . '?' . $queryString . $otherArgs;
-        $resetLink = '&nbsp;&nbsp;<a href="' . $resetUrl . '" title="Reset" class="search-link">' . '&#10006;' . '</a>';
+        $resetLink = '<a href="' . $resetUrl . '" title="Reset" class="search-reset-link">' . '&#10006;' . '</a>';
         return $resetLink;
     }
 
@@ -548,8 +548,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->setFacetsTableActions();
 
         $title = __('Refine your search');
-        $resetLink = $this->emitHtmlForResetLink($query);
-        $html = "<div class='facet-sections-title'>$title$resetLink</div>";
+        $html = "<div class='facet-sections-title'>$title</div>";
 
         // Display all the facet entries.
         $html .= $this->emitHtmlForFacetSections();
@@ -577,7 +576,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Create the link that the user can click to remove this facet, but leave all the other applied facets.
         // In the facet text, add a space after each comma for readability.
         $facetUrl = $this->findUrl . '?' . $updatedQueryString;
-        $link = $facetToRemoveName . ' <a href="' . $facetUrl . '" class="search-link">' . '&#10006;' . '</a>';
+        $link = $facetToRemoveName . '<a href="' . $facetUrl . '" title="Remove filter" class="search-reset-link">' . '&#10006;' . '</a>';
         return $link;
     }
 
@@ -854,6 +853,17 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $filterBarFacets[$groupName]['reset'][] = $resetLink;
                 }
             }
+        }
+
+        ksort($filterBarFacets);
+
+        if (count($filterBarFacets) >= 2)
+        {
+            $resetLink = $this->emitHtmlForResetLink($query);
+            $filterBarFacets[__('Clear all')] = [
+                'name' => [__('zzz')],
+                'reset' => [$resetLink]
+            ];
         }
 
         return $filterBarFacets;
