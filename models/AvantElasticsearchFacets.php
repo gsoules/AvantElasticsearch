@@ -794,6 +794,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $appliedRootFacets = $this->appliedFacets['root'];
         $appliedLeafFacets = $this->appliedFacets['leaf'];
 
+        $this->queryStringWithApplieFacets = $this->createQueryStringWithFacets($query);
+
         // Add all the leaf facets to the filter bar facets.
         foreach ($appliedLeafFacets as $leafFacetGroup => $leafFacetNames)
         {
@@ -810,9 +812,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     }
                 }
 
-                $leafFacetName = str_replace(',', ', ', $leafFacetName);
+                $leafFacetNamePretty = str_replace(',', ', ', $leafFacetName);
                 $groupName = $this->facetDefinitions[$leafFacetGroup]['name'];
-                $filterBarFacets[$groupName][] = $leafFacetName;
+                $filterBarFacets[$groupName]['name'][] = $leafFacetNamePretty;
+
+                $facetToRemoveRootPath = $leafFacetName;
+                $parts = explode(',', $facetToRemoveRootPath);
+                $facetToRemoveName = $parts[count($parts) - 1];
+                $resetLink = $this->emitHtmlLinkForRemoveFilter($leafFacetGroup, $facetToRemoveName, $facetToRemoveRootPath, false);
+                $filterBarFacets[$groupName]['reset'][] = $resetLink;
             }
         }
 
@@ -825,9 +833,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $skipThisRoot = false;
 
                 // Check to see if this root is the root of a leaf that's applied
-                if (isset($filterBarFacets[$groupName]))
+                if (isset($filterBarFacets[$groupName]['name']))
                 {
-                    foreach ($filterBarFacets[$groupName] as $facetName)
+                    foreach ($filterBarFacets[$groupName]['name'] as $facetName)
                     {
                         if (strpos($facetName, $rootFacetName . ',') === 0)
                         {
@@ -841,7 +849,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 if (!$skipThisRoot)
                 {
                     // It's okay to add this root since none of its leaf facets are applied.
-                    $filterBarFacets[$groupName][] = $rootFacetName;
+                    $filterBarFacets[$groupName]['name'][] = $rootFacetName;
+                    $resetLink = $this->emitHtmlLinkForRemoveFilter($rootFacetGroup, $rootFacetName, $rootFacetName, true);
+                    $filterBarFacets[$groupName]['reset'][] = $resetLink;
                 }
             }
         }
