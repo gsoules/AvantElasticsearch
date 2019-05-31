@@ -60,7 +60,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->reportException($e);
+            $this->recordException($e);
         }
     }
 
@@ -265,13 +265,15 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         $this->lastException = $e;
         $this->lastError = $this->getElasticsearchExceptionMessage($e);
+        $this->reportException();
     }
 
-    protected function reportException(Exception $e)
+    protected function reportException()
     {
-        // TO-DO: Need to figure out what to do to report a Client exception, e.g. send email.
-        // For now keep a breakpoint here.
-        $this->recordException($e);
+        $subject = 'Exception in ES client on ' . date("Y-m-d H:i:s");
+        $body = $this->lastError;
+        $body = str_replace('<br/>', PHP_EOL, $body);
+        AvantCommon::sendEmailToAdministrator($subject, $body);
     }
 
     public function search($params)
@@ -309,7 +311,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->reportException($e);
+            $this->recordException($e);
             return null;
         }
     }

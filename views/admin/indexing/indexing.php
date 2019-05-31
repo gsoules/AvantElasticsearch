@@ -1,5 +1,4 @@
 <?php
-
 $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
 
 if (AvantCommon::isAjaxRequest())
