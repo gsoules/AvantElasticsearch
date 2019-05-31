@@ -15,13 +15,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
-    public function constructSearchQueryParams($options, $commingled)
+    public function constructSearchQueryParams($options, $commingled, $isIndexView)
     {
-        if (!isset($options['query']) || !is_array($options['query']))
-        {
-            throw new Exception("Query parameter is required to execute elasticsearch query.");
-        }
-
         $offset = isset($options['offset']) ? $options['offset'] : 0;
         $limit = isset($options['limit']) ? $options['limit'] : 20;
         $terms = isset($options['query']['query']) ? $options['query']['query'] : '';
