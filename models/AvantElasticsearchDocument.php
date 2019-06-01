@@ -50,9 +50,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $urlData = $this->getItemUrlData($itemData);
         $this->setField('url', $urlData);
 
-        $pdfData = $this->getItemPdfData($itemData);
-        if (!empty($pdfData))
-            $this->setField('pdf', $pdfData);
+        $fileText = $this->getItemFileText($itemData);
+        if (!empty($fileText))
+            $this->setField('pdf', $fileText);
 
         $itemAttributes = $this->getItemAttributes($itemData, $this->titleString);
         $this->setField('item', $itemAttributes);
@@ -377,32 +377,33 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $webPath;
     }
 
-    protected function getItemPdfData($itemData)
+    protected function getItemFileText($itemData)
     {
-        $pdfMimeTypes = array(
+        $textFileMimeTypes = array(
             'application/pdf',
             'application/x-pdf',
             'application/acrobat',
             'text/x-pdf',
             'text/pdf',
+            'text/plain',
             'applications/vnd.pdf'
         );
 
-        $pdfData = array();
-        $pdfTexts = array();
+        $fileData = array();
+        $fileTexts = array();
         $fileNames = array();
         $filePaths = array();
 
-        foreach ($itemData['files_data'] as $fileData)
+        foreach ($itemData['files_data'] as $data)
         {
-            if (!in_array($fileData['mime_type'], $pdfMimeTypes))
+            if (!in_array($data['mime_type'], $textFileMimeTypes))
             {
-                // This is not a PDF file.
+                // This is not file that we know how to get text from.
                 continue;
             }
 
-            // Attempt to extract the PDF file's text.
-            $fileName = $fileData['filename'];
+            // Attempt to extract the file's text.
+            $fileName = $data['filename'];
             $filepath = $this->getItemPdfFilepath('original', $fileName);
             if (!file_exists($filepath))
             {
@@ -417,7 +418,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 }
             }
 
-            $text = self::extractTextFromPdf($filepath);
+            if ($data['mime_type'] == 'text/plain')
+            {
+                $text = file_get_contents($filepath);
+            }
+            else
+            {
+                $text = self::extractTextFromPdf($filepath);
+            }
 
             if (!is_string($text))
             {
@@ -430,23 +438,23 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Strip non ASCII characters from the text.
             $text = preg_replace('/[\x00-\x1F\x7F-\xFF]/', ' ', $text);
 
-            // Record the PDF's text and its file name in parallel arrays so we know which file contains which text.
-            $pdfTexts[] = $text;
-            $fileNames[] = $fileData['original_filename'];
-            $filePaths[] = $this->getItemImageFileWebPath($fileData, IMAGE_FILE_TYPE_ORIGINAL);
+            // Record the file's text and its file name in parallel arrays so we know which file contains which text.
+            $fileTexts[] = $text;
+            $fileNames[] = $data['original_filename'];
+            $filePaths[] = $this->getItemImageFileWebPath($data, IMAGE_FILE_TYPE_ORIGINAL);
         }
 
-        if (!empty($pdfTexts) && !empty($fileNames))
+        if (!empty($fileTexts) && !empty($fileNames))
         {
             foreach ($fileNames as $index => $fileName)
             {
-                $pdfData["text-$index"] = $pdfTexts[$index];
-                $pdfData['file-name'][] = $fileName;
-                $pdfData['file-url'][] = $filePaths[$index];
+                $fileData["text-$index"] = $fileTexts[$index];
+                $fileData['file-name'][] = $fileName;
+                $fileData['file-url'][] = $filePaths[$index];
             }
         }
 
-        return $pdfData;
+        return $fileData;
     }
 
     protected function getItemPdfFilepath($directory, $filename)

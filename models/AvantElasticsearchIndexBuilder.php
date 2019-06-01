@@ -35,6 +35,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemFieldTexts = $this->getItemFieldTexts($item);
         $itemFilesData =  $this->getItemFilesData($item);
         $itemTagsData = $this->getItemTagsData($item);
+        $itemData['id'] = $item->id;
         $itemData['identifier'] = $identifier;
         $itemData['field_texts'] = $itemFieldTexts;
         $itemData['files_data'] = $itemFilesData;
