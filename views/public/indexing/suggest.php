@@ -1,6 +1,8 @@
 <?php
+    $executionSeconds0 = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
+
     // Get the text to show suggestions for.
-    $prefix = isset($_REQUEST['term']) ? $_REQUEST['term'] : '';
+    $prefix = isset($_REQUEST['query']) ? $_REQUEST['query'] : '';
 
     // Specify how many suggestions to return.
     $maxRequests = 7;
@@ -18,7 +20,10 @@
     $prefix = $avantElasticsearchSuggest->stripPunctuation($prefix);
 
     $params = $avantElasticsearchQueryBuilder->constructSuggestQueryParams($prefix, false, $maxRequests);
+    $start =  microtime(true);
     $rawSuggestions = $avantElasticsearchClient->suggest($params);
+    $end =  microtime(true);
+    $executionSeconds1 = $end - $start;
 
     if (empty($rawSuggestions))
     {
@@ -57,6 +62,12 @@
         $suggestions[] = (object) array('label' => $firstTitle, 'value' => $value);
     }
 
+    $executionSeconds2 = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
+    $suggestions[] = (object) array('label' => $executionSeconds0, 'value' => '');
+    $suggestions[] = (object) array('label' => $executionSeconds1, 'value' => '');
+    $suggestions[] = (object) array('label' => $executionSeconds2, 'value' => '');
+
     // Return the suggestions as JSON in response to the autocomplete request.
     echo json_encode($suggestions);
+
 
