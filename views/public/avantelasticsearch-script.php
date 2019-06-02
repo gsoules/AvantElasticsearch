@@ -21,7 +21,7 @@ jQuery(document).ready(function()
                 url: suggestUrl,
                 dataType: "json",
                 data: {
-                    term : request.term,
+                    query : request.term,
                     all : searchAllIsChecked() ? 'on' : 'off'
                 },
                 success: function(data) {
