@@ -30,7 +30,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function createElasticsearchClient(array $options)
     {
-        $timeout = isset($options['timeout']) ? $options['timeout'] : 30;
+        $timeout = isset($options['timeout']) ? $options['timeout'] : 10;
         $nobody = isset($options['nobody']) ? $options['nobody'] : false;
 
         $builder = ClientBuilder::create();
