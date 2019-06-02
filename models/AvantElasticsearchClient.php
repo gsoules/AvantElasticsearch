@@ -295,7 +295,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
             {
                 // This should only happen if someone manually edited the sort argument in the query string.
                 $column = array_keys($params["body"]["sort"][0])[0];
-                $this->lastError = __("Invalid sort column '%s' specified", $column);
+                $this->lastError = __("Invalid sort column: '%s'", $column);
             }
             return null;
         }
