@@ -3,7 +3,7 @@
     $prefix = isset($_REQUEST['query']) ? $_REQUEST['query'] : '';
 
     // Specify how many suggestions to return.
-    $maxRequests = 7;
+    $maxRequests = 12;
 
     $avantElasticsearchClient = new AvantElasticsearchClient();
     if (!$avantElasticsearchClient->ready())
