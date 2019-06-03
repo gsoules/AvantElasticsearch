@@ -20,6 +20,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $avantElasticsearchFacets;
     protected $facetDefinitions;
     protected $itemHasDate = false;
+    protected $itemHasPlace = false;
+    protected $itemHasSubject = false;
+    protected $itemHasType = false;
     protected $itemHasIdentifier = false;
     protected $itemTypeIsReference = false;
     protected $itemSubjectIsPeople = false;
@@ -230,11 +233,30 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->elementData['identifier'] = $aliasText;
         }
 
+
+        // Create a field-text to represent an unspecified date, place, or subject.
         if (!$this->itemHasDate)
         {
-            // Create an empty field-text to represent date unknown. Wrap it in a field-texts array.
-            $emptyDateFieldTexts = $this->createFieldTexts('');
-            $this->createFacetDataForField('date', $emptyDateFieldTexts);
+            $fieldTexts = $this->createFieldTexts('[blank]');
+            $this->createFacetDataForField('date', $fieldTexts);
+        }
+
+        if (!$this->itemHasPlace)
+        {
+            $fieldTexts = $this->createFieldTexts('[blank]');
+            $this->createFacetDataForField('place', $fieldTexts);
+        }
+
+        if (!$this->itemHasSubject)
+        {
+            $fieldTexts = $this->createFieldTexts('[blank]');
+            $this->createFacetDataForField('subject', $fieldTexts);
+        }
+
+        if (!$this->itemHasType)
+        {
+            $fieldTexts = $this->createFieldTexts('[blank]');
+            $this->createFacetDataForField('type', $fieldTexts);
         }
     }
 
@@ -504,30 +526,30 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->titleString = $fieldTextsString;
             if (strlen($this->titleString) == 0)
             {
-                $this->titleString = __('Untitled');
+                $this->titleString = UNTITLED_ITEM;
             }
             $this->titleFieldTexts = $fieldTexts;
         }
 
         if ($elasticsearchFieldName == 'identifier')
-        {
             $this->itemHasIdentifier = true;
-        }
 
         if ($elasticsearchFieldName == 'date')
-        {
             $this->itemHasDate = true;
+
+        if ($elasticsearchFieldName == 'place')
+            $this->itemHasPlace = true;
+
+        if ($elasticsearchFieldName == 'subject')
+        {
+            $this->itemHasSubject = true;
+            $this->itemSubjectIsPeople = strpos($fieldTextsString, 'People') !== false;
         }
 
         if ($elasticsearchFieldName == 'type')
         {
-            // TO-DO: Make this logic generic so it doesn't depend on knowledge of specific type and subject values.
+            $this->itemHasType = true;
             $this->itemTypeIsReference = $fieldTextsString == 'Reference';
-        }
-
-        if ($elasticsearchFieldName == 'subject')
-        {
-            $this->itemSubjectIsPeople = strpos($fieldTextsString, 'People') !== false;
         }
     }
 }

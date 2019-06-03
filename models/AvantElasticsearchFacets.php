@@ -103,6 +103,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetName = $facetTableEntry['name'];
         $facetText = str_replace(',', ', ', $facetName);
 
+        if ($facetText == BLANK_FACET_TEXT)
+        {
+            $facetText = BLANK_FACET_SUBSTITUTE;
+        }
+
         $html = '';
 
         if ($action == 'add')
@@ -709,28 +714,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function getFacetValueForDate($text)
     {
-        if ($text == '')
+        if ($text == BLANK_FACET_TEXT)
+            return $text;
+
+        $year = '';
+        if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
         {
-            $value = __('Unknown');
+            $year = $matches[1];
+        }
+
+        if (empty($year))
+        {
+            // This date is malformed.
+            $value = BLANK_FACET_TEXT;
         }
         else
         {
-            $year = '';
-            if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
-            {
-                $year = $matches[1];
-            }
-
-            if (empty($year))
-            {
-                // This date is malformed.
-                $value = __('Unknown');
-            }
-            else
-            {
-                $decade = $year - ($year % 10);
-                $value = $decade . "s";
-            }
+            $decade = $year - ($year % 10);
+            $value = $decade . "s";
         }
 
         return $value;
