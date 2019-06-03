@@ -86,7 +86,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     public function copyItemElementValuesToDocument($itemData)
     {
-        $itemId = $itemData['id'];
         $itemFieldTexts = $itemData['field_texts'];
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)

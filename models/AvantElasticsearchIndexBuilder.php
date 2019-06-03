@@ -541,7 +541,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function getItemFilesData($item)
     {
-        $itemId = $item->id;
         $itemFiles = $item->Files;
         $itemFilesData = array();
 
