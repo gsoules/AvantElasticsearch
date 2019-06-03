@@ -139,7 +139,19 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         if ($this->AvantSearchUsesElasticsearch())
         {
             // Emit the Javascript for Elasticsearch suggestions while typing in the search box.
-            echo get_view()->partial('avantelasticsearch-script.php');
+            $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+            $activeIndexName = $avantElasticsearchQueryBuilder->getNameOfActiveIndex();
+            $localIndexName = AvantElasticsearch::getNameOfLocalIndex();
+            $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
+            $findUrl = url('find?query=');
+            $suggestUrl = ElasticsearchConfig::getOptionValueForHost();
+
+            echo get_view()->partial('avantelasticsearch-script.php', array(
+                'suggestUrl' => $suggestUrl,
+                'findUrl' => $findUrl,
+                'activeIndex' => $activeIndexName,
+                'localIndex' => $localIndexName,
+                'sharedIndex' => $sharedIndexName));
         }
     }
 

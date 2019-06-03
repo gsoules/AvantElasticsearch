@@ -1,9 +1,12 @@
 <script type="text/javascript">
 jQuery(document).ready(function()
 {
+    var activeIndex = '<?php echo $activeIndex; ?>';
+    var localIndex = '<?php echo $localIndex; ?>';
+    var sharedIndex = '<?php echo $sharedIndex; ?>';
+    var suggestUrl = '<?php echo $suggestUrl; ?>';
+    var findUrl = '<?php echo $findUrl; ?>';
     var searchAllCheckbox = jQuery('#all');
-    //var suggestUrl = '<?php echo url('/elasticsearch/suggest'); ?>';
-    var suggestUrl = 'https://search-digitalarchive-6wn5q4bmsxnikvykh7xiswwo4q.us-east-2.es.amazonaws.com/mdi/_search';
 
     function searchAllIsChecked()
     {
@@ -12,16 +15,16 @@ jQuery(document).ready(function()
 
     searchAllCheckbox.change(function (e)
     {
-        Cookies.set('SEARCH-ALL', searchAllIsChecked(), {expires: 7});
+        var checked = searchAllIsChecked();
+        activeIndex = checked ? sharedIndex : localIndex;
+        Cookies.set('SEARCH-ALL', checked, {expires: 7});
     });
-
-    // account for all=on
 
     function constructSuggestQuery(term)
     {
         var query =
             {
-                "_source":["suggestions","item.title"],
+                "_source":["item.title"],
                 "suggest":{
                     "keywords-suggest":
                         {
@@ -41,15 +44,21 @@ jQuery(document).ready(function()
             };
 
         query = JSON.stringify(query);
-        console.log('QUERY: ' + query);
         return query;
+    }
+
+    function constructSuggestUrl()
+    {
+        var url = 'https://search-digitalarchive-6wn5q4bmsxnikvykh7xiswwo4q.us-east-2.es.amazonaws.com/';
+        url += activeIndex + '/_search';
+        return url;
     }
 
     jQuery( "#query" ).autocomplete(
     {
         source: function(request, response) {
             jQuery.ajax({
-                url: suggestUrl,
+                url: constructSuggestUrl(),
                 method: "POST",
                 contentType: 'application/json; charset=UTF-8',
                 crossDomain: true,
@@ -57,11 +66,35 @@ jQuery(document).ready(function()
                 data: constructSuggestQuery(request.term),
                 success: function(data)
                 {
-                    console.log('SUCCESS');
-                    var suggestions = JSON.stringify(data);
-                    console.log(suggestions);
-                    var x = [{"label":"TTT", "value":"VVVV"}, {"label":"222", "value":"333"}];
-                    response(x);
+                    var suggestions = [];
+                    var titles = [];
+                    var options = data["suggest"]["keywords-suggest"][0]["options"];
+                    var count = options.length;
+                    if (count === 0)
+                    {
+                        console.log('FOUND: ' + count);
+                    }
+                    for (i = 0; i < count; i++)
+                    {
+                        // Get the titles for this suggestion.
+                        var option = options[i]["_source"]["item"]["title"];
+
+                        // Use just the first title.
+                        var title = option.split('\n')[0];
+
+                        if ((titles.indexOf(title) === -1))
+                        {
+                            // The title is not already in the array so add it.
+                            titles.push(title);
+                            var value = findUrl + encodeURI(title);
+                            if (activeIndex === sharedIndex)
+                                value += '&all=on';
+                            suggestions.push({"label":title, "value":value});
+                            //console.log('ADD:' + title + ' : ' + value);
+                        }
+                    }
+
+                    response(suggestions);
                 },
                 error: function(jqXHR, textStatus, errorThrown)
                 {
