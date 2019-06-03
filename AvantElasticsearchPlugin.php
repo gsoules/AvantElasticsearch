@@ -136,23 +136,25 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookPublicFooter($args)
     {
-        if ($this->AvantSearchUsesElasticsearch())
-        {
-            // Emit the Javascript for Elasticsearch suggestions while typing in the search box.
-            $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
-            $activeIndexName = $avantElasticsearchQueryBuilder->getNameOfActiveIndex();
-            $localIndexName = AvantElasticsearch::getNameOfLocalIndex();
-            $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
-            $findUrl = url('find?query=');
-            $suggestUrl = ElasticsearchConfig::getOptionValueForHost();
+        if (!$this->AvantSearchUsesElasticsearch())
+            return;
 
-            echo get_view()->partial('avantelasticsearch-script.php', array(
-                'suggestUrl' => $suggestUrl,
-                'findUrl' => $findUrl,
-                'activeIndex' => $activeIndexName,
-                'localIndex' => $localIndexName,
-                'sharedIndex' => $sharedIndexName));
-        }
+        // Emit the Javascript for Elasticsearch suggestions while typing in the search box.
+        $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+        $activeIndexName = $avantElasticsearchQueryBuilder->getNameOfActiveIndex();
+        $localIndexName = AvantElasticsearch::getNameOfLocalIndex();
+        $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
+        $findUrl = url('find?query=');
+        $suggestUrl = 'https://' . ElasticsearchConfig::getOptionValueForHost();
+        $query = $avantElasticsearchQueryBuilder->constructSuggestQueryParams(1, 12);
+
+        echo get_view()->partial('avantelasticsearch-script.php', array(
+            'query' => $query,
+            'suggestUrl' => $suggestUrl,
+            'findUrl' => $findUrl,
+            'activeIndex' => $activeIndexName,
+            'localIndex' => $localIndexName,
+            'sharedIndex' => $sharedIndexName));
     }
 
     public function hookPublicHead($args)

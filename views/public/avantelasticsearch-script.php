@@ -2,10 +2,12 @@
 jQuery(document).ready(function()
 {
     var activeIndex = '<?php echo $activeIndex; ?>';
+    var findUrl = '<?php echo $findUrl; ?>';
     var localIndex = '<?php echo $localIndex; ?>';
+    var query = '<?php echo $query; ?>';
     var sharedIndex = '<?php echo $sharedIndex; ?>';
     var suggestUrl = '<?php echo $suggestUrl; ?>';
-    var findUrl = '<?php echo $findUrl; ?>';
+
     var searchAllCheckbox = jQuery('#all');
 
     function searchAllIsChecked()
@@ -22,36 +24,12 @@ jQuery(document).ready(function()
 
     function constructSuggestQuery(term)
     {
-        var query =
-            {
-                "_source":["item.title"],
-                "suggest":{
-                    "keywords-suggest":
-                        {
-                            "prefix":term,
-                            "completion":
-                                {
-                                    "field":"suggestions",
-                                    "skip_duplicates":false,
-                                    "size":12,
-                                    "fuzzy":
-                                        {
-                                            "fuzziness":0
-                                        }
-                                }
-                        }
-                }
-            };
-
-        query = JSON.stringify(query);
-        return query;
+        return query.replace('%s', term);
     }
 
     function constructSuggestUrl()
     {
-        var url = 'https://search-digitalarchive-6wn5q4bmsxnikvykh7xiswwo4q.us-east-2.es.amazonaws.com/';
-        url += activeIndex + '/_search';
-        return url;
+        return suggestUrl + '/' + activeIndex + '/_search';
     }
 
     jQuery( "#query" ).autocomplete(
@@ -70,10 +48,6 @@ jQuery(document).ready(function()
                     var titles = [];
                     var options = data["suggest"]["keywords-suggest"][0]["options"];
                     var count = options.length;
-                    if (count === 0)
-                    {
-                        console.log('FOUND: ' + count);
-                    }
                     for (i = 0; i < count; i++)
                     {
                         // Get the titles for this suggestion.
@@ -93,7 +67,6 @@ jQuery(document).ready(function()
                             //console.log('ADD:' + title + ' : ' + value);
                         }
                     }
-
                     response(suggestions);
                 },
                 error: function(jqXHR, textStatus, errorThrown)
