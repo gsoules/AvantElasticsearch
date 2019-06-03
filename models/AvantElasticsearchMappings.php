@@ -105,7 +105,10 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addBooleanFieldToMappingProperties('item.public');
 
         // Numeric fields.
-        $this->addNumericFieldToMappingProperties('item.file-count');
+        $this->addNumericFieldToMappingProperties('file.audio');
+        $this->addNumericFieldToMappingProperties('file.document');
+        $this->addNumericFieldToMappingProperties('file.image');
+        $this->addNumericFieldToMappingProperties('file.video');
         $this->addNumericFieldToMappingProperties('item.id');
 
         // Keyword fields. None of these require full-text search.
@@ -126,9 +129,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('sort.address-number');
         $this->addKeywordFieldToMappingProperties('sort.address-street');
         $this->addKeywordFieldToMappingProperties('sort.identifier');
-//        $this->addKeywordFieldToMappingProperties('sort.place');
-//        $this->addKeywordFieldToMappingProperties('sort.subject');
-//        $this->addKeywordFieldToMappingProperties('sort.type');
         $this->addKeywordFieldToMappingProperties('url.image');
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');

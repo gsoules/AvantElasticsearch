@@ -168,7 +168,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     public function constructTermAggregationsQueryParams($fieldName)
     {
         $params = [
-            'index' => $this->getNameOfActiveIndex(),
+            'index' => $this->getNameOfLocalIndex(),
             'body' => [
                 'size' => 0,
                 'aggregations' => [
@@ -177,9 +177,24 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                             'field' => $fieldName
                         ],
                         'aggregations' => [
-                            'files' => [
+                            'audio' => [
                                 'sum' => [
-                                    'field' => 'item.file-count'
+                                    'field' => 'file.audio'
+                                ]
+                             ],
+                            'document' => [
+                                'sum' => [
+                                    'field' => 'file.document'
+                                ]
+                             ],
+                            'image' => [
+                                'sum' => [
+                                    'field' => 'file.image'
+                                ]
+                             ],
+                            'video' => [
+                                'sum' => [
+                                    'field' => 'file.video'
                                 ]
                              ]
                         ]

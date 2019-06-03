@@ -60,6 +60,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $itemAttributes = $this->getItemAttributes($itemData, $this->titleString);
         $this->setField('item', $itemAttributes);
 
+        $fileCounts = $this->getFileCounts($itemData);
+        $this->setField('file', $fileCounts);
+
         $this->setField('element', $this->elementData);
         $this->setField('sort', $this->sortData);
         $this->setField('facet', $this->facetData);
@@ -322,13 +325,51 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $pdfText;
     }
 
+    protected function getFileCounts($itemData)
+    {
+        $audio = 0;
+        $document = 0;
+        $image = 0;
+        $video = 0;
+
+        // This test for applicable mime types is overly simplistic given how many
+        // mime types exist, but it's sufficient for statistics gatering purposes.
+        foreach ($itemData['files_data'] as $fileData)
+        {
+            $mimeType = $fileData['mime_type'];
+            if (strpos($mimeType, 'pdf') === 0)
+            {
+                $document++;
+            }
+            else if (strpos($mimeType, 'image') === 0)
+            {
+                $image++;
+            }
+            else if (strpos($mimeType, 'audio') === 0)
+            {
+                $audio++;
+            }
+            else if (strpos($mimeType, 'video') === 0)
+            {
+                $video++;
+            }
+        }
+
+        $fileCounts = array(
+            'audio' => $audio,
+            'document' => $document,
+            'image' => $image,
+            'video' => $video
+        );
+        return $fileCounts;
+    }
+
     protected function getItemAttributes($itemData, $titleString)
     {
         $itemAttributes = array(
             'id' => $itemData['id'],
             'title' => $titleString,
             'public' => (bool)$itemData['public'],
-            'file-count' => count($itemData['files_data']),
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
         );
@@ -377,12 +418,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         $textFileMimeTypes = array(
             'application/pdf',
-            'application/x-pdf',
-            'application/acrobat',
-            'text/x-pdf',
-            'text/pdf',
-            'text/plain',
-            'applications/vnd.pdf'
+            'text/plain'
         );
 
         $fileData = array();
@@ -394,7 +430,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             if (!in_array($data['mime_type'], $textFileMimeTypes))
             {
-                // This is not file that we know how to get text from.
+                // This is not a file that we know how to get text from.
                 continue;
             }
 
