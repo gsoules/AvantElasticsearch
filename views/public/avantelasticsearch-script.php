@@ -2,7 +2,8 @@
 jQuery(document).ready(function()
 {
     var searchAllCheckbox = jQuery('#all');
-    var suggestUrl = '<?php echo url('/elasticsearch/suggest'); ?>';
+    //var suggestUrl = '<?php echo url('/elasticsearch/suggest'); ?>';
+    var suggestUrl = 'https://search-digitalarchive-6wn5q4bmsxnikvykh7xiswwo4q.us-east-2.es.amazonaws.com/mdi/_search';
 
     function searchAllIsChecked()
     {
@@ -14,18 +15,58 @@ jQuery(document).ready(function()
         Cookies.set('SEARCH-ALL', searchAllIsChecked(), {expires: 7});
     });
 
+    // account for all=on
+
+    function constructSuggestQuery(term)
+    {
+        var query =
+            {
+                "_source":["suggestions","item.title"],
+                "suggest":{
+                    "keywords-suggest":
+                        {
+                            "prefix":term,
+                            "completion":
+                                {
+                                    "field":"suggestions",
+                                    "skip_duplicates":false,
+                                    "size":12,
+                                    "fuzzy":
+                                        {
+                                            "fuzziness":0
+                                        }
+                                }
+                        }
+                }
+            };
+
+        query = JSON.stringify(query);
+        console.log('QUERY: ' + query);
+        return query;
+    }
+
     jQuery( "#query" ).autocomplete(
     {
         source: function(request, response) {
             jQuery.ajax({
                 url: suggestUrl,
+                method: "POST",
+                contentType: 'application/json; charset=UTF-8',
+                crossDomain: true,
                 dataType: "json",
-                data: {
-                    query : request.term,
-                    all : searchAllIsChecked() ? 'on' : 'off'
+                data: constructSuggestQuery(request.term),
+                success: function(data)
+                {
+                    console.log('SUCCESS');
+                    var suggestions = JSON.stringify(data);
+                    console.log(suggestions);
+                    var x = [{"label":"TTT", "value":"VVVV"}, {"label":"222", "value":"333"}];
+                    response(x);
                 },
-                success: function(data) {
-                    response(data);
+                error: function(jqXHR, textStatus, errorThrown)
+                {
+                    var jso = jQuery.parseJSON(jqXHR.responseText);
+                    console.log('ERROR: ' + jqXHR.status + ' : ' + errorThrown + ' : ' + jso.error);
                 }
             });
         },
