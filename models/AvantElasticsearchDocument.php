@@ -337,19 +337,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         foreach ($itemData['files_data'] as $fileData)
         {
             $mimeType = $fileData['mime_type'];
-            if (strpos($mimeType, 'pdf') === 0)
+            if (strpos($mimeType, 'pdf') !== false || strpos($mimeType, 'text') !== false)
             {
                 $document++;
             }
-            else if (strpos($mimeType, 'image') === 0)
+            else if (strpos($mimeType, 'image') !== false)
             {
                 $image++;
             }
-            else if (strpos($mimeType, 'audio') === 0)
+            else if (strpos($mimeType, 'audio') !== false)
             {
                 $audio++;
             }
-            else if (strpos($mimeType, 'video') === 0)
+            else if (strpos($mimeType, 'video') !== false)
             {
                 $video++;
             }

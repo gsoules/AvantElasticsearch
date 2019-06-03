@@ -69,10 +69,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $textOnlyFields = array(
             'address',
             'description',
-            'identifier',
-//            'place',
-//            'subject',
-//            'type'
+            'identifier'
         );
 
         foreach ($elements as $elementName)
