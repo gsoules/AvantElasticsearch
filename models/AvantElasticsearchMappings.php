@@ -70,10 +70,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             'address',
             'description',
             'identifier',
-            'place',
-            'subject',
-            'title',
-            'type'
+//            'place',
+//            'subject',
+//            'type'
         );
 
         foreach ($elements as $elementName)
@@ -127,9 +126,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('sort.address-number');
         $this->addKeywordFieldToMappingProperties('sort.address-street');
         $this->addKeywordFieldToMappingProperties('sort.identifier');
-        $this->addKeywordFieldToMappingProperties('sort.place');
-        $this->addKeywordFieldToMappingProperties('sort.subject');
-        $this->addKeywordFieldToMappingProperties('sort.type');
+//        $this->addKeywordFieldToMappingProperties('sort.place');
+//        $this->addKeywordFieldToMappingProperties('sort.subject');
+//        $this->addKeywordFieldToMappingProperties('sort.type');
         $this->addKeywordFieldToMappingProperties('url.image');
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');

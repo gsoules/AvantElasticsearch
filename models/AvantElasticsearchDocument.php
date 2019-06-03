@@ -174,33 +174,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // Create the various kinds of data associated with this field.
         $this->createHtmlData($elasticsearchFieldName, $fieldTexts);
         $this->createIntegerElementSortData($elasticsearchFieldName, $fieldTextsString);
-        $this->createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts);
         $this->createAddressElementSortData($elasticsearchFieldName, $fieldTexts);
         $this->createFacetDataForField($elasticsearchFieldName, $fieldTexts);
-    }
-
-    protected function createHierarchyElementSortData($elasticsearchFieldName, $fieldTexts)
-    {
-        if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
-        {
-            // This element is not used as facet. Only hierarchy facets need hierarchy sort data.
-            return;
-        }
-
-        if ($this->facetDefinitions[$elasticsearchFieldName]['is_hierarchy'])
-        {
-            // Get only the first value for this element since that's all that's used for sorting purposes.
-            $text = $fieldTexts[0]['text'];
-
-            // Find the last comma.
-            $index = strrpos($text, ',', -1);
-            if ($index !== false)
-            {
-                // Filter out the ancestry to leave just the leaf text.
-                $text = trim(substr($text, $index + 1));
-            }
-            $this->sortData[$elasticsearchFieldName] = $text;
-        }
     }
 
     protected function createHtmlData($elasticsearchFieldName, $fieldTexts)
