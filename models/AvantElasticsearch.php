@@ -14,7 +14,7 @@ define ('ES_DOCUMENT_EOL', "\n");
 // what gets recorded in the index whereas the substitute is what the user sees. This allows us to change the latter
 // without having to reindex. Doing this also makes it easy for administrators to identify missing data.
 define('BLANK_FACET_TEXT', '[blank]');
-define('BLANK_FACET_SUBSTITUTE', 'Unknown');
+define('BLANK_FACET_SUBSTITUTE', 'None');
 
 // Used for reporting statistics.
 define('MB_BYTES', 1024 * 1024);
