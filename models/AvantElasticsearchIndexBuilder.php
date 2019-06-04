@@ -779,6 +779,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             // Perform the actual indexing on this batch of documents.
             $documentBatchParams = $this->createDocumentBatchParams($start, $end);
+
+            // Create a new client. While this should not be necessary, it's done to see if this will
+            // prevent the No Alive Nodes exception from occurring due to a suspected bug in the client code.
+            $this->avantElasticsearchClient = new AvantElasticsearchClient();
+
             if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
             {
                 $this->logClientError();
