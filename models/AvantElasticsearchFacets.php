@@ -20,67 +20,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->defineFacets();
     }
 
-    public function createAggregationsForElasticsearchQuery($commingled)
-    {
-        foreach ($this->facetDefinitions as $group => $definition)
-        {
-            if ($definition['not_used'])
-            {
-                continue;
-            }
-            else if ($definition['commingled'] && !$commingled)
-            {
-                // This facet is only used when searching for commingled results.
-                continue;
-            }
-            else if ($definition['is_root_hierarchy'])
-            {
-                // Build a sub-aggregation to get buckets of root values, each containing buckets of leaf values.
-                $terms[$group] = [
-                    'terms' => [
-                        'field' => "facet.$group.root",
-                        'size' => 128
-                    ],
-                    'aggregations' => [
-                        'leafs' => [
-                            'terms' => [
-                                'field' => "facet.$group.leaf",
-                                'size' => 128
-                            ]
-                        ]
-                    ]
-                ];
-
-                // Sorting is currently required for hierarchical data because the logic for presenting hierarchical
-                // facets indented as root > first-child > leaf is dependent on the values being sorted.
-                $terms[$group]['terms']['order'] = array('_key' => 'asc');
-                $terms[$group]['aggregations']['leafs']['terms']['order'] = array('_key' => 'asc');
-            }
-            else
-            {
-                // Build a simple aggregation to return buckets of values.
-                $terms[$group] = [
-                    'terms' => [
-                        'field' => "facet.$group",
-                        'size' => 128
-                    ]
-                ];
-
-                if ($definition['sort'])
-                {
-                    // Sort the buckets by their values in ascending order. When not sorted, Elasticsearch
-                    // returns them in reverse count order (buckets with the most values are at the top).
-                    $terms[$group]['terms']['order'] = array('_key' => 'asc');
-                }
-            }
-        }
-
-        // Convert the array into a nested object for the aggregation as required by Elasticsearch.
-        $aggregations = (object)json_decode(json_encode($terms));
-
-        return $aggregations;
-    }
-
     protected function createFacet($group, $name, $isHierarchy = false, $isRootHierarchy = false)
     {
         $definition = array(
@@ -651,8 +590,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $this->facetDefinitions;
     }
 
-    public function getFacetFiltersForElasticsearchQuery($roots, $leafs)
+    public function getFacetFilters($roots, $leafs)
     {
+        // Create the filter portion of the query to limit the results to specific facet values.
+        // The results only contain results that satisfy the filters.
+
         $filters = array();
 
         foreach ($this->facetDefinitions as $group => $facetDefinition)

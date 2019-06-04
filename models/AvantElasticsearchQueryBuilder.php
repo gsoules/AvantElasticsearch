@@ -15,47 +15,207 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
-    public function constructSearchQueryParams($options, $commingled, $isIndexView)
+    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled)
     {
-        $offset = isset($options['offset']) ? $options['offset'] : 0;
-        $limit = isset($options['limit']) ? $options['limit'] : 20;
-        $terms = isset($options['query']['query']) ? $options['query']['query'] : '';
-        $roots = isset($options['query'][FACET_KIND_ROOT]) ? $options['query'][FACET_KIND_ROOT] : [];
-        $leafs = isset($options['query'][FACET_KIND_LEAF]) ? $options['query'][FACET_KIND_LEAF] : [];
-        $sort = isset($options['sort']) ? $options['sort'] : null;
+        $terms = isset($query['query']) ? $query['query'] : '';
+        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
+        $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
+        $viewId = isset($query['view']) ? $query['view'] : 1;
+        $page = isset($query['page']) ? $query['page'] : 1;
+        $offset = ($page - 1) * $limit;
 
-        // Fields that the query will return.
-        $source = [
-            'element.*',
-            'item.*',
-            'file.*',
-            'tags',
-            'html-fields',
-            'pdf.file-name',
-            'pdf.file-url',
-            'url.*'
+        $isImageView = $viewId === SearchResultsViewFactory::IMAGE_VIEW_ID;
+        $isIndexView = $viewId === SearchResultsViewFactory::INDEX_VIEW_ID;
+        $isTableView = $viewId === SearchResultsViewFactory::TABLE_VIEW_ID;
+        $isTreeView = $viewId === SearchResultsViewFactory::TREE_VIEW_ID;
+
+        $body['_source'] = $this->constructSourceFields();
+        $body['highlight'] = $this->constructHighlightParams();
+        $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
+        $body['query']['bool']['should'] = $this->constructShouldQueryParams();
+        $body['aggregations'] = $this->constructAggregationsParams($commingled);;
+
+        // Create filters that will limit the query results.
+        $queryFilters = $this->constructQueryFilters($public, $fileFilter, $roots, $leafs);
+        $contributorFilters = $this->constructContributorFilters($commingled);
+
+        if (!empty($contributorFilters))
+            $queryFilters[] = $contributorFilters;
+
+        if (count($queryFilters) > 0)
+        {
+            $body['query']['bool']['filter'] = $queryFilters;
+        }
+
+        if (empty($sort))
+        {
+            // Compute scores to be used as the relevance sort criteria.
+            $body['track_scores'] = true;
+        }
+        else
+        {
+            $body['sort'] = $sort;
+        }
+
+        $params = [
+            'index' => $this->getNameOfActiveIndex(),
+            'from' => $offset,
+            'size' => $limit,
+            'body' => $body
         ];
 
+        return $params;
+    }
+
+    protected function constructAggregationsParams($commingled)
+    {
+        // Create the aggregations portion of the query to indicate which facet values to return.
+        // All requested facet values are returned for the entire set of results.
+
+        $facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
+        foreach ($facetDefinitions as $group => $definition)
+        {
+            if ($definition['not_used'])
+            {
+                continue;
+            }
+            else if ($definition['commingled'] && !$commingled)
+            {
+                // This facet is only used when show commingled results.
+                continue;
+            }
+            else if ($definition['is_root_hierarchy'])
+            {
+                // Build a sub-aggregation to get buckets of root values, each containing buckets of leaf values.
+                $terms[$group] = [
+                    'terms' => [
+                        'field' => "facet.$group.root",
+                        'size' => 128
+                    ],
+                    'aggregations' => [
+                        'leafs' => [
+                            'terms' => [
+                                'field' => "facet.$group.leaf",
+                                'size' => 128
+                            ]
+                        ]
+                    ]
+                ];
+
+                // Sorting is currently required for hierarchical data because the logic for presenting hierarchical
+                // facets indented as root > first-child > leaf is dependent on the values being sorted.
+                $terms[$group]['terms']['order'] = array('_key' => 'asc');
+                $terms[$group]['aggregations']['leafs']['terms']['order'] = array('_key' => 'asc');
+            }
+            else
+            {
+                // Build a simple aggregation to return buckets of values.
+                $terms[$group] = [
+                    'terms' => [
+                        'field' => "facet.$group",
+                        'size' => 128
+                    ]
+                ];
+
+                if ($definition['sort'])
+                {
+                    // Sort the buckets by their values in ascending order. When not sorted, Elasticsearch
+                    // returns them in reverse count order (buckets with the most values are at the top).
+                    $terms[$group]['terms']['order'] = array('_key' => 'asc');
+                }
+            }
+        }
+
+        // Convert the array into a nested object for the aggregation as required by Elasticsearch.
+        $aggregations = (object)json_decode(json_encode($terms));
+
+        return $aggregations;
+    }
+
+    public function constructFileStatisticsAggregationParams()
+    {
+        $params = [
+            'index' => $this->getNameOfLocalIndex(),
+            'body' => [
+                'size' => 0,
+                'aggregations' => [
+                    'contributors' => [
+                        'terms' => [
+                            'field' => 'item.contributor'
+                        ],
+                        'aggregations' => [
+                            'audio' => [
+                                'sum' => [
+                                    'field' => 'file.audio'
+                                ]
+                            ],
+                            'document' => [
+                                'sum' => [
+                                    'field' => 'file.document'
+                                ]
+                            ],
+                            'image' => [
+                                'sum' => [
+                                    'field' => 'file.image'
+                                ]
+                            ],
+                            'video' => [
+                                'sum' => [
+                                    'field' => 'file.video'
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        return $params;
+    }
+
+    protected function constructContributorFilters($commingled)
+    {
+        $contributorFilters = array();
+
+        if ($commingled)
+        {
+            // This is where we can add support to only display results from specific contributors. Somehow the
+            // $contributorIds array needs to get populated with selections the user has made to indicate which contributors
+            // they want to see results from. To show results from all contributors, return an empty array;
+
+            // $contributorIds = ['gcihs', 'local'];
+            // $contributorFilters = array('terms' => ['item.contributor-id' => $contributorIds]);
+        }
+
+        return $contributorFilters;
+    }
+
+    protected function constructHighlightParams()
+    {
         // Highlighting the query will return.
         $highlight =
             ['fields' =>
                 [
                     'element.description' =>
-                    (object)[
-                        'number_of_fragments' => 0,
-                        'pre_tags' => ['<span class="hit-highlight">'],
-                        'post_tags' => ['</span>']
-                    ],
+                        (object)[
+                            'number_of_fragments' => 0,
+                            'pre_tags' => ['<span class="hit-highlight">'],
+                            'post_tags' => ['</span>']
+                        ],
                     'pdf.text-*' =>
-                    (object)[
-                        'number_of_fragments' => 3,
-                        'fragment_size' => 150,
-                        'pre_tags' => ['<span class="hit-highlight">'],
-                        'post_tags' => ['</span>']
-                    ]
+                        (object)[
+                            'number_of_fragments' => 3,
+                            'fragment_size' => 150,
+                            'pre_tags' => ['<span class="hit-highlight">'],
+                            'post_tags' => ['</span>']
+                        ]
                 ]
-        ];
+            ];
+        return $highlight;
+    }
 
+    protected function constructMustQueryParams($terms)
+    {
         $mustQuery = [
             "multi_match" => [
                 'query' => $terms,
@@ -72,8 +232,31 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 ]
             ]
         ];
+        return $mustQuery;
+    }
 
-        $shouldQuery[] = [
+    protected function constructQueryFilters($public, $fileFilter, array $roots, array $leafs)
+    {
+        $queryFilters = $this->avantElasticsearchFacets->getFacetFilters($roots, $leafs);
+
+        if ($public)
+        {
+            // Filter results to only contain public items.
+            $queryFilters[] = array('term' => ['item.public' => true]);
+        }
+
+        if ($fileFilter == 1)
+        {
+            // Filter results to only contain items that have a file attached and thus have an image.
+            $queryFilters[] = array('exists' => ['field' => "url.image"]);
+        }
+
+        return $queryFilters;
+    }
+
+    protected function constructShouldQueryParams()
+    {
+        $shouldQuery = [
             "match" => [
                 "element.type" => [
                     "query" => "reference",
@@ -81,68 +264,29 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 ]
             ]
         ];
+        return $shouldQuery;
+    }
 
-        $body['_source'] = $source;
-        $body['highlight'] = $highlight;
-        $body['query']['bool']['must'] = $mustQuery;
-        $body['query']['bool']['should'] = $shouldQuery;
-
-        // Create the aggregations portion of the query to indicate which facet values to return.
-        // All requested facet values are returned for the entire set of results.
-        $aggregations = $this->avantElasticsearchFacets->createAggregationsForElasticsearchQuery($commingled);
-        $body['aggregations'] = $aggregations;
-
-        // Create the filter portion of the query to limit the results to specific facet values.
-        // The results only contain results that satisfy the filters.
-        $filters = $this->avantElasticsearchFacets->getFacetFiltersForElasticsearchQuery($roots, $leafs);
-
-        if (!$commingled)
-        {
-            // Until support is in place for searching the local index, filter the results to only show those
-            // contributed by this installation.
-            $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
-            $filters[] = array('term' => ['item.contributor-id' => $contributorId]);
-
-            if ($options['public'])
-            {
-                // Filter results to only contain public items.
-                $filters[] = array('term' => ['item.public' => true]);
-            }
-        }
-
-        if ($options['files'])
-        {
-            // Filter results to only contain items that have a file attached and thus have an image.
-            $filters[] = array('exists' => ['field' => "url.image"]);
-        }
-
-        if (count($filters) > 0)
-        {
-            $body['query']['bool']['filter'] = $filters;
-        }
-
-        if (isset($sort))
-        {
-            // Specify sort criteria and also compute scores to be used as the final sort criteria.
-            $body['sort'] = $sort;
-            $body['track_scores'] = true;
-        }
-
-        $params = [
-            'index' => $this->getNameOfActiveIndex(),
-            'from' => $offset,
-            'size' => $limit,
-            'body' => $body
+    protected function constructSourceFields()
+    {
+        // Fields that the query will return.
+        $source = [
+            'element.*',
+            'item.*',
+            'file.*',
+            'tags',
+            'html-fields',
+            'pdf.file-name',
+            'pdf.file-url',
+            'url.*'
         ];
-
-        return $params;
+        return $source;
     }
 
     public function constructSuggestQueryParams($fuzziness, $size)
     {
         // Note that skip_duplicates is false to ensure that all the right values are returned.
         // The Elasticsearch documentation also says that performance is better when false.
-
         $query = [
             '_source' => [
                 'item.title'
@@ -164,47 +308,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         ];
 
         return json_encode($query);
-    }
-
-    public function constructTermAggregationsQueryParams($fieldName)
-    {
-        $params = [
-            'index' => $this->getNameOfLocalIndex(),
-            'body' => [
-                'size' => 0,
-                'aggregations' => [
-                    'contributors' => [
-                        'terms' => [
-                            'field' => $fieldName
-                        ],
-                        'aggregations' => [
-                            'audio' => [
-                                'sum' => [
-                                    'field' => 'file.audio'
-                                ]
-                             ],
-                            'document' => [
-                                'sum' => [
-                                    'field' => 'file.document'
-                                ]
-                             ],
-                            'image' => [
-                                'sum' => [
-                                    'field' => 'file.image'
-                                ]
-                             ],
-                            'video' => [
-                                'sum' => [
-                                    'field' => 'file.video'
-                                ]
-                             ]
-                        ]
-                    ]
-                ]
-            ]
-        ];
-
-        return $params;
     }
 
     public function getFacetDefinitions()
