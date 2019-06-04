@@ -28,6 +28,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $source = [
             'element.*',
             'item.*',
+            'file.*',
             'tags',
             'html-fields',
             'pdf.file-name',

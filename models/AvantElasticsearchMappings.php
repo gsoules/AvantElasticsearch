@@ -105,6 +105,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addNumericFieldToMappingProperties('file.audio');
         $this->addNumericFieldToMappingProperties('file.document');
         $this->addNumericFieldToMappingProperties('file.image');
+        $this->addNumericFieldToMappingProperties('file.total');
         $this->addNumericFieldToMappingProperties('file.video');
         $this->addNumericFieldToMappingProperties('item.id');
 

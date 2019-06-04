@@ -355,12 +355,24 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
         }
 
+        $total = $audio + $document + $image + $video;
+
         $fileCounts = array(
             'audio' => $audio,
             'document' => $document,
             'image' => $image,
+            'total' => $total,
             'video' => $video
         );
+
+        foreach ($fileCounts as $key => $fileCount)
+        {
+            if ($fileCount == 0 && $key != 'total')
+            {
+                unset($fileCounts[$key]);
+            }
+        }
+
         return $fileCounts;
     }
 
