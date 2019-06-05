@@ -30,7 +30,10 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function createElasticsearchClient(array $options)
     {
-        $timeout = isset($options['timeout']) ? $options['timeout'] : 10;
+        // We don't know the appropriate timeout (seconds), but lowering from 30 to 10 seems to have allowed the
+        // "No alive nodes" exception to occur during bulk indexing operations which can take several seconds.
+        $timeout = isset($options['timeout']) ? $options['timeout'] : 30;
+
         $nobody = isset($options['nobody']) ? $options['nobody'] : false;
 
         $builder = ClientBuilder::create();
