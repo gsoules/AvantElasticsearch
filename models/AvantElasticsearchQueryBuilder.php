@@ -17,45 +17,48 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled)
     {
-        $terms = isset($query['query']) ? $query['query'] : '';
-        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
+        // Get parameter values or defaults.
+        $indexId = isset($query['index']) ? $query['index'] : 0;
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
-        $viewId = isset($query['view']) ? $query['view'] : 1;
         $page = isset($query['page']) ? $query['page'] : 1;
         $offset = ($page - 1) * $limit;
+        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
+        $terms = isset($query['query']) ? $query['query'] : '';
+        $viewId = isset($query['view']) ? $query['view'] : 1;
 
-        $isImageView = $viewId === SearchResultsViewFactory::IMAGE_VIEW_ID;
-        $isIndexView = $viewId === SearchResultsViewFactory::INDEX_VIEW_ID;
-        $isTableView = $viewId === SearchResultsViewFactory::TABLE_VIEW_ID;
-        $isTreeView = $viewId === SearchResultsViewFactory::TREE_VIEW_ID;
-
-        $body['_source'] = $this->constructSourceFields();
-        $body['highlight'] = $this->constructHighlightParams();
+        // Initialize the query body.
+        $body['_source'] = $this->constructSourceFields($viewId, $indexId);
         $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
         $body['query']['bool']['should'] = $this->constructShouldQueryParams();
         $body['aggregations'] = $this->constructAggregationsParams($commingled);;
 
+        $highlightParams = $this->constructHighlightParams($viewId);
+        if (!empty($highlightParams))
+            $body['highlight'] = $highlightParams;
+
         // Create filters that will limit the query results.
         $queryFilters = $this->constructQueryFilters($public, $fileFilter, $roots, $leafs);
-        $contributorFilters = $this->constructContributorFilters($commingled);
 
+        // Create filters to limit results to specific contributors.
+        $contributorFilters = $this->constructContributorFilters($commingled);
         if (!empty($contributorFilters))
             $queryFilters[] = $contributorFilters;
 
+        // Add filters to the query body.
         if (count($queryFilters) > 0)
         {
             $body['query']['bool']['filter'] = $queryFilters;
         }
 
-        if (empty($sort))
-        {
-            // Compute scores to be used as the relevance sort criteria.
-            $body['track_scores'] = true;
-        }
-        else
+        // Specify if sorting by column. If not, sort is by relevance based on score.
+        if (!empty($sort))
         {
             $body['sort'] = $sort;
         }
+
+        // Compute scores even when not sorting by relevance.
+        if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
+            $body['track_scores'] = true;
 
         $params = [
             'index' => $this->getNameOfActiveIndex(),
@@ -190,27 +193,33 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $contributorFilters;
     }
 
-    protected function constructHighlightParams()
+    protected function constructHighlightParams($viewId)
     {
-        // Highlighting the query will return.
-        $highlight =
-            ['fields' =>
-                [
-                    'element.description' =>
-                        (object)[
-                            'number_of_fragments' => 0,
-                            'pre_tags' => ['<span class="hit-highlight">'],
-                            'post_tags' => ['</span>']
-                        ],
-                    'pdf.text-*' =>
-                        (object)[
-                            'number_of_fragments' => 3,
-                            'fragment_size' => 150,
-                            'pre_tags' => ['<span class="hit-highlight">'],
-                            'post_tags' => ['</span>']
-                        ]
-                ]
-            ];
+        $highlight = array();
+
+        if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
+        {
+            // Highlighting the query will return.
+            $highlight =
+                ['fields' =>
+                    [
+                        'element.description' =>
+                            (object)[
+                                'number_of_fragments' => 0,
+                                'pre_tags' => ['<span class="hit-highlight">'],
+                                'post_tags' => ['</span>']
+                            ],
+                        'pdf.text-*' =>
+                            (object)[
+                                'number_of_fragments' => 3,
+                                'fragment_size' => 150,
+                                'pre_tags' => ['<span class="hit-highlight">'],
+                                'post_tags' => ['</span>']
+                            ]
+                    ]
+                ];
+        }
+
         return $highlight;
     }
 
@@ -267,20 +276,47 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    protected function constructSourceFields()
+    protected function constructSourceFields($viewId, $indexId)
     {
-        // Fields that the query will return.
-        $source = [
-            'element.*',
-            'item.*',
-            'file.*',
-            'tags',
-            'html-fields',
-            'pdf.file-name',
-            'pdf.file-url',
-            'url.*'
-        ];
-        return $source;
+        $fields = array();
+
+        // Specify which fields the query will return.
+        if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
+        {
+            $fields = [
+                'element.*',
+                'item.*',
+                'file.*',
+                'tags',
+                'html-fields',
+                'pdf.file-name',
+                'pdf.file-url',
+                'url.*'
+            ];
+        }
+        else if ($viewId == SearchResultsViewFactory::IMAGE_VIEW_ID)
+        {
+            $fields = [
+                'element.title',
+                'element.identifier',
+                'item.*',
+                'file.*',
+                'url.*'
+            ];
+        }
+        else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
+        {
+            $indexFieldName = 'creator';
+            $fields = [
+                'element.' . $indexFieldName,
+                'item.id'
+            ];
+        }
+        else if ($viewId == SearchResultsViewFactory::TREE_VIEW_ID)
+        {
+        }
+
+        return $fields;
     }
 
     public function constructSuggestQueryParams($fuzziness, $size)
