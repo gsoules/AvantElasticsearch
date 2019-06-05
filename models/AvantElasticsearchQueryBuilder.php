@@ -324,13 +324,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'url.*'
             ];
         }
-        else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
-        {
-            // Size will be set to 0 to return no results, only aggregations.
-        }
-        else if ($viewId == SearchResultsViewFactory::TREE_VIEW_ID)
-        {
-        }
 
         return $fields;
     }
