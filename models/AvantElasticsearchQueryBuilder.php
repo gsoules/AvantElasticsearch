@@ -30,7 +30,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
         $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
         $body['query']['bool']['should'] = $this->constructShouldQueryParams();
-        $body['aggregations'] = $this->constructAggregationsParams($commingled);;
+        $body['aggregations'] = $this->constructAggregationsParams($viewId, $commingled);;
 
         $highlightParams = $this->constructHighlightParams($viewId);
         if (!empty($highlightParams))
@@ -56,9 +56,16 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $body['sort'] = $sort;
         }
 
-        // Compute scores even when not sorting by relevance.
         if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
+        {
+            // Compute scores even when not sorting by relevance.
             $body['track_scores'] = true;
+        }
+        else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
+        {
+            // Only return aggregations, not results.
+            //$limit = 0;
+        }
 
         $params = [
             'index' => $this->getNameOfActiveIndex(),
@@ -70,7 +77,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $params;
     }
 
-    protected function constructAggregationsParams($commingled)
+    protected function constructAggregationsParams($viewId, $commingled)
     {
         // Create the aggregations portion of the query to indicate which facet values to return.
         // All requested facet values are returned for the entire set of results.
@@ -127,6 +134,17 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     $terms[$group]['terms']['order'] = array('_key' => 'asc');
                 }
             }
+        }
+
+        if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
+        {
+            $terms['index'] = [
+                'terms' => [
+                    'field' => "element.creator.keyword",
+                    'size' => 128,
+                    'order' => ['_key' => 'asc']
+                ]
+            ];
         }
 
         // Convert the array into a nested object for the aggregation as required by Elasticsearch.
@@ -306,11 +324,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
         else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
         {
-            $indexFieldName = 'creator';
-            $fields = [
-                'element.' . $indexFieldName,
-                'item.id'
-            ];
+            // Size will be set to 0 to return no results, only aggregations.
         }
         else if ($viewId == SearchResultsViewFactory::TREE_VIEW_ID)
         {
