@@ -25,12 +25,13 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
         $terms = isset($query['query']) ? $query['query'] : '';
         $viewId = isset($query['view']) ? $query['view'] : 1;
+        $indexId = isset($query['index']) ? $query['index'] : 'Title';
 
         // Initialize the query body.
-        $body['_source'] = $this->constructSourceFields($viewId, $indexId);
+        $body['_source'] = $this->constructSourceFields($viewId);
         $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
         $body['query']['bool']['should'] = $this->constructShouldQueryParams();
-        $body['aggregations'] = $this->constructAggregationsParams($viewId, $commingled);;
+        $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $commingled);
 
         $highlightParams = $this->constructHighlightParams($viewId);
         if (!empty($highlightParams))
@@ -64,7 +65,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
         {
             // Only return aggregations, not results.
-            //$limit = 0;
+            $limit = 0;
         }
 
         $params = [
@@ -77,7 +78,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $params;
     }
 
-    protected function constructAggregationsParams($viewId, $commingled)
+    protected function constructAggregationsParams($viewId, $indexId, $commingled)
     {
         // Create the aggregations portion of the query to indicate which facet values to return.
         // All requested facet values are returned for the entire set of results.
@@ -138,9 +139,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
         {
+            $indexFieldName = $this->convertElementNameToElasticsearchFieldName($indexId);
             $terms['index'] = [
                 'terms' => [
-                    'field' => "element.creator.keyword",
+                    'field' => "element.$indexFieldName.keyword",
                     'size' => 128,
                     'order' => ['_key' => 'asc']
                 ]
@@ -294,7 +296,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    protected function constructSourceFields($viewId, $indexId)
+    protected function constructSourceFields($viewId)
     {
         $fields = array();
 
