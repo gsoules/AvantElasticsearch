@@ -80,6 +80,23 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $aggregations;
     }
 
+    protected function constructContributorFilters($commingled)
+    {
+        $contributorFilters = array();
+
+        if ($commingled)
+        {
+            // This is where we can add support to only display results from specific contributors. Somehow the
+            // $contributorIds array needs to get populated with selections the user has made to indicate which contributors
+            // they want to see results from. To show results from all contributors, return an empty array;
+
+            // $contributorIds = ['gcihs', 'local'];
+            // $contributorFilters = array('terms' => ['item.contributor-id' => $contributorIds]);
+        }
+
+        return $contributorFilters;
+    }
+
     public function constructFileStatisticsAggregationParams()
     {
         $params = [
@@ -116,46 +133,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     ]
                 ]
             ]
-        ];
-
-        return $params;
-    }
-
-    protected function constructContributorFilters($commingled)
-    {
-        $contributorFilters = array();
-
-        if ($commingled)
-        {
-            // This is where we can add support to only display results from specific contributors. Somehow the
-            // $contributorIds array needs to get populated with selections the user has made to indicate which contributors
-            // they want to see results from. To show results from all contributors, return an empty array;
-
-            // $contributorIds = ['gcihs', 'local'];
-            // $contributorFilters = array('terms' => ['item.contributor-id' => $contributorIds]);
-        }
-
-        return $contributorFilters;
-    }
-
-    public function constructDidYouMeanQueryParams($term)
-    {
-        $query = [
-            'text' => $term,
-            'did-you-mean' => [
-                'phrase' =>
-                    [
-                        'field' => 'element.title'
-                    ]
-            ]
-        ];
-
-        $body['suggest'] = $query;
-
-        $params = [
-            'index' => $this->getNameOfActiveIndex(),
-            'size' => 10,
-            'body' => $body
         ];
 
         return $params;
