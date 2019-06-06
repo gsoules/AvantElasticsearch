@@ -168,7 +168,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $highlight;
     }
 
-    protected function constructMustQueryParams($terms)
+    protected function constructMustQueryParams($terms, $fuzzy)
     {
         if (empty($terms))
         {
@@ -177,21 +177,30 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         else
         {
             $mustQuery = [
-                "multi_match" => [
+                'multi_match' => [
                     'query' => $terms,
-                    'type' => "cross_fields",
-                    'analyzer' => "english",
-                    'operator' => "and",
+                    'type' => 'cross_fields',
+                    'analyzer' => 'english',
+                    'operator' => 'and',
                     'fields' => [
-                        "item.title^15",
-                        "element.title^10",
-                        "element.identifier^2",
-                        "element.*",
-                        "tags",
-                        "pdf.text-*"
+                        'item.title^15',
+                        'element.title^10',
+                        'element.identifier^2',
+                        'element.*',
+                        'tags',
+                        'pdf.text-*'
                     ]
                 ]
             ];
+
+            if ($fuzzy)
+            {
+                // Elasticsearch does not support fuzziness with cross fields, so switch to best fields.
+                // This will produce different results, but fuzziness is only enabled if the search
+                // didn't produce any results.
+                $mustQuery['multi_match']['type'] = 'best_fields';
+                $mustQuery['multi_match']['fuzziness'] = 'auto';
+            }
         }
 
         return $mustQuery;
@@ -216,7 +225,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $queryFilters;
     }
 
-    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled)
+    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -229,7 +238,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         // Initialize the query body.
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
-        $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
+        $body['query']['bool']['must'] = $this->constructMustQueryParams($terms, $fuzzy);
         $body['query']['bool']['should'] = $this->constructShouldQueryParams();
         $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $commingled);
 
