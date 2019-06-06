@@ -28,7 +28,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $indexId = isset($query['index']) ? $query['index'] : 'Title';
 
         // Initialize the query body.
-        $body['_source'] = $this->constructSourceFields($viewId);
+        $body['_source'] = $this->constructSourceFields($viewId, $indexId);
         $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
         $body['query']['bool']['should'] = $this->constructShouldQueryParams();
         $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $commingled);
@@ -61,11 +61,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         {
             // Compute scores even when not sorting by relevance.
             $body['track_scores'] = true;
-        }
-        else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
-        {
-            // Only return aggregations, not results.
-            $limit = 0;
         }
 
         $params = [
@@ -135,18 +130,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     $terms[$group]['terms']['order'] = array('_key' => 'asc');
                 }
             }
-        }
-
-        if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
-        {
-            $indexFieldName = $this->convertElementNameToElasticsearchFieldName($indexId);
-            $terms['index'] = [
-                'terms' => [
-                    'field' => "element.$indexFieldName.keyword",
-                    'size' => 128,
-                    'order' => ['_key' => 'asc']
-                ]
-            ];
         }
 
         // Convert the array into a nested object for the aggregation as required by Elasticsearch.
@@ -296,7 +279,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    protected function constructSourceFields($viewId)
+    protected function constructSourceFields($viewId, $indexId)
     {
         $fields = array();
 
@@ -322,6 +305,15 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'item.*',
                 'file.*',
                 'url.*'
+            ];
+        }
+        else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
+        {
+            $indexFieldName = $this->convertElementNameToElasticsearchFieldName($indexId);
+            $fields = [
+                'element.' . $indexFieldName,
+                'element.identifier',
+                'item.id*'
             ];
         }
 
