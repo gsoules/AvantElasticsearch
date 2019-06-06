@@ -17,7 +17,7 @@
 
 /* === Elasticsearch Search Results with Facet sidebar ===
 --------------------------------------------------------- */
-#search-table-elasticsearch-results {
+#elasticsearch-results {
     float: left;
     clear: right;
     width: calc(100% - 200px);
@@ -25,10 +25,13 @@
     padding-left: 8px;
 }
 
-#search-table-elasticsearch-sidebar {
+#elasticsearch-results.grid-view {
+    margin-top: -16px;
+}
+
+#elasticsearch-sidebar {
     float: left;
     width: 200px;
-    margin-top: 19px;
     background-color: #ffffff;
     border-radius: 5px;
     border: 1px solid #e8e8e8;
