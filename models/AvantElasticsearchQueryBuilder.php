@@ -24,7 +24,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $offset = ($page - 1) * $limit;
         $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
         $terms = isset($query['query']) ? $query['query'] : '';
-        $viewId = isset($query['view']) ? $query['view'] : 1;
+        $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
         $indexId = isset($query['index']) ? $query['index'] : 'Title';
 
         // Initialize the query body.
@@ -313,7 +313,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $fields = [
                 'element.' . $indexFieldName,
                 'element.identifier',
-                'item.id*'
+                'url.item'
             ];
         }
 
