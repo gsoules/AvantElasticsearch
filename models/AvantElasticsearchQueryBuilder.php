@@ -297,7 +297,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'url.*'
             ];
         }
-        else if ($viewId == SearchResultsViewFactory::IMAGE_VIEW_ID)
+        else if ($viewId == SearchResultsViewFactory::GRID_VIEW_ID)
         {
             $fields = [
                 'element.title',
