@@ -42,9 +42,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetName = $facetTableEntry['name'];
         $facetText = str_replace(',', ', ', $facetName);
 
-        if ($facetText == BLANK_FACET_TEXT)
+        if ($facetText == BLANK_FIELD_TEXT)
         {
-            $facetText = BLANK_FACET_SUBSTITUTE;
+            $facetText = BLANK_FIELD_SUBSTITUTE;
         }
 
         $html = '';
@@ -656,7 +656,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function getFacetValueForDate($text)
     {
-        if ($text == BLANK_FACET_TEXT)
+        if ($text == BLANK_FIELD_TEXT)
             return $text;
 
         $year = '';
@@ -668,7 +668,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if (empty($year))
         {
             // This date is malformed.
-            $value = BLANK_FACET_TEXT;
+            $value = BLANK_FIELD_TEXT;
         }
         else
         {

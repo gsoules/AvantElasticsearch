@@ -13,8 +13,8 @@ define ('ES_DOCUMENT_EOL', "\n");
 // This way the user knows that the facet values shown are not representative of all the results. The text value is
 // what gets recorded in the index whereas the substitute is what the user sees. This allows us to change the latter
 // without having to reindex. Doing this also makes it easy for administrators to identify missing data.
-define('BLANK_FACET_TEXT', '[blank]');
-define('BLANK_FACET_SUBSTITUTE', 'None');
+define('BLANK_FIELD_TEXT', '[blank]');
+define('BLANK_FIELD_SUBSTITUTE', 'none');
 
 // Used for reporting statistics.
 define('MB_BYTES', 1024 * 1024);
