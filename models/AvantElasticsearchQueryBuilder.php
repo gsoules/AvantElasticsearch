@@ -15,64 +15,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
-    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled)
-    {
-        // Get parameter values or defaults.
-        $indexId = isset($query['index']) ? $query['index'] : 0;
-        $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
-        $page = isset($query['page']) ? $query['page'] : 1;
-        $offset = ($page - 1) * $limit;
-        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
-        $terms = isset($query['query']) ? $query['query'] : '';
-        $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
-        $indexId = isset($query['index']) ? $query['index'] : 'Title';
-
-        // Initialize the query body.
-        $body['_source'] = $this->constructSourceFields($viewId, $indexId);
-        $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
-        $body['query']['bool']['should'] = $this->constructShouldQueryParams();
-        $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $commingled);
-
-        $highlightParams = $this->constructHighlightParams($viewId);
-        if (!empty($highlightParams))
-            $body['highlight'] = $highlightParams;
-
-        // Create filters that will limit the query results.
-        $queryFilters = $this->constructQueryFilters($public, $fileFilter, $roots, $leafs);
-
-        // Create filters to limit results to specific contributors.
-        $contributorFilters = $this->constructContributorFilters($commingled);
-        if (!empty($contributorFilters))
-            $queryFilters[] = $contributorFilters;
-
-        // Add filters to the query body.
-        if (count($queryFilters) > 0)
-        {
-            $body['query']['bool']['filter'] = $queryFilters;
-        }
-
-        // Specify if sorting by column. If not, sort is by relevance based on score.
-        if (!empty($sort))
-        {
-            $body['sort'] = $sort;
-        }
-
-        if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
-        {
-            // Compute scores even when not sorting by relevance.
-            $body['track_scores'] = true;
-        }
-
-        $params = [
-            'index' => $this->getNameOfActiveIndex(),
-            'from' => $offset,
-            'size' => $limit,
-            'body' => $body
-        ];
-
-        return $params;
-    }
-
     protected function constructAggregationsParams($viewId, $indexId, $commingled)
     {
         // Create the aggregations portion of the query to indicate which facet values to return.
@@ -196,6 +138,29 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $contributorFilters;
     }
 
+    public function constructDidYouMeanQueryParams($term)
+    {
+        $query = [
+            'text' => $term,
+            'did-you-mean' => [
+                'phrase' =>
+                    [
+                        'field' => 'element.title'
+                    ]
+            ]
+        ];
+
+        $body['suggest'] = $query;
+
+        $params = [
+            'index' => $this->getNameOfActiveIndex(),
+            'size' => 10,
+            'body' => $body
+        ];
+
+        return $params;
+    }
+
     protected function constructHighlightParams($viewId)
     {
         $highlight = array();
@@ -272,6 +237,63 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         return $queryFilters;
+    }
+
+    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled)
+    {
+        // Get parameter values or defaults.
+        $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
+        $page = isset($query['page']) ? $query['page'] : 1;
+        $offset = ($page - 1) * $limit;
+        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
+        $terms = isset($query['query']) ? $query['query'] : '';
+        $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
+        $indexId = isset($query['index']) ? $query['index'] : 'Title';
+
+        // Initialize the query body.
+        $body['_source'] = $this->constructSourceFields($viewId, $indexId);
+        $body['query']['bool']['must'] = $this->constructMustQueryParams($terms);
+        $body['query']['bool']['should'] = $this->constructShouldQueryParams();
+        $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $commingled);
+
+        $highlightParams = $this->constructHighlightParams($viewId);
+        if (!empty($highlightParams))
+            $body['highlight'] = $highlightParams;
+
+        // Create filters that will limit the query results.
+        $queryFilters = $this->constructQueryFilters($public, $fileFilter, $roots, $leafs);
+
+        // Create filters to limit results to specific contributors.
+        $contributorFilters = $this->constructContributorFilters($commingled);
+        if (!empty($contributorFilters))
+            $queryFilters[] = $contributorFilters;
+
+        // Add filters to the query body.
+        if (count($queryFilters) > 0)
+        {
+            $body['query']['bool']['filter'] = $queryFilters;
+        }
+
+        // Specify if sorting by column. If not, sort is by relevance based on score.
+        if (!empty($sort))
+        {
+            $body['sort'] = $sort;
+        }
+
+        if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
+        {
+            // Compute scores even when not sorting by relevance.
+            $body['track_scores'] = true;
+        }
+
+        $params = [
+            'index' => $this->getNameOfActiveIndex(),
+            'from' => $offset,
+            'size' => $limit,
+            'body' => $body
+        ];
+
+        return $params;
     }
 
     protected function constructShouldQueryParams()
