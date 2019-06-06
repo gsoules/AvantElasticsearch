@@ -228,22 +228,30 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function constructMustQueryParams($terms)
     {
-        $mustQuery = [
-            "multi_match" => [
-                'query' => $terms,
-                'type' => "cross_fields",
-                'analyzer' => "english",
-                'operator' => "and",
-                'fields' => [
-                    "item.title^15",
-                    "element.title^10",
-                    "element.identifier^2",
-                    "element.*",
-                    "tags",
-                    "pdf.text-*"
+        if (empty($terms))
+        {
+            $mustQuery = ['match_all' => (object)[]];
+        }
+        else
+        {
+            $mustQuery = [
+                "multi_match" => [
+                    'query' => $terms,
+                    'type' => "cross_fields",
+                    'analyzer' => "english",
+                    'operator' => "and",
+                    'fields' => [
+                        "item.title^15",
+                        "element.title^10",
+                        "element.identifier^2",
+                        "element.*",
+                        "tags",
+                        "pdf.text-*"
+                    ]
                 ]
-            ]
-        ];
+            ];
+        }
+
         return $mustQuery;
     }
 
