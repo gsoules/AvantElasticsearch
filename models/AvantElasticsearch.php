@@ -211,16 +211,9 @@ class AvantElasticsearch
             // Search the shared index because the local index is disabled.
             $useSharedIndex = true;
         }
-        else if (isset($_REQUEST['all']))
+        else if (isset($_REQUEST['site']))
         {
-            // all=on in the query string means search the shared index.
-            $useSharedIndex = $_REQUEST['all'] == 'on';
-        }
-        else if (isset($_COOKIE['SEARCH-ALL']))
-        {
-            // The the cookie is used when both indexes are enabled and there's no query string arg. This
-            // happens when someone comes back to the site after previously visiting and dropping the cookie.
-            $useSharedIndex = $_COOKIE['SEARCH-ALL'] == 'true';
+            $useSharedIndex = intval($_REQUEST['site']) == 1;
         }
         else
         {
