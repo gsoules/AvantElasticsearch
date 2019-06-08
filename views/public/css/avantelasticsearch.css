@@ -26,7 +26,10 @@
 }
 
 #elasticsearch-results.grid-view {
-    margin-top: -16px;
+}
+
+.item-preview.grid-view {
+    margin-top: 0;
 }
 
 #elasticsearch-sidebar {
