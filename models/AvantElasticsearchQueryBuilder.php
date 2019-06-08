@@ -176,22 +176,47 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
         else
         {
-            $mustQuery = [
-                'multi_match' => [
-                    'query' => $terms,
-                    'type' => 'cross_fields',
-                    'analyzer' => 'english',
-                    'operator' => 'and',
-                    'fields' => [
-                        'item.title^15',
-                        'element.title^10',
-                        'element.identifier^2',
-                        'element.*',
-                        'tags',
-                        'pdf.text-*'
+            // Determine if the request if for a phrase match -- the terms are wrapped in double quotes.
+            $phraseMatch = strpos($terms, '"') === 0 && strrpos($terms, '"') === strlen($terms) - 1;
+
+            if ($phraseMatch)
+            {
+                $mustQuery = [
+                    'multi_match' => [
+                        'query' => $terms,
+                        'type' => 'phrase',
+                        'analyzer' => 'english',
+                        'fields' => [
+                            'item.title^15',
+                            'element.title^10',
+                            'element.description',
+                            'element.creator',
+                            'element.type',
+                            'element.subject',
+                            'pdf.text-*'
+                        ]
                     ]
-                ]
-            ];
+                ];
+            }
+            else
+            {
+                $mustQuery = [
+                    'multi_match' => [
+                        'query' => $terms,
+                        'type' => 'cross_fields',
+                        'analyzer' => 'english',
+                        'operator' => 'and',
+                        'fields' => [
+                            'item.title^15',
+                            'element.title^10',
+                            'element.identifier^2',
+                            'element.*',
+                            'tags',
+                            'pdf.text-*'
+                        ]
+                    ]
+                ];
+            }
 
             if ($fuzzy)
             {
