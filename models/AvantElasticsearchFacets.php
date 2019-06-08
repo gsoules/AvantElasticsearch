@@ -28,7 +28,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             'is_date' => false,
             'is_hierarchy' => $isHierarchy,
             'is_root_hierarchy' => $isRootHierarchy,
-            'commingled' => false,
+            'shared' => false,
             'sort' => true,
             'not_used' => false);
 
@@ -249,7 +249,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->facetDefinitions['date']['is_date'] = true;
 
         $this->createFacet('contributor', 'Contributor');
-        $this->facetDefinitions['contributor']['commingled'] = true;
+        $this->facetDefinitions['contributor']['shared'] = true;
         $this->facetDefinitions['contributor']['sort'] = false;
 
         // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
@@ -569,7 +569,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if (!isset($this->facetsTable[$group]))
         {
             // Normally this won't happen, but it could if the caller is attempting to look for a group that's not in
-            // the facets table, e.g. a facet used only for commingled results when the results are not commingled.
+            // the facets table, e.g. a facet used only for shared results when the results are not shared.
             return -1;
         }
 

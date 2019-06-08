@@ -15,7 +15,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
-    protected function constructAggregationsParams($viewId, $indexId, $commingled)
+    protected function constructAggregationsParams($viewId, $indexId, $sharedSearchingEnabled)
     {
         // Create the aggregations portion of the query to indicate which facet values to return.
         // All requested facet values are returned for the entire set of results.
@@ -27,9 +27,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             {
                 continue;
             }
-            else if ($definition['commingled'] && !$commingled)
+            else if ($definition['shared'] && !$sharedSearchingEnabled)
             {
-                // This facet is only used when show commingled results.
+                // This facet is only used when showing shared results.
                 continue;
             }
             else if ($definition['is_root_hierarchy'])
@@ -80,11 +80,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $aggregations;
     }
 
-    protected function constructContributorFilters($commingled)
+    protected function constructContributorFilters($sharedSearchingEnabled)
     {
         $contributorFilters = array();
 
-        if ($commingled)
+        if ($sharedSearchingEnabled)
         {
             // This is where we can add support to only display results from specific contributors. Somehow the
             // $contributorIds array needs to get populated with selections the user has made to indicate which contributors
@@ -250,7 +250,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $queryFilters;
     }
 
-    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $commingled, $fuzzy)
+    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -265,7 +265,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
         $body['query']['bool']['must'] = $this->constructMustQueryParams($terms, $fuzzy);
         $body['query']['bool']['should'] = $this->constructShouldQueryParams();
-        $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $commingled);
+        $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $sharedSearchingEnabled);
 
         $highlightParams = $this->constructHighlightParams($viewId);
         if (!empty($highlightParams))
@@ -275,7 +275,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $queryFilters = $this->constructQueryFilters($public, $fileFilter, $roots, $leafs);
 
         // Create filters to limit results to specific contributors.
-        $contributorFilters = $this->constructContributorFilters($commingled);
+        $contributorFilters = $this->constructContributorFilters($sharedSearchingEnabled);
         if (!empty($contributorFilters))
             $queryFilters[] = $contributorFilters;
 
