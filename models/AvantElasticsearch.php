@@ -54,6 +54,19 @@ class AvantElasticsearch
         return array($this->createFieldText($text));
     }
 
+    public static function getAvantElasticsearcConfig()
+    {
+        try
+        {
+            $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
+            return new Zend_Config_Ini($configFile, 'config');
+        }
+        catch (Exception $e)
+        {
+            return null;
+        }
+    }
+
     public function getDocumentMappingType()
     {
         return '_doc';
@@ -109,7 +122,7 @@ class AvantElasticsearch
         return get_class($e) . '<br/>' . $message;
     }
 
-    public function getElementsUsedByThisInstallation($public = true)
+    public function getElementsUsedByThisInstallation($public = false)
     {
         // Determine if the elements are already cached. Note that they might be in cache, but don't
         // match the public option,  in which case, they need to be fetched again per the option.
@@ -171,6 +184,19 @@ class AvantElasticsearch
         $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
         $configuration = new Zend_Config_Ini($configFile, 'config');
         return $configuration->shared_index_name;
+    }
+
+    protected function getSharedIndexFieldNames()
+    {
+        $config = AvantElasticsearch::getAvantElasticsearcConfig();
+        $elementsList = $config ? $config->shared_elements : array();
+        $elementNames = array_map('trim', explode(',', $elementsList));
+        $fieldNames = array();
+        foreach ($elementNames as $elementName)
+        {
+            $fieldNames[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+        }
+        return $fieldNames;
     }
 
     public function isJson($string)

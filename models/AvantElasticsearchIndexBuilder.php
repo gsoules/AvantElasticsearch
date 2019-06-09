@@ -140,13 +140,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $document;
     }
 
-    protected function createIndex($indexName)
+    protected function createIndex($indexName, $isSharedIndex)
     {
         $avantElasticsearchMappings = new AvantElasticsearchMappings();
 
+        $mappings = $avantElasticsearchMappings->constructElasticsearchMapping($isSharedIndex);
+
         $params = [
             'index' => $indexName,
-            'body' => ['mappings' => $avantElasticsearchMappings->constructElasticsearchMapping()]
+            'body' => ['mappings' => $mappings]
         ];
 
         if (!$this->avantElasticsearchClient->createIndex($params))
@@ -188,7 +190,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemData;
     }
 
-    protected function createNewIndex()
+    protected function createNewIndex($isSharedIndex)
     {
         $indexName = $this->getNameOfActiveIndex();
         $params = ['index' => $indexName];
@@ -202,7 +204,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             return false;
         }
 
-        if ($this->createIndex($indexName))
+        if ($this->createIndex($indexName, $isSharedIndex))
         {
             $this->logEvent(__('Created new index: %s', $indexName));
         }
@@ -303,7 +305,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return true;
     }
 
-    protected function fetchFilesData($public = true)
+    protected function fetchFilesData($public = false)
     {
         try
         {
@@ -347,7 +349,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemFilesData;
     }
 
-    protected function fetchItemsData($public = true)
+    protected function fetchItemsData($public = false)
     {
         try
         {
@@ -378,7 +380,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $items;
     }
 
-    protected function fetchFieldTextsForRangeOfItems($firstItemId, $lastItemId, $public = true)
+    protected function fetchFieldTextsForRangeOfItems($firstItemId, $lastItemId, $public = false)
     {
         // This method gets all element texts for all items in the database. It returns them as an array of item-field-texts.
         // * Each item-field-texts contains an array of field-texts, one for each of the item's elements.
@@ -485,6 +487,48 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $itemTagsData;
+    }
+
+    protected function filterPublicItemsAndPrivateElements()
+    {
+        // This method removes all non-public items, and non-shared fields from the documents that will go into the
+        // shared index. This is necessary to support the overall indexing approach which is to:
+        // * Export all items and all fields into a single JSON data file.
+        // * Import all items and all fields into the local index.
+        // * Import only shared fields from public items into the shared index.
+        // This export once, import twice approach makes it possible to update or create a new local index without
+        // affecting the shared index, and vice-versa, using the same export file. An alternative approach of creating
+        // separate local and shared export files would eliminate the need for this method, but would incur the
+        // cost of doing two exports and having to manage two export files, making sure always to import the right one.
+
+        $allFieldNames = array();
+        $elementNames = $this->getElementsUsedByThisInstallation();
+        foreach ($elementNames as $elementName)
+        {
+            $allFieldNames[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+        }
+
+        $sharedFieldsNames = $this->getSharedIndexFieldNames();
+
+        $localFieldNames = array_diff($allFieldNames, $sharedFieldsNames);
+
+        foreach($this->batchDocuments as $index => $document)
+        {
+            if (!$document->body->item->public)
+            {
+                // Remove the document for this non-public item.
+                unset($this->batchDocuments[$index]);
+            }
+
+            // Remove the non-shared fields from the document.
+            foreach ($localFieldNames as $fieldName)
+            {
+                unset($document->body->element->$fieldName);
+            }
+        }
+
+        // Reindex the array to remove gaps.
+        $this->batchDocuments = array_values($this->batchDocuments);
     }
 
     protected function freeSqlData($itemId, $index)
@@ -633,6 +677,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $executionSeconds = intval(microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]);
             $time = $executionSeconds == 0 ? '< 1 second' : "$executionSeconds seconds";
             $this->logEvent(__('Execution time: %s', $time));
+            $this->logEvent(__('DONE'));
 
             $response = $this->readLog($indexingId, $indexingOperation);
         }
@@ -707,6 +752,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->initializeIndexingOperation($indexName, $indexingId, $indexingOperation);
         $dataFileName = $this->getIndexingDataFileName($indexingId);
 
+        $isSharedIndex = $indexName == self::getNameOfSharedIndex();
+
         // Verify that the import file exists.
         if (!file_exists($dataFileName))
         {
@@ -717,7 +764,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Delete the existing index if requested.
         if ($deleteExistingIndex)
         {
-            if (!$this->createNewIndex())
+            if (!$this->createNewIndex($isSharedIndex))
             {
                 return;
             }
@@ -725,6 +772,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // Read the index file into an array of AvantElasticsearchDocument objects.
         $this->batchDocuments = json_decode(file_get_contents($dataFileName), false);
+
+        if ($isSharedIndex)
+        {
+            // Filter out content that does not go into the shared index.
+            $this->filterPublicItemsAndPrivateElements();
+        }
+
         $this->batchDocumentsCount = count($this->batchDocuments);
 
         // Build a list of document sizes.
@@ -778,13 +832,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
             $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start + 1, $end + 1, $batchSizeMb));
 
-            // Perform the actual indexing on this batch of documents.
             $documentBatchParams = $this->createDocumentBatchParams($start, $end);
 
             // Create a new client. While this should not be necessary, it's done to see if this will
             // prevent the No Alive Nodes exception from occurring due to a suspected bug in the client code.
             $this->avantElasticsearchClient = new AvantElasticsearchClient();
 
+            // Perform the actual indexing on this batch of documents.
             if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
             {
                 $this->logClientError();
@@ -811,9 +865,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return file_get_contents($logFileName);
     }
 
-    /**
-     * @param $itemsCount
-     */
     protected function reportExportStatistics($itemsCount)
     {
         $this->logEvent(__('Export complete. %s items', $itemsCount));

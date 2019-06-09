@@ -56,28 +56,38 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
-    public function constructElasticsearchMapping()
+    public function constructElasticsearchMapping($isSharedIndex)
     {
-        $elements = $this->getElementsUsedByThisInstallation();
+        $fieldNames = array();
+
+        if ($isSharedIndex)
+        {
+            $fieldNames = $this->getSharedIndexFieldNames();
+        }
+        else
+        {
+            $elementNames = $this->getElementsUsedByThisInstallation();
+            foreach ($elementNames as $elementName)
+            {
+                $fieldNames[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+            }
+        }
+
         $mappingType = $this->getDocumentMappingType();
 
         // Text fields for elements that don't require a corresponding keyword field for sorting or aggregating
         // because these fields have a separate keyword field for those purposes.
         // To learn about text fields see: www.elastic.co/guide/en/elasticsearch/reference/master/text.html
-        // TO-DO: Make text-only-fields list configurable so that site specific fields like datestart and status can be added.
-        // Also make a keywordOnlyFields list for the same purpose.
         $textOnlyFields = array(
             'address',
             'description',
             'identifier'
         );
 
-        foreach ($elements as $elementName)
+        foreach ($fieldNames as $fieldName)
         {
             // Create a text and keyword mapping for item elements. The text fields is needed to allow full-text
             // search of the field. The keyword mapping is necessary for sorting.
-            $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
-
             if (in_array($fieldName, $textOnlyFields))
             {
                 $this->addTextFieldToMappingProperties("element.$fieldName");
