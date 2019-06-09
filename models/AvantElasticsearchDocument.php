@@ -226,12 +226,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function createSpecialFieldsData($itemFieldTexts)
     {
-        if (!$this->itemHasIdentifier)
+        if ($this->installation['alias-id'] != 0)
         {
             // This installation does not use the Identifier element because it has an Identifier Alias
             // configured in AvantCommon. Get the alias value and use it as the identifier field value.
-            $aliasElementId = CommonConfig::getOptionDataForIdentifierAlias();
-            $aliasText = $itemFieldTexts[$aliasElementId][0]['text'];
+            $id = $this->installation['alias-id'];
+            $aliasText = isset($itemFieldTexts[$id][0]['text']) ? $itemFieldTexts[$id][0]['text'] : BLANK_FIELD_TEXT;
             $this->elementData['identifier'] = $aliasText;
         }
 

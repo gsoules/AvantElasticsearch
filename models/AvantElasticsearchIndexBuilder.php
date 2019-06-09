@@ -72,6 +72,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->installation['installation_elements'] = $this->getElementsUsedByThisInstallation();
         $this->installation['contributor'] = ElasticsearchConfig::getOptionValueForContributor();
         $this->installation['contributor-id'] = ElasticsearchConfig::getOptionValueForContributorId();
+        $this->installation['alias-id'] = CommonConfig::getOptionDataForIdentifierAlias();
         $this->installation['item_path'] = public_url('items/show/');
         $this->installation['files_path'] = public_url('files');
 

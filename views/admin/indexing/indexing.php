@@ -160,7 +160,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     },
                     error: function (request, status, error)
                     {
-                        alert('AJAX ERROR on reportProgress' + ' >>> ' + error);
+                        alert('AJAX ERROR on reportProgress' + ' >>> ' + JSON.stringify(request));
                     }
                 }
             );
@@ -206,7 +206,8 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     },
                     error: function (request, status, error)
                     {
-                        alert('AJAX ERROR on ' + selectedAction + ' >>> ' + error);
+                        clearTimeout(progressTimer);
+                        alert('AJAX ERROR on ' + selectedAction + ' >>> ' +  JSON.stringify(request));
                     }
                 }
             );
