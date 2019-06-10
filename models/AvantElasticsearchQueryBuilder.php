@@ -97,10 +97,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $contributorFilters;
     }
 
-    public function constructFileStatisticsAggregationParams()
+    public function constructFileStatisticsAggregationParams($indexName)
     {
         $params = [
-            'index' => $this->getNameOfLocalIndex(),
+            'index' => $indexName,
             'body' => [
                 'size' => 0,
                 'aggregations' => [

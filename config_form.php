@@ -104,7 +104,7 @@ $healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '
         <label><?php echo CONFIG_LABEL_ES_LOCAL; ?></label>
     </div>
     <div class="inputs five columns omega">
-        <p class="explanation"><?php echo __("Enable local index '%s'", $localIndexName); ?></p>
+        <p class="explanation"><?php echo __("Update local index '%s' after Add, Save, or Delete item", $localIndexName); ?></p>
         <?php echo $view->formCheckbox(ElasticsearchConfig::OPTION_ES_LOCAL, true, array('checked' => (boolean)get_option(ElasticsearchConfig::OPTION_ES_LOCAL))); ?>
     </div>
 </div>
@@ -114,7 +114,7 @@ $healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '
         <label><?php echo CONFIG_LABEL_ES_SHARE; ?></label>
     </div>
     <div class="inputs five columns omega">
-        <p class="explanation"><?php echo __("Enable shared index '%s'", $sharedIndexName); ?></p>
+        <p class="explanation"><?php echo __("Update shared index '%s' after Add, Save, or Delete item", $sharedIndexName); ?></p>
         <?php echo $view->formCheckbox(ElasticsearchConfig::OPTION_ES_SHARE, true, array('checked' => (boolean)get_option(ElasticsearchConfig::OPTION_ES_SHARE))); ?>
     </div>
 </div>

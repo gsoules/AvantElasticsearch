@@ -268,8 +268,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->sqlFilesData = $this->fetchFilesData();
         if (empty($this->sqlFilesData))
         {
-            $this->logError('Failed to fetch file data from SQL database');
-            return false;
+            $this->logEvent('No file data fetched from SQL database');
         }
 
         // Get the tags for all items so that each document won't do a SQL query to get its item's tags.
@@ -277,8 +276,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->sqlTagsData = $this->fetchTagsData();
         if (empty($this->sqlTagsData))
         {
-            $this->logError('Failed to fetch tag data from SQL database');
-            return false;
+            $this->logEvent('No tags fetched from SQL database');
         }
 
         return true;
