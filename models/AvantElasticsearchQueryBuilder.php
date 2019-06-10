@@ -231,7 +231,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $mustQuery;
     }
 
-    protected function constructQueryFilters($public, $fileFilter, array $roots, array $leafs)
+    protected function constructQueryFilters($public, array $roots, array $leafs)
     {
         $queryFilters = $this->avantElasticsearchFacets->getFacetFilters($roots, $leafs);
 
@@ -241,16 +241,28 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $queryFilters[] = array('term' => ['item.public' => true]);
         }
 
-        if ($fileFilter == 1)
+        if (intval(AvantCommon::queryStringArg('filter')) == 1)
         {
             // Filter results to only contain items that have a file attached and thus have an image.
             $queryFilters[] = array('exists' => ['field' => "url.image"]);
         }
 
+        if (isset($_GET['advanced'][0]))
+        {
+            $advanced = $_GET['advanced'][0];
+            if (isset($advanced['type']) && $advanced['type'] == 'is exactly')
+            {
+                $elementName = isset($advanced['element_id']) ? $advanced['element_id'] : '';
+                $termValue = isset($advanced['terms']) ? $advanced['terms'] : '';
+                $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
+                $queryFilters[] = array('term' => ["element.$fieldName.keyword" => $termValue]);
+            }
+        }
+
         return $queryFilters;
     }
 
-    public function constructSearchQueryParams($query, $limit, $sort, $public, $fileFilter, $sharedSearchingEnabled, $fuzzy)
+    public function constructSearchQueryParams($query, $limit, $sort, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -272,7 +284,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $body['highlight'] = $highlightParams;
 
         // Create filters that will limit the query results.
-        $queryFilters = $this->constructQueryFilters($public, $fileFilter, $roots, $leafs);
+        $queryFilters = $this->constructQueryFilters($public, $roots, $leafs);
 
         // Create filters to limit results to specific contributors.
         $contributorFilters = $this->constructContributorFilters($sharedSearchingEnabled);

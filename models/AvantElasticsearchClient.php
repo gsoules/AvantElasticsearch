@@ -273,9 +273,14 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function reportException()
     {
+        $message = $this->lastException->getMessage();
+        $trace = $this->lastException->getTraceAsString();
         $subject = 'Exception in ES client on ' . date("Y-m-d H:i:s");
         $body = $this->lastError;
         $body = str_replace('<br/>', PHP_EOL, $body);
+        $body .= PHP_EOL . 'JSON:' . PHP_EOL . $message;
+        $body .= PHP_EOL . 'TRACE:' . PHP_EOL . $trace;
+
         AvantCommon::sendEmailToAdministrator($subject, $body);
     }
 
