@@ -81,7 +81,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
     }
 
-    public function deleteDocument($params)
+    public function deleteDocument($params, $failedAttemptOk = false)
     {
         try
         {
@@ -90,8 +90,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            $this->recordException($e);
-            return false;
+            $className = get_class($e);
+            if ($failedAttemptOk && $className == 'Elasticsearch\Common\Exceptions\Missing404Exception')
+            {
+                return true;
+            }
+            else
+            {
+                $this->recordException($e);
+                return false;
+            }
         }
     }
 

@@ -105,7 +105,8 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
                         // 'attempt' because we don't know if the item is in the shared index, but if it is, it needs to
                         // get deleted. This logic handles the case where the items was public, but the admin just now
                         // unchecked the public box and saved the item. If that's not the case, the delete has no effect.
-                        $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+                        $failedAttemptOk = true;
+                        $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $failedAttemptOk);
                     }
                 }
             }
