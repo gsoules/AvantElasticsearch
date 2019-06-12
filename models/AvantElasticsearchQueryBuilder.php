@@ -193,6 +193,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                             'element.creator',
                             'element.type',
                             'element.subject',
+                            'element.instructions',
                             'pdf.text-*'
                         ]
                     ]
@@ -247,15 +248,38 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $queryFilters[] = array('exists' => ['field' => "url.image"]);
         }
 
-        if (isset($_GET['advanced'][0]))
+        if (isset($_GET['advanced']))
         {
-            $advanced = $_GET['advanced'][0];
-            if (isset($advanced['type']) && $advanced['type'] == 'is exactly')
+            $advancedFilters = $_GET['advanced'];
+
+            foreach ($advancedFilters as $advanced)
             {
-                $elementName = isset($advanced['element_id']) ? $advanced['element_id'] : '';
-                $termValue = isset($advanced['terms']) ? $advanced['terms'] : '';
-                $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
-                $queryFilters[] = array('term' => ["element.$fieldName.keyword" => $termValue]);
+                if (isset($advanced['type']))
+                {
+                    $elementId = isset($advanced['element_id']) ? $advanced['element_id'] : '';
+                    if (ctype_digit($elementId))
+                    {
+                        // The value is an Omeka element Id.
+                        $elementName = ItemMetadata::getElementNameFromId($elementId);
+                    }
+                    else
+                    {
+                        // The value is an Omeka element name.
+                        $elementName = $elementId;
+                    }
+
+                    $termValue = isset($advanced['terms']) ? $advanced['terms'] : '';
+                    $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
+
+                    if ($advanced['type'] == 'is exactly')
+                    {
+                        $queryFilters[] = array('term' => ["element.$fieldName.keyword" => $termValue]);
+                    }
+                    else if ($advanced['type'] == 'starts with')
+                    {
+                        $queryFilters[] = array('wildcard' => ["element.$fieldName.keyword" => $termValue]);
+                    }
+                }
             }
         }
 
