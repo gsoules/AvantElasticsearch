@@ -169,7 +169,88 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $highlight;
     }
 
-    protected function constructMustQueryParams($terms, $fuzzy)
+    protected function constructQueryCondition($fieldName, $condition, $value)
+    {
+        $query = '';
+
+        switch ($condition)
+        {
+            case 'contains':
+                break;
+
+            case 'does not contain':
+                break;
+
+            case 'is exactly':
+                $query = array('term' => ["element.$fieldName.keyword" => $value]);
+                break;
+
+            case 'is not exactly':
+                break;
+
+            case 'is empty':
+                // Handled by the constuctQueryMustNotExist method.
+                break;
+
+            case 'is not empty':
+                $query = array('exists' => ['field' => "element.$fieldName"]);
+                break;
+
+            case 'starts with':
+                $query = array('wildcard' => ["element.$fieldName.keyword" => $value]);
+                break;
+
+            case 'ends with':
+                break;
+
+            case 'matches':
+                break;
+
+            case 'does not match':
+                break;
+
+            default:
+        }
+
+        return $query;
+    }
+
+    protected function constructQueryFilters($public, array $roots, array $leafs, $sharedSearchingEnabled)
+    {
+        // Get filters that are already set for applied facets.
+        $queryFilters = $this->avantElasticsearchFacets->getFacetFilters($roots, $leafs);
+
+        // Filter results to only contain public items.
+        if ($public)
+            $queryFilters[] = array('term' => ['item.public' => true]);
+
+        // Filter results to only contain items that have a file attached and thus have an image.
+        if (intval(AvantCommon::queryStringArg('filter')) == 1)
+            $queryFilters[] = array('exists' => ['field' => "url.image"]);
+
+        // Construct a query for each Advanced Search filter.
+        $advancedFilters = $this->getAdvancedFilters();
+        foreach ($advancedFilters as $advanced)
+        {
+            $condition = $this->getAdvancedCondition($advanced);
+            if (empty($condition) || $condition == 'is empty')
+                continue;
+
+            $fieldName = $this->getAdvancedFieldName($advanced);
+            $value = $this->getAdvancedValue($advanced);
+
+            $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $value);
+        }
+
+        // Create filters to limit results to specific contributors.
+        $contributorFilters = $this->constructContributorFilters($sharedSearchingEnabled);
+        if (!empty($contributorFilters))
+            $queryFilters[] = $contributorFilters;
+
+        return $queryFilters;
+    }
+
+    protected function constructQueryMust($terms, $fuzzy)
     {
         if (empty($terms))
         {
@@ -233,101 +314,45 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $mustQuery;
     }
 
-    protected function constructQueryCondition($fieldName, $condition, $value)
+    protected function constructQueryMustNotExists()
     {
-        $query = '';
+        // This method is used only to support the Is Empty filter for Advanced Search. Unlike Is Not Empty which is
+        // implemented using an Elasticsearch query filter, Is Empty is implemented in the must_not portion of the query.
+        $mustNot = array();
 
-        switch ($condition)
+        $advancedFilters = $this->getAdvancedFilters();
+        foreach ($advancedFilters as $advanced)
         {
-            case 'contains':
-                break;
+            if ($this->getAdvancedCondition($advanced) != 'is empty')
+                continue;
 
-            case 'does not contain':
-                break;
+            $fieldName = $this->getAdvancedFieldName($advanced);
 
-            case 'is exactly':
-                $query = array('term' => ["element.$fieldName.keyword" => $value]);
-                break;
-
-            case 'is not exactly':
-                break;
-
-            case 'is empty':
-                break;
-
-            case 'is not empty':
-                break;
-
-            case 'starts with':
-                return array('wildcard' => ["element.$fieldName.keyword" => $value]);
-                break;
-
-            case 'ends with':
-                break;
-
-            case 'matches':
-                break;
-
-            case 'does not match':
-                break;
-
-            default:
+            $mustNot[] = [
+                "exists" => [
+                    "field" => "element.$fieldName"
+                ]
+            ];
         }
 
-        return $query;
+        return $mustNot;
     }
 
-    protected function constructQueryFilters($public, array $roots, array $leafs)
+    protected function constructQueryShould()
     {
-        $queryFilters = $this->avantElasticsearchFacets->getFacetFilters($roots, $leafs);
+        $shouldQuery = [
+            "match" => [
+                "element.type" => [
+                    "query" => "reference",
+                    "boost" => 2
+                ]
+            ]
+        ];
 
-        if ($public)
-        {
-            // Filter results to only contain public items.
-            $queryFilters[] = array('term' => ['item.public' => true]);
-        }
-
-        if (intval(AvantCommon::queryStringArg('filter')) == 1)
-        {
-            // Filter results to only contain items that have a file attached and thus have an image.
-            $queryFilters[] = array('exists' => ['field' => "url.image"]);
-        }
-
-        if (isset($_GET['advanced']))
-        {
-            $advancedFilters = $_GET['advanced'];
-
-            foreach ($advancedFilters as $advanced)
-            {
-                $condition = isset($advanced['type']) ? $advanced['type'] : '';
-                if (empty($condition))
-                    continue;
-
-                $elementId = isset($advanced['element_id']) ? $advanced['element_id'] : '';
-                if (ctype_digit($elementId))
-                {
-                    // The value is an Omeka element Id. Attempt to get the element's name.
-                    $elementName = ItemMetadata::getElementNameFromId($elementId);
-                    if (empty($elementName))
-                        continue;
-                }
-                else
-                {
-                    // The value is an Omeka element name.
-                    $elementName = $elementId;
-                }
-
-                // Construct the query for this condition.
-                $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
-                $value = isset($advanced['terms']) ? $advanced['terms'] : '';
-                $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $value);
-            }
-        }
-
-        return $queryFilters;
+        return $shouldQuery;
     }
 
-    public function constructSearchQueryParams($query, $limit, $sort, $public, $sharedSearchingEnabled, $fuzzy)
+    public function constructSearchQuery($query, $limit, $sort, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -338,41 +363,34 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
         $indexId = isset($query['index']) ? $query['index'] : 'Title';
 
-        // Initialize the query body.
+        // Specify which fields the query will return.
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
-        $body['query']['bool']['must'] = $this->constructMustQueryParams($terms, $fuzzy);
-        $body['query']['bool']['should'] = $this->constructShouldQueryParams();
+
+        // Construct the actual query.
+        $body['query']['bool']['must'] = $this->constructQueryMust($terms, $fuzzy);
+        $body['query']['bool']['should'] = $this->constructQueryShould();
+        $body['query']['bool']['must_not'] = $this->constructQueryMustNotExists();
+
+        // Create filters that will limit the query results.
+        $queryFilters = $this->constructQueryFilters($public, $roots, $leafs, $sharedSearchingEnabled);
+        if (count($queryFilters) > 0)
+            $body['query']['bool']['filter'] = $queryFilters;
+
+        // Construct the aggregations that will provide facet values.
         $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $sharedSearchingEnabled);
 
+        // Specify which fields will have hit highlighting.
         $highlightParams = $this->constructHighlightParams($viewId);
         if (!empty($highlightParams))
             $body['highlight'] = $highlightParams;
 
-        // Create filters that will limit the query results.
-        $queryFilters = $this->constructQueryFilters($public, $roots, $leafs);
-
-        // Create filters to limit results to specific contributors.
-        $contributorFilters = $this->constructContributorFilters($sharedSearchingEnabled);
-        if (!empty($contributorFilters))
-            $queryFilters[] = $contributorFilters;
-
-        // Add filters to the query body.
-        if (count($queryFilters) > 0)
-        {
-            $body['query']['bool']['filter'] = $queryFilters;
-        }
-
-        // Specify if sorting by column. If not, sort is by relevance based on score.
+        // Specify if sorting by column. If not, sorting is by relevance based on score.
         if (!empty($sort))
-        {
             $body['sort'] = $sort;
-        }
 
+        // Compute scores even when not sorting by relevance.
         if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
-        {
-            // Compute scores even when not sorting by relevance.
             $body['track_scores'] = true;
-        }
 
         $params = [
             'index' => $this->getNameOfActiveIndex(),
@@ -382,19 +400,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         ];
 
         return $params;
-    }
-
-    protected function constructShouldQueryParams()
-    {
-        $shouldQuery = [
-            "match" => [
-                "element.type" => [
-                    "query" => "reference",
-                    "boost" => 2
-                ]
-            ]
-        ];
-        return $shouldQuery;
     }
 
     protected function constructSourceFields($viewId, $indexId)
@@ -465,6 +470,38 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         ];
 
         return json_encode($query);
+    }
+
+    protected function getAdvancedCondition($advanced)
+    {
+        return isset($advanced['type']) ? $advanced['type'] : '';
+    }
+
+    protected function getAdvancedFieldName($advanced)
+    {
+        $elementId = isset($advanced['element_id']) ? $advanced['element_id'] : '';
+        if (ctype_digit($elementId))
+        {
+            // The value is an Omeka element Id. Attempt to get the element's name.
+            $elementName = ItemMetadata::getElementNameFromId($elementId);
+        }
+        else
+        {
+            // The value is an Omeka element name.
+            $elementName = $elementId;
+        }
+
+        return $this->convertElementNameToElasticsearchFieldName($elementName);
+    }
+
+    protected function getAdvancedFilters()
+    {
+        return isset($_GET['advanced']) ? $_GET['advanced'] : array();
+    }
+
+    protected function getAdvancedValue($advanced)
+    {
+        return isset($advanced['type']) ? $advanced['type'] : '';
     }
 
     public function getFacetDefinitions()
