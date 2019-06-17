@@ -150,13 +150,14 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     [
                         'element.description' =>
                             (object)[
-                                'number_of_fragments' => 0,
+                                'number_of_fragments' => 4,
+                                'fragment_size' => 150,
                                 'pre_tags' => ['<span class="hit-highlight">'],
                                 'post_tags' => ['</span>']
                             ],
                         'pdf.text-*' =>
                             (object)[
-                                'number_of_fragments' => 3,
+                                'number_of_fragments' => 4,
                                 'fragment_size' => 150,
                                 'pre_tags' => ['<span class="hit-highlight">'],
                                 'post_tags' => ['</span>']
@@ -232,6 +233,50 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $mustQuery;
     }
 
+    protected function constructQueryCondition($fieldName, $condition, $value)
+    {
+        $query = '';
+
+        switch ($condition)
+        {
+            case 'contains':
+                break;
+
+            case 'does not contain':
+                break;
+
+            case 'is exactly':
+                $query = array('term' => ["element.$fieldName.keyword" => $value]);
+                break;
+
+            case 'is not exactly':
+                break;
+
+            case 'is empty':
+                break;
+
+            case 'is not empty':
+                break;
+
+            case 'starts with':
+                return array('wildcard' => ["element.$fieldName.keyword" => $value]);
+                break;
+
+            case 'ends with':
+                break;
+
+            case 'matches':
+                break;
+
+            case 'does not match':
+                break;
+
+            default:
+        }
+
+        return $query;
+    }
+
     protected function constructQueryFilters($public, array $roots, array $leafs)
     {
         $queryFilters = $this->avantElasticsearchFacets->getFacetFilters($roots, $leafs);
@@ -254,32 +299,28 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
             foreach ($advancedFilters as $advanced)
             {
-                if (isset($advanced['type']))
+                $condition = isset($advanced['type']) ? $advanced['type'] : '';
+                if (empty($condition))
+                    continue;
+
+                $elementId = isset($advanced['element_id']) ? $advanced['element_id'] : '';
+                if (ctype_digit($elementId))
                 {
-                    $elementId = isset($advanced['element_id']) ? $advanced['element_id'] : '';
-                    if (ctype_digit($elementId))
-                    {
-                        // The value is an Omeka element Id.
-                        $elementName = ItemMetadata::getElementNameFromId($elementId);
-                    }
-                    else
-                    {
-                        // The value is an Omeka element name.
-                        $elementName = $elementId;
-                    }
-
-                    $termValue = isset($advanced['terms']) ? $advanced['terms'] : '';
-                    $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
-
-                    if ($advanced['type'] == 'is exactly')
-                    {
-                        $queryFilters[] = array('term' => ["element.$fieldName.keyword" => $termValue]);
-                    }
-                    else if ($advanced['type'] == 'starts with')
-                    {
-                        $queryFilters[] = array('wildcard' => ["element.$fieldName.keyword" => $termValue]);
-                    }
+                    // The value is an Omeka element Id. Attempt to get the element's name.
+                    $elementName = ItemMetadata::getElementNameFromId($elementId);
+                    if (empty($elementName))
+                        continue;
                 }
+                else
+                {
+                    // The value is an Omeka element name.
+                    $elementName = $elementId;
+                }
+
+                // Construct the query for this condition.
+                $fieldName = $this->convertElementNameToElasticsearchFieldName($elementName);
+                $value = isset($advanced['terms']) ? $advanced['terms'] : '';
+                $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $value);
             }
         }
 
@@ -379,6 +420,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $fields = [
                 'element.title',
                 'element.identifier',
+                'element.type',
+                'element.subject',
                 'item.*',
                 'file.*',
                 'url.*'
