@@ -51,12 +51,16 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             'fields' => [
                 'keyword' => [
                     'type' => 'keyword'
+                ],
+                'lowercase' => [
+                    'type' => 'keyword',
+                    'normalizer' => 'lowerCaseNormalizer'
                 ]
             ]
         ];
     }
 
-    public function constructElasticsearchMapping($isSharedIndex)
+    public function constructElasticsearchMappings($isSharedIndex)
     {
         $fieldNames = array();
 
@@ -79,9 +83,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // because these fields have a separate keyword field for those purposes.
         // To learn about text fields see: www.elastic.co/guide/en/elasticsearch/reference/master/text.html
         $textOnlyFields = array(
-            'address',
-            'description',
-            'identifier'
+//            'address',
+//            'description',
+//            'identifier'
         );
 
         foreach ($fieldNames as $fieldName)
@@ -146,22 +150,39 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // will have zero or one PDF attachment, but if there's an item with 10 PDFs, fields up to pdf-text-9 will
         // created and mapped when that item is indexed.
         $template = (object) array(
-            "pdf_text" => [
-                "path_match" => "pdf.text-*",
-                    "mapping" => [
+            'pdf_text' => [
+                'path_match' => 'pdf.text-*',
+                    'mapping' => [
                         'type' => 'text',
                         'analyzer' => 'english'
                     ]
                 ]
             );
 
-        $mapping = [
+        $mappings = [
             $mappingType => [
                 'properties' => $this->properties,
                 'dynamic_templates' => [$template]
             ]
         ];
 
-        return $mapping;
+        return $mappings;
+    }
+
+    public function constructElasticsearchSettings()
+    {
+        $settings = [
+            'analysis' => [
+                'normalizer' => [
+                    'lowerCaseNormalizer' => [
+                        'type' => 'custom',
+                        'char_filter' => [],
+                        'filter' => ['lowercase', 'asciifolding']
+                    ]
+                ]
+            ]
+        ];
+
+        return $settings;
     }
 }

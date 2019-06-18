@@ -169,20 +169,29 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $highlight;
     }
 
-    protected function constructQueryCondition($fieldName, $condition, $value)
+    protected function constructQueryCondition($fieldName, $condition, $terms)
     {
         $query = '';
 
         switch ($condition)
         {
             case 'contains':
+                $query = array(
+                    'simple_query_string' => [
+                        'query' => $terms,
+                        'default_operator' => 'and',
+                        'fields' => [
+                            "element.$fieldName"
+                        ]
+                    ]
+                );
                 break;
 
             case 'does not contain':
                 break;
 
             case 'is exactly':
-                $query = array('term' => ["element.$fieldName.keyword" => $value]);
+                $query = array('term' => ["element.$fieldName.lowercase" => $terms]);
                 break;
 
             case 'is not exactly':
@@ -197,10 +206,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 break;
 
             case 'starts with':
-                $query = array('wildcard' => ["element.$fieldName.keyword" => $value]);
+                $query = array('prefix' => ["element.$fieldName.lowercase" => $terms]);
                 break;
 
             case 'ends with':
+                $query = array('wildcard' => ["element.$fieldName.lowercase" => "*$terms"]);
                 break;
 
             case 'matches':
@@ -237,9 +247,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 continue;
 
             $fieldName = $this->getAdvancedFieldName($advanced);
-            $value = $this->getAdvancedValue($advanced);
+            $terms = $this->getAdvancedTerms($advanced);
 
-            $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $value);
+            $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $terms);
         }
 
         // Create filters to limit results to specific contributors.
@@ -258,57 +268,47 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
         else
         {
-            // Determine if the request if for a phrase match -- the terms are wrapped in double quotes.
-            $phraseMatch = strpos($terms, '"') === 0 && strrpos($terms, '"') === strlen($terms) - 1;
-
-            if ($phraseMatch)
-            {
-                $mustQuery = [
-                    'multi_match' => [
-                        'query' => $terms,
-                        'type' => 'phrase',
-                        'analyzer' => 'english',
-                        'fields' => [
-                            'item.title^15',
-                            'element.title^10',
-                            'element.description',
-                            'element.creator',
-                            'element.type',
-                            'element.subject',
-                            'element.instructions',
-                            'pdf.text-*'
-                        ]
-                    ]
-                ];
-            }
-            else
-            {
-                $mustQuery = [
-                    'multi_match' => [
-                        'query' => $terms,
-                        'type' => 'cross_fields',
-                        'analyzer' => 'english',
-                        'operator' => 'and',
-                        'fields' => [
-                            'item.title^15',
-                            'element.title^10',
-                            'element.identifier^2',
-                            'element.*',
-                            'tags',
-                            'pdf.text-*'
-                        ]
-                    ]
-                ];
-            }
-
             if ($fuzzy)
             {
-                // Elasticsearch does not support fuzziness with cross fields, so switch to best fields.
-                // This will produce different results, but fuzziness is only enabled if the search
-                // didn't produce any results.
-                $mustQuery['multi_match']['type'] = 'best_fields';
-                $mustQuery['multi_match']['fuzziness'] = 'auto';
+                // Determine if the request if for a phrase match -- the terms are wrapped in double quotes.
+                $phraseMatch = strpos($terms, '"') === 0 && strrpos($terms, '"') === strlen($terms) - 1;
+
+                if ($phraseMatch)
+                {
+                    // Append '~1' to the end of the phrase to add a slop value of 1.
+                    $terms .= '~1';
+                }
+                else
+                {
+                    // Remove all non alphanumeric characters from the terms and create an array of unique keywords.
+                    $cleanText = preg_replace('/[^a-z\d" ]/i', '', $terms);
+                    $parts = explode(' ', $cleanText);
+                    $parts = array_unique($parts);
+
+                    // Append '~1' to the end of each keyword to enable fuzziness with an edit distance of 1.
+                    foreach ($parts as $part)
+                    {
+                        if (empty($part))
+                            continue;
+                        $terms = str_replace($part, "$part~1", $terms);
+                    }
+                }
+
             }
+
+            $mustQuery = [
+                'simple_query_string' => [
+                    'query' => $terms,
+                    'default_operator' => 'and',
+                    'fields' => [
+                        'item.title^15',
+                        'element.title^10',
+                        'element.*',
+                        'tags',
+                        'pdf.text-*'
+                    ]
+                ]
+            ];
         }
 
         return $mustQuery;
@@ -344,7 +344,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             "match" => [
                 "element.type" => [
                     "query" => "reference",
-                    "boost" => 2
+                    "boost" => 10
                 ]
             ]
         ];
@@ -359,9 +359,15 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $page = isset($query['page']) ? $query['page'] : 1;
         $offset = ($page - 1) * $limit;
         $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
-        $terms = isset($query['query']) ? $query['query'] : '';
         $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
         $indexId = isset($query['index']) ? $query['index'] : 'Title';
+
+        // Get keywords that were specified on the Advanced Search page.
+        $terms = isset($query['keywords']) ? $query['keywords'] : '';
+
+        // Check if keywords came from the Simple Search text box.
+        if (empty($terms))
+            $terms = isset($query['query']) ? $query['query'] : '';
 
         // Specify which fields the query will return.
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
@@ -499,9 +505,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return isset($_GET['advanced']) ? $_GET['advanced'] : array();
     }
 
-    protected function getAdvancedValue($advanced)
+    protected function getAdvancedTerms($advanced)
     {
-        return isset($advanced['type']) ? $advanced['type'] : '';
+        return isset($advanced['terms']) ? $advanced['terms'] : '';
     }
 
     public function getFacetDefinitions()

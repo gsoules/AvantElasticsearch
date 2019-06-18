@@ -144,11 +144,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     {
         $avantElasticsearchMappings = new AvantElasticsearchMappings();
 
-        $mappings = $avantElasticsearchMappings->constructElasticsearchMapping($isSharedIndex);
+        $settings = $avantElasticsearchMappings->constructElasticsearchSettings();
+        $mappings = $avantElasticsearchMappings->constructElasticsearchMappings($isSharedIndex);
 
         $params = [
             'index' => $indexName,
-            'body' => ['mappings' => $mappings]
+            'body' => [
+                'settings' => $settings,
+                'mappings' => $mappings]
         ];
 
         if (!$this->avantElasticsearchClient->createIndex($params))
