@@ -171,30 +171,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function constructQueryCondition($fieldName, $condition, $terms)
     {
-        $query = '';
-
         switch ($condition)
         {
-            case 'contains':
-                $query = array(
-                    'simple_query_string' => [
-                        'query' => $terms,
-                        'default_operator' => 'and',
-                        'fields' => [
-                            "element.$fieldName"
-                        ]
-                    ]
-                );
-                break;
-
-            case 'does not contain':
-                break;
-
             case 'is exactly':
                 $query = array('term' => ["element.$fieldName.lowercase" => $terms]);
-                break;
-
-            case 'is not exactly':
                 break;
 
             case 'is empty':
@@ -214,12 +194,20 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 break;
 
             case 'matches':
-                break;
-
-            case 'does not match':
+                $query = array('regexp' => ["element.$fieldName.lowercase" => $terms]);
                 break;
 
             default:
+                // 'contains'
+                $query = array(
+                    'simple_query_string' => [
+                        'query' => $terms,
+                        'default_operator' => 'and',
+                        'fields' => [
+                            "element.$fieldName"
+                        ]
+                    ]
+                );
         }
 
         return $query;
@@ -302,7 +290,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'default_operator' => 'and',
                     'fields' => [
                         'item.title^15',
-                        'element.title^10',
                         'element.*',
                         'tags',
                         'pdf.text-*'
@@ -344,7 +331,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             "match" => [
                 "element.type" => [
                     "query" => "reference",
-                    "boost" => 10
+                    "boost" => 5
                 ]
             ]
         ];
@@ -375,7 +362,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Construct the actual query.
         $body['query']['bool']['must'] = $this->constructQueryMust($terms, $fuzzy);
         $body['query']['bool']['should'] = $this->constructQueryShould();
-        $body['query']['bool']['must_not'] = $this->constructQueryMustNotExists();
+
+        $mustNot = $this->constructQueryMustNotExists();
+        if (!empty($mustNot))
+            $body['query']['bool']['must_not'] = $mustNot;
 
         // Create filters that will limit the query results.
         $queryFilters = $this->constructQueryFilters($public, $roots, $leafs, $sharedSearchingEnabled);
