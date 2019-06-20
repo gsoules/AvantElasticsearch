@@ -270,18 +270,32 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 {
                     // Remove all non alphanumeric characters from the terms and create an array of unique keywords.
                     $cleanText = preg_replace('/[^a-z\d" ]/i', '', $terms);
-                    $parts = explode(' ', $cleanText);
-                    $parts = array_unique($parts);
+                    $words = explode(' ', $cleanText);
+                    $words = array_unique($words);
 
-                    // Append '~1' to the end of each keyword to enable fuzziness with an edit distance of 1.
-                    foreach ($parts as $part)
+                    // Edit the search terms to increase the chances of getting results from the query.
+                    foreach ($words as $word)
                     {
-                        if (empty($part))
+                        // Ignore empty words and numbers.
+                        if (empty($word) || ctype_digit($word))
                             continue;
-                        $terms = str_replace($part, "$part~1", $terms);
+
+                        // See if there is a synonym for this word.
+                        $synonym = $this->getFuzzySynonym($word);
+
+                        if (empty($synonym))
+                        {
+                            // Append '~1' to the end of the keyword to enable fuzziness with an edit distance of 1.
+                            $replacement = "$word~1";
+                        }
+                        else
+                        {
+                            $replacement = $synonym;
+                        }
+
+                        $terms = str_replace($word, $replacement, $terms);
                     }
                 }
-
             }
 
             $mustQuery = [
@@ -289,7 +303,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'query' => $terms,
                     'default_operator' => 'and',
                     'fields' => [
-                        'item.title^15',
+                        'item.title^20',
+                        'item.description^10',
                         'element.*',
                         'tags',
                         'pdf.text-*'
@@ -503,6 +518,22 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     public function getFacetDefinitions()
     {
         return $this->avantElasticsearchFacets->getFacetDefinitions();
+    }
+
+    protected function getFuzzySynonym($word)
+    {
+        // Replace common abbreviations with synonyms. If this list becomes long, consider putting the synonyms into
+        // the config.ini file, or use Elasticsearch's Synonym Token Filter mechanism. For now this is simple and fast.
+
+        switch (strtolower($word))
+        {
+            case 'pt';
+                return 'point';
+            case 'rd';
+                return 'road';
+            default:
+                return '';
+        }
     }
 
     public function isUsingSharedIndex()
