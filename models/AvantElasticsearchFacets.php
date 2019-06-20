@@ -115,10 +115,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Each aggregate contains any array of buckets with each bucket containing a unique value and a count to
         // indicate how many of the search results have that value. If the facet is a hierarchy, the bucket's value
         // is the hierarchy's root name plus an array of sub-aggregate data for that root's leaf values. Each
-        // sub-aggregate contains its own array of buckets with each bucket containing a leaf value and count to
+        // sub-aggregate contains its own array of buckets with each bucket containing a leaf value and a count to
         // indicate how many of the search results contain the leaf value for that root. For non-hierarchy facets
-        // like 'date' there are no sub-aggregates. In this code, both the leaf values for hierarchy facets and the
-        // top level values for non-hierarchy facets are referred to as leafs. Only the root value of hierarchy
+        // like Date, there are no sub-aggregates. In this code, both the leaf values for hierarchy facets and the
+        // top level values for non-hierarchy facets are referred to as leafs. Only the root values of hierarchy
         // facets are referred to as roots.
 
         $table = array();
@@ -314,7 +314,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetApplied = $entry['action'] == 'remove' ? true : $facetApplied;
         $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot, false);
 
-        // Emit hierarchy  leaf entries for this facet entry.
+        // Emit hierarchy leaf entries for this facet entry.
         if (isset($entry['leafs']))
         {
             $leafEntries = $entry['leafs'];
@@ -526,10 +526,22 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function entryHasNoFilteringEffect($entry)
     {
-        // See if this entry's count is less than the total number of search results.
-        // if not, the entry will have no effect since it cannot be used to further narrow the results.
-        //return false;
-        return $entry['count'] >= $this->totalResults && $entry['action'] == 'add';
+        // See if this entry's count, and the count of each of its leafs, is greater than or equal to the total number
+        // of search results. If true, the entry will have no effect since it cannot be used to further narrow the
+        // results. We have to check the leaf counts because a root count could be the same as the total number of
+        // results, but the leafs could provide further filtering.
+        if ($entry['count'] >= $this->totalResults && $entry['action'] == 'add')
+        {
+            $leafs = isset($entry['leafs']) ? $entry['leafs'] : array();
+            foreach ($leafs as $leaf)
+            {
+                if ($leaf['count'] < $this->totalResults)
+                    return false;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     protected function extractAppliedFacetsFromSearchRequest($query)
