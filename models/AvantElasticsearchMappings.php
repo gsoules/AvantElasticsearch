@@ -37,6 +37,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     protected function addTextFieldToMappingProperties($fieldName, $analyzer = 'english')
     {
+        // To learn about text fields see: www.elastic.co/guide/en/elasticsearch/reference/master/text.html
         $this->properties[$fieldName] = [
             'type' => 'text',
             'analyzer' => $analyzer
@@ -79,35 +80,22 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         $mappingType = $this->getDocumentMappingType();
 
-        // Text fields for elements that don't require a corresponding keyword field for sorting or aggregating
-        // because these fields have a separate keyword field for those purposes.
-        // To learn about text fields see: www.elastic.co/guide/en/elasticsearch/reference/master/text.html
-        $textOnlyFields = array(
-//            'address',
-//            'description',
-//            'identifier'
-        );
-
         foreach ($fieldNames as $fieldName)
         {
-            // Create a text and keyword mapping for item elements. The text fields is needed to allow full-text
-            // search of the field. The keyword mapping is necessary for sorting.
-            if (in_array($fieldName, $textOnlyFields))
-            {
-                $this->addTextFieldToMappingProperties("element.$fieldName");
-            }
-            else
-            {
-                $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
-            }
+            $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
         }
 
         // Tags are not an element, so add a fields for them.
         $this->addTextFieldToMappingProperties('tags');
 
-        // The 'item.title' field is a copy of the 'element.title' field. This one uses the standard analyzer
-        // whereas element.title uses the english analyzer. This yields the best possible search results on title content.
+        // Make a copy of the Title and Description fields using the standard analyzer instead of the English analyzer.
+        // This yields the best possible search results on Title and Description content because it allows boosting on
+        // hits in these fields where the search terms exactly match the original text with no stemming as is often the
+        // case with fields that use the English analyzer. The English analyzer increases results because it can match
+        // more loosely, but ranking is more accurate with the Standard Analyzer. Note that these fields are initialized
+        // by AvantElasticsearchDocument::getItemAttributes(). If you add another field here, add it there as well.
         $this->addTextFieldToMappingProperties('item.title', 'standard');
+        $this->addTextFieldToMappingProperties('item.description', 'standard');
 
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');

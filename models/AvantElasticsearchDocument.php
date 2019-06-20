@@ -18,6 +18,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     /* @var $avantElasticsearchFacets AvantElasticsearchFacets */
     protected $avantElasticsearchFacets;
+    protected $descriptionString;
     protected $facetDefinitions;
     protected $itemHasDate = false;
     protected $itemHasPlace = false;
@@ -57,7 +58,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($fileText))
             $this->setField('pdf', $fileText);
 
-        $itemAttributes = $this->getItemAttributes($itemData, $this->titleString);
+        $itemAttributes = $this->getItemAttributes($itemData, $this->titleString, $this->descriptionString);
         $this->setField('item', $itemAttributes);
 
         $fileCounts = $this->getFileCounts($itemData);
@@ -376,11 +377,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $fileCounts;
     }
 
-    protected function getItemAttributes($itemData, $titleString)
+    protected function getItemAttributes($itemData, $titleString, $descriptionString)
     {
         $itemAttributes = array(
             'id' => $itemData['id'],
             'title' => $titleString,
+            'description' => $descriptionString,
             'public' => (bool)$itemData['public'],
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
@@ -577,6 +579,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
             $this->titleFieldTexts = $fieldTexts;
         }
+
+        if ($elasticsearchFieldName == 'description')
+            $this->descriptionString = $fieldTextsString;
 
         if ($elasticsearchFieldName == 'identifier')
             $this->itemHasIdentifier = true;
