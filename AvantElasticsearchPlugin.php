@@ -60,9 +60,9 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
             $item = $args['record'];
             $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
 
-            if ($sharedIndexIsEnabled)
+            if ($sharedIndexIsEnabled && $item->public)
             {
-                // Delete the item from the shared index.
+                // Delete the public item from the shared index. A non-public item should not be in the index.
                 $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfSharedIndex());
                 $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
             }
