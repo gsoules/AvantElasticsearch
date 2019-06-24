@@ -10,6 +10,27 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         ];
     }
 
+    protected function addBoostFields()
+    {
+        // Make a copy of the Title and Description fields using the standard analyzer instead of the English analyzer.
+        // This yields the best possible search results on Title and Description content because it allows boosting on
+        // hits in these fields where the search terms exactly match the original text without the stemming done by the
+        // English analyzer. The English analyzer increases results because it can match more loosely, e.g. it will
+        // treat 'run' and 'running' the same, but ranking is more accurate with the Standard Analyzer. Boost values
+        // are specified in AvantElasticsearchQueryBuilder::constructQueryMust() e.g. 'item.title^20' boosts title by 20.
+        //
+        // Be aware that the item.* fields are initialized by AvantElasticsearchDocument::getItemAttributes(). If you
+        // add another field here, add it there as well.
+
+        // Note: It seems that it should be possible to get the same boost behavior by adding a 'standard' text field
+        // which uses the 'standard' analyzer in addTextAndKeywordFieldToMappingProperties()) instead of creating these
+        // copies, but that did not work. Boosting element.title.standard and element.description.standard seemed to
+        // have no effect at all. As such, we'll do it this way until such time as we can figure out a better way.
+        //
+        $this->addTextFieldToMappingProperties('item.title', 'standard');
+        $this->addTextFieldToMappingProperties('item.description', 'standard');
+    }
+
     protected function addCompletionFieldToMappingProperties($fieldName)
     {
         // Use the Standard analyzer because by default Elasticsearch uses the Simple analyzer for completion
@@ -85,17 +106,11 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
         }
 
+        // Specify special fields that will be used to influence document scores by boosting.
+        $this->addBoostFields();
+
         // Tags are not an element, so add a fields for them.
         $this->addTextFieldToMappingProperties('tags');
-
-        // Make a copy of the Title and Description fields using the standard analyzer instead of the English analyzer.
-        // This yields the best possible search results on Title and Description content because it allows boosting on
-        // hits in these fields where the search terms exactly match the original text with no stemming as is often the
-        // case with fields that use the English analyzer. The English analyzer increases results because it can match
-        // more loosely, but ranking is more accurate with the Standard Analyzer. Note that these fields are initialized
-        // by AvantElasticsearchDocument::getItemAttributes(). If you add another field here, add it there as well.
-        $this->addTextFieldToMappingProperties('item.title', 'standard');
-        $this->addTextFieldToMappingProperties('item.description', 'standard');
 
         // Completion field.
         $this->addCompletionFieldToMappingProperties('suggestions');
@@ -110,6 +125,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addNumericFieldToMappingProperties('file.total');
         $this->addNumericFieldToMappingProperties('file.video');
         $this->addNumericFieldToMappingProperties('item.id');
+        $this->addNumericFieldToMappingProperties('item.year');
 
         // Keyword fields. None of these require full-text search.
         // To learn about keyword fields see: www.elastic.co/guide/en/elasticsearch/reference/master/keyword.html

@@ -29,6 +29,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $itemSubjectIsPeople = false;
     protected $titleString = '';
     protected $titleFieldTexts = null;
+    protected $year = 0;
 
     // Arrays for collecting multiple values.
     protected $elementData = [];
@@ -58,7 +59,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($fileText))
             $this->setField('pdf', $fileText);
 
-        $itemAttributes = $this->getItemAttributes($itemData, $this->titleString, $this->descriptionString);
+        $itemAttributes = $this->getItemAttributes($itemData, $this->titleString, $this->year, $this->descriptionString);
         $this->setField('item', $itemAttributes);
 
         $fileCounts = $this->getFileCounts($itemData);
@@ -240,25 +241,25 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // Create a field-text to represent an unspecified date, place, or subject.
         if (!$this->itemHasDate)
         {
-            $fieldTexts = $this->createFieldTexts('[blank]');
+            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
             $this->createFacetDataForField('date', $fieldTexts);
         }
 
         if (!$this->itemHasPlace)
         {
-            $fieldTexts = $this->createFieldTexts('[blank]');
+            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
             $this->createFacetDataForField('place', $fieldTexts);
         }
 
         if (!$this->itemHasSubject)
         {
-            $fieldTexts = $this->createFieldTexts('[blank]');
+            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
             $this->createFacetDataForField('subject', $fieldTexts);
         }
 
         if (!$this->itemHasType)
         {
-            $fieldTexts = $this->createFieldTexts('[blank]');
+            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
             $this->createFacetDataForField('type', $fieldTexts);
         }
     }
@@ -377,7 +378,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $fileCounts;
     }
 
-    protected function getItemAttributes($itemData, $titleString, $descriptionString)
+    protected function getItemAttributes($itemData, $titleString, $year, $descriptionString)
     {
         $itemAttributes = array(
             'id' => $itemData['id'],
@@ -387,6 +388,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor-id']
         );
+
+        if ($year > 0)
+            $itemAttributes['year'] = $year;
+
         return $itemAttributes;
     }
 
@@ -587,7 +592,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->itemHasIdentifier = true;
 
         if ($elasticsearchFieldName == 'date')
+        {
             $this->itemHasDate = true;
+            $this->year = intval($this->getYearFromDate($fieldTextsString));
+        }
 
         if ($elasticsearchFieldName == 'place')
             $this->itemHasPlace = true;

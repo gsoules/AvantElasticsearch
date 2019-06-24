@@ -199,6 +199,16 @@ class AvantElasticsearch
         return $fieldNames;
     }
 
+    public function getYearFromDate($dateText)
+    {
+        $year = '';
+        if (preg_match("/^.*(\d{4}).*$/", $dateText, $matches))
+        {
+            $year = $matches[1];
+        }
+        return $year;
+    }
+
     public function isJson($string)
     {
         json_decode($string);

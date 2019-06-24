@@ -671,11 +671,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if ($text == BLANK_FIELD_TEXT)
             return $text;
 
-        $year = '';
-        if (preg_match("/^.*(\d{4}).*$/", $text, $matches))
-        {
-            $year = $matches[1];
-        }
+        $year = $this->getYearFromDate($text);
 
         if (empty($year))
         {

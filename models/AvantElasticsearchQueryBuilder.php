@@ -2,6 +2,7 @@
 class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 {
     protected $avantElasticsearchFacets;
+    protected $synonyms;
     protected $usingSharedIndex;
 
     public function __construct()
@@ -239,6 +240,16 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
             $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $terms);
         }
+
+        // Create year range filter.
+        $yearFilter = $this->constructYearFilter();
+        if (!empty($yearFilter))
+            $queryFilters[] = $yearFilter;
+
+        // Create tags filter.
+        $tagsFilter = $this->constructTagsFilter();
+        if (!empty($tagsFilter))
+            $queryFilters[] = $tagsFilter;
 
         // Create filters to limit results to specific contributors.
         $contributorFilters = $this->constructContributorFilters($sharedSearchingEnabled);
@@ -483,6 +494,50 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return json_encode($query);
     }
 
+    protected function constructTagsFilter()
+    {
+        $tags = AvantCommon::queryStringArg('tags', '');
+
+        if (empty($tags))
+            return '';
+
+        $query = array(
+            'simple_query_string' => [
+                'query' => $tags,
+                'default_operator' => 'and',
+                'fields' => [
+                    'tags'
+                ]
+            ]
+        );
+
+        return $query;
+    }
+
+    protected function constructYearFilter()
+    {
+        $yearStart = AvantCommon::queryStringArg('year_start', 0);
+        $yearEnd = AvantCommon::queryStringArg('year_end', 0);
+
+        if (empty($yearStart && empty($yearEnd)))
+            return '';
+
+        $query = array(
+            'range' => [
+                'item.year' => [
+                ]
+            ]
+        );
+
+        if ($yearStart >= 0)
+            $query['range']['item.year']['gte'] = $yearStart;
+
+        if ($yearEnd >= 0 && $yearEnd >= $yearStart)
+            $query['range']['item.year']['lte'] = $yearEnd;
+
+        return $query;
+    }
+
     protected function getAdvancedCondition($advanced)
     {
         return isset($advanced['type']) ? $advanced['type'] : '';
@@ -522,18 +577,29 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function getFuzzySynonym($word)
     {
-        // Replace common abbreviations with synonyms. If this list becomes long, consider putting the synonyms into
-        // the config.ini file, or use Elasticsearch's Synonym Token Filter mechanism. For now this is simple and fast.
+        // Replace common abbreviations with synonyms. If this list becomes long, consider using
+        // Elasticsearch's Synonym Token Filter mechanism. For now this is simple and fast.
+        // Returns a string containing the original word ORed with the synonym e.g. '(rd|road)'.
 
-        switch (strtolower($word))
+        $word = strtolower($word);
+
+        if (!isset($this->synonyms))
         {
-            case 'pt';
-                return 'point';
-            case 'rd';
-                return 'road';
-            default:
-                return '';
+            $config = AvantElasticsearch::getAvantElasticsearcConfig();
+            $this->synonyms = $config ? $config-> synonyms : array();
         }
+
+        foreach ($this->synonyms as $pair)
+        {
+            $parts = array_map('trim', explode(',', $pair));
+            if (count($parts) != 2)
+                continue;
+
+            if ($parts[0] == $word)
+                return "($parts[0]|$parts[1])";
+        }
+
+        return '';
     }
 
     public function isUsingSharedIndex()
