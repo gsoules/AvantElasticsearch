@@ -224,12 +224,32 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             if ($arg == 'page')
                 continue;
 
-            // Ignore any unexpected array values. This could happen if the user mistyped or edited the query string,
-            // for example by specifying 'rot_type[]=Image' instead of 'root_type[]=Image'.
             if (is_array($value))
-                continue;
+            {
+                if ($arg != 'advanced')
+                {
+                    // Ignore any unexpected array values. This could happen if the user mistyped or edited the query string,
+                    // for example by specifying 'rot_type[]=Image' instead of 'root_type[]=Image'.
+                    continue;
+                }
 
-            $updatedQueryString .= '&' . urlencode("$arg") . '=' . urlencode($value);
+                foreach ($value as $index => $advancedArg)
+                {
+                    if (!is_array($advancedArg))
+                    {
+                        // Again ignore any unexpected query string syntax.
+                        continue;
+                    }
+
+                    $updatedQueryString .= "&advanced[$index][element_id]=" . urlencode($advancedArg['element_id']);
+                    $updatedQueryString .= "&advanced[$index][type]=" . urlencode($advancedArg['type']);
+                    $updatedQueryString .= "&advanced[$index][terms]=" . urlencode($advancedArg['terms']);
+                }
+            }
+            else
+            {
+                $updatedQueryString .= '&' . urlencode("$arg") . '=' . urlencode($value);
+            }
         }
 
         $this->queryStringWithApplieFacets = $updatedQueryString;
@@ -240,12 +260,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     {
         // The order below is the order in which facet names appear in the facets section on the search results page.
 
-        $this->createFacet('subject', 'Subjects', true, true);
-        $this->createFacet('type', 'Item Type', true, true);
+        $this->createFacet('subject', 'Subject', true, true);
+        $this->createFacet('type', 'Type', true, true);
 
-        $this->createFacet('place', 'Places', true);
+        $this->createFacet('place', 'Place', true);
 
-        $this->createFacet('date', 'Dates');
+        $this->createFacet('date', 'Date');
         $this->facetDefinitions['date']['is_date'] = true;
 
         $this->createFacet('contributor', 'Contributor');
@@ -392,31 +412,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return "<li$class>$html</li>";
     }
 
-    protected function emitHtmlForResetLink($query)
-    {
-        if (empty($this->appliedFacets['root']) && empty($this->appliedFacets['leaf']))
-        {
-            // No facets are applied and therefore no reset link is needed.
-            return '';
-        }
-
-        // Create new query string args minus root or leaf facets, or the pagination arg if it exists.
-        $otherArgs = '';
-        foreach ($query as $argName => $argValue)
-        {
-            if ($argName == 'query' || $argName == 'root' || $argName == 'leaf' || $argName == 'page')
-                continue;
-
-            $otherArgs .= "&$argName=$argValue";
-        }
-
-        $terms = isset($query['query']) ? $query['query'] : '';
-        $queryString = "query=" . urlencode($terms);
-        $resetUrl = $this->findUrl . '?' . $queryString . $otherArgs;
-        $resetLink = '<a href="' . $resetUrl . '" title="Reset" class="search-reset-link">' . '&#10006;' . '</a>';
-        return $resetLink;
-    }
-
     protected function emitHtmlForFacetSection($group, $facetDefinition)
     {
         $html = '';
@@ -515,12 +510,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function emitHtmlLinkForRemoveFilter($facetToRemoveGroup, $facetToRemoveName, $facetToRemoveRootPath, $isRoot)
     {
-        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($this->queryStringWithApplieFacets, $facetToRemoveGroup, $facetToRemoveRootPath, $isRoot);
-
         // Create the link that the user can click to remove this facet, but leave all the other applied facets.
-        // In the facet text, add a space after each comma for readability.
-        $facetUrl = $this->findUrl . '?' . $updatedQueryString;
-        $link = $facetToRemoveName . '<a href="' . $facetUrl . '" title="Remove filter" class="search-reset-link">' . '&#10006;' . '</a>';
+        $facetUrl = $this->getUrlForRemoveFilter($facetToRemoveGroup, $facetToRemoveRootPath, $isRoot);
+        $link = $facetToRemoveName . AvantSearch::getSearchFilterResetLink($facetUrl);
         return $link;
     }
 
@@ -766,8 +758,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $facetToRemoveRootPath = $leafFacetName;
                 $parts = explode(',', $facetToRemoveRootPath);
                 $facetToRemoveName = $parts[count($parts) - 1];
-                $resetLink = $this->emitHtmlLinkForRemoveFilter($leafFacetGroup, $facetToRemoveName, $facetToRemoveRootPath, false);
-                $filterBarFacets[$groupName]['reset'][] = $resetLink;
+                $resetUrl = $this->getUrlForRemoveFilter($leafFacetGroup, $facetToRemoveRootPath, false);
+                $filterBarFacets[$groupName]['reset-url'][] = $resetUrl;
+                $filterBarFacets[$groupName]['reset-text'][] = "$groupName: $facetToRemoveName";
+                $filterBarFacets[$groupName]['root-name'][] = $parts[0];
             }
         }
 
@@ -780,11 +774,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $skipThisRoot = false;
 
                 // Check to see if this root is the root of a leaf that's applied
-                if (isset($filterBarFacets[$groupName]['name']))
+                if (isset($filterBarFacets[$groupName]['root-name']))
                 {
-                    foreach ($filterBarFacets[$groupName]['name'] as $facetName)
+                    foreach ($filterBarFacets[$groupName]['root-name'] as $leafRootName)
                     {
-                        if (strpos($facetName, $rootFacetName . ',') === 0)
+                        if ($leafRootName == $rootFacetName)
                         {
                             // One of this root's leafs is applied so ignore this root.
                             $skipThisRoot = true;
@@ -796,8 +790,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 if (!$skipThisRoot)
                 {
                     // It's okay to add this root since none of its leaf facets are applied.
-                    $resetLink = $this->emitHtmlLinkForRemoveFilter($rootFacetGroup, $rootFacetName, $rootFacetName, true);
-                    $filterBarFacets[$groupName]['reset'][] = $resetLink;
+                    $resetUrl = $this->getUrlForRemoveFilter($rootFacetGroup, $rootFacetName, true);
+                    $filterBarFacets[$groupName]['reset-url'][] = $resetUrl;
+                    $filterBarFacets[$groupName]['reset-text'][] = "$groupName: $rootFacetName";
                 }
             }
         }
@@ -806,8 +801,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         if (count($filterBarFacets) >= 2)
         {
-            $resetLink = $this->emitHtmlForResetLink($query);
-            $filterBarFacets[__('Clear all')] = ['reset' => [$resetLink]];
+            $resetLink = $this->getUrlForResetLink($query);
+            $filterBarFacets[__('Clear all')] = ['reset-url' => [$resetLink], 'reset-text' => [__('Clear all')]];
         }
 
         return $filterBarFacets;
@@ -836,6 +831,37 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $rootName = substr($leafName, 0, $index);
         }
         return $rootName;
+    }
+
+    protected function getUrlForRemoveFilter($facetToRemoveGroup, $facetToRemoveRootPath, $isRoot)
+    {
+        $updatedQueryString = $this->editQueryStringToRemoveFacetArg($this->queryStringWithApplieFacets, $facetToRemoveGroup, $facetToRemoveRootPath, $isRoot);
+        $url = $this->findUrl . '?' . $updatedQueryString;
+        return $url;
+    }
+
+    protected function getUrlForResetLink($query)
+    {
+        if (empty($this->appliedFacets['root']) && empty($this->appliedFacets['leaf']))
+        {
+            // No facets are applied and therefore no reset link is needed.
+            return '';
+        }
+
+        // Create new query string args minus root or leaf facets, or the pagination arg if it exists.
+        $otherArgs = '';
+        foreach ($query as $argName => $argValue)
+        {
+            if ($argName == 'query' || $argName == 'root' || $argName == 'leaf' || $argName == 'page' || $argName == 'advanced')
+                continue;
+
+            $otherArgs .= "&$argName=$argValue";
+        }
+
+        $terms = isset($query['query']) ? $query['query'] : '';
+        $queryString = "query=" . urlencode($terms);
+        $resetUrl = $this->findUrl . '?' . $queryString . $otherArgs;
+        return $resetUrl;
     }
 
     protected function isDefinedGroup($group)
