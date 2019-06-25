@@ -172,30 +172,49 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function constructQueryCondition($fieldName, $condition, $terms)
     {
+        if (empty($terms) && !($condition == 'is empty' || $condition == 'is not empty'))
+            return '';
+
+        if ($fieldName == 'tags')
+        {
+            $field = 'tags';
+            if ($condition == 'is exactly')
+            {
+                // The 'is exactly' condition won't work with tags because its value is an array, not a string.
+                $condition = 'contains';
+            }
+        }
+        else if ($fieldName == 'contributor')
+            $field = 'item.contributor-id';
+        else
+            $field = "element.$fieldName";
+
+        $fieldLowerCase = "$field.lowercase";
+
         switch ($condition)
         {
             case 'is exactly':
-                $query = array('term' => ["element.$fieldName.lowercase" => $terms]);
+                $query = array('term' => [$fieldLowerCase => $terms]);
                 break;
 
             case 'is empty':
-                // Handled by the constuctQueryMustNotExist method.
+                // Handled by the constructQueryMustNotExists method.
                 break;
 
             case 'is not empty':
-                $query = array('exists' => ['field' => "element.$fieldName"]);
+                $query = array('exists' => ['field' => $field]);
                 break;
 
             case 'starts with':
-                $query = array('prefix' => ["element.$fieldName.lowercase" => $terms]);
+                $query = array('prefix' => [$fieldLowerCase => $terms]);
                 break;
 
             case 'ends with':
-                $query = array('wildcard' => ["element.$fieldName.lowercase" => "*$terms"]);
+                $query = array('wildcard' => [$fieldLowerCase => "*$terms"]);
                 break;
 
             case 'matches':
-                $query = array('regexp' => ["element.$fieldName.lowercase" => $terms]);
+                $query = array('regexp' => [$fieldLowerCase => $terms]);
                 break;
 
             default:
@@ -205,7 +224,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                         'query' => $terms,
                         'default_operator' => 'and',
                         'fields' => [
-                            "element.$fieldName"
+                            $field
                         ]
                     ]
                 );
@@ -238,7 +257,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $fieldName = $this->getAdvancedFieldName($advanced);
             $terms = $this->getAdvancedTerms($advanced);
 
-            $queryFilters[] = $this->constructQueryCondition($fieldName, $condition, $terms);
+            $conditionFilter = $this->constructQueryCondition($fieldName, $condition, $terms);
+            if (!empty($conditionFilter))
+                $queryFilters[] = $conditionFilter;
         }
 
         // Create year range filter.
@@ -331,6 +352,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         // This method is used only to support the Is Empty filter for Advanced Search. Unlike Is Not Empty which is
         // implemented using an Elasticsearch query filter, Is Empty is implemented in the must_not portion of the query.
+
         $mustNot = array();
 
         $advancedFilters = $this->getAdvancedFilters();
@@ -340,10 +362,16 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 continue;
 
             $fieldName = $this->getAdvancedFieldName($advanced);
+            if ($fieldName == 'tags')
+                $field = 'tags';
+            else if ($fieldName == 'contributor')
+                $field = 'item.contributor-id';
+            else
+                $field = "element.$fieldName";
 
             $mustNot[] = [
                 "exists" => [
-                    "field" => "element.$fieldName"
+                    "field" => $field
                 ]
             ];
         }
@@ -567,7 +595,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function getAdvancedTerms($advanced)
     {
-        return isset($advanced['terms']) ? $advanced['terms'] : '';
+        return isset($advanced['terms']) ? trim($advanced['terms']) : '';
     }
 
     public function getFacetDefinitions()
