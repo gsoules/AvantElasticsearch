@@ -131,6 +131,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                                 ]
                             ]
                         ]
+                    ],
+                    'contributor-ids' => [
+                        'terms' => [
+                            'field' => 'item.contributor-id'
+                        ]
                     ]
                 ]
             ]

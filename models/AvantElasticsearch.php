@@ -53,6 +53,124 @@ class AvantElasticsearch
     {
         return array($this->createFieldText($text));
     }
+    public static function generateContributorStatistics()
+    {
+        $stats = '';
+        $avantElasticsearchClient = new AvantElasticsearchClient();
+
+        if ($avantElasticsearchClient->ready())
+        {
+            $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+
+            // Explicitly specify that the shared index should be queried.
+            $indexName = AvantElasticsearch::getNameOfSharedIndex();
+            $avantElasticsearchQueryBuilder->setIndexName($indexName);
+
+            $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
+            $response = $avantElasticsearchClient->search($params);
+            if ($response == null)
+            {
+                $stats = $avantElasticsearchClient->getLastError();
+            }
+            else
+            {
+                $audioTotal = 0;
+                $documentTotal = 0;
+                $imageTotal = 0;
+                $itemTotal = 0;
+                $videoTotal = 0;
+
+                $rows = '';
+                $buckets = $response['aggregations']['contributors']['buckets'];
+
+                // Get all the totals so that we'll know which columns to generate.
+                foreach ($buckets as $index => $bucket)
+                {
+                    $itemCount = $bucket['doc_count'];
+                    $itemTotal += $itemCount;
+
+                    $imageCount = intval($bucket['image']['value']);
+                    $imageTotal += $imageCount;
+
+                    $documentCount = intval($bucket['document']['value']);
+                    $documentTotal += $documentCount;
+
+                    $audioCount = intval($bucket['audio']['value']);
+                    $audioTotal += $audioCount;
+
+                    $videoCount = intval($bucket['video']['value']);
+                    $videoTotal += $videoCount;
+                }
+
+                // Generate the headers
+                $header = "<table id='search-stats-table'>";
+                $header .= '<tr>';
+                $header .= '<td><strong>Contributor Name</strong></td>';
+                $header .= '<td><strong>Items</strong></td>';
+                $header .= '<td><strong>Images</strong></td>';
+                $header .= '<td><strong>Docs</strong></td>';
+                if ($audioTotal > 0)
+                {
+                    $header .= '<td><strong>Audio</strong></td>';
+                }
+                if ($videoTotal > 0)
+                {
+                    $header .= '<td><strong>Video</strong></td>';
+                }
+                $header .= '</tr>';
+
+                // Generate the rows.
+                foreach ($buckets as $index => $bucket)
+                {
+                    $contributorId = $response['aggregations']['contributor-ids']['buckets'][$index]['key'];
+
+                    $itemCount = $bucket['doc_count'];
+                    $imageCount = intval($bucket['image']['value']);
+                    $documentCount = intval($bucket['document']['value']);
+                    $audioCount = intval($bucket['audio']['value']);
+                    $videoCount = intval($bucket['video']['value']);
+
+                    $rows .= '<tr>';
+                    $contributor = $bucket['key'];
+                    $rows .= "<td>$contributor ($contributorId)</td>";
+                    $rows .= "<td>$itemCount</td>";
+                    $rows .= "<td>$imageCount</td>";
+                    $rows .= "<td>$documentCount</td>";
+                    if ($audioTotal > 0)
+                    {
+                        $rows .= "<td>$audioCount</td>";
+                    }
+                    $rows .= '</tr>';
+                    if ($videoTotal > 0)
+                    {
+                        $rows .= "<td>$videoCount</td>";
+                    }
+                    $rows .= '</tr>';
+                }
+
+                // Generate the Totals row.
+                $itemTotal = number_format($itemTotal);
+                $totals = '<tr>';
+                $totals .= '<td><strong>Totals</strong>';
+                $totals .= "<td><strong>$itemTotal</strong></td>";
+                $totals .= "<td><strong>$imageTotal</strong></td>";
+                $totals .= "<td><strong>$documentTotal</strong></td>";
+                if ($audioTotal > 0)
+                {
+                    $totals .= "<td><strong>$audioTotal</strong></td>";
+                }
+                if ($videoTotal > 0)
+                {
+                    $totals .= "<td><strong>$videoTotal</strong></td>";
+                }
+                $totals .= "</tr>";
+                $totals .= '</table>';
+
+                $stats = $header . $rows . $totals;
+            }
+        }
+        return $stats;
+    }
 
     public static function getAvantElasticsearcConfig()
     {
