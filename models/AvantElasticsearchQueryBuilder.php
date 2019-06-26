@@ -552,7 +552,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $yearStart = AvantCommon::queryStringArg('year_start', 0);
         $yearEnd = AvantCommon::queryStringArg('year_end', 0);
 
-        if (empty($yearStart && empty($yearEnd)))
+        if (empty($yearStart) && empty($yearEnd))
             return '';
 
         $query = array(
