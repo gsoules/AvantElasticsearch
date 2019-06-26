@@ -418,26 +418,40 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Specify which fields the query will return.
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
 
-        // Construct the actual query.
-        $body['query']['bool']['must'] = $this->constructQueryMust($terms, $fuzzy);
-        $body['query']['bool']['should'] = $this->constructQueryShould();
+        if (strpos($terms, '::') === 0 && !empty(current_user()))
+        {
+            // Construct an admin query using Elasticsearch Query String Syntax.
+            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax
+            // Examples:
+            //    ::file.total:>10 = find items that have more than 10 files attached to them
+            //    ::item.public:false AND element.status:ok = find non-public items that have a status of 'ok'
+            //    ::url.cover:true = find items that are using a cover image
+            $q = substr($terms, 2);
+            $body['query'] = array('query_string' => ['query' => $q]);
+        }
+        else
+        {
+            // Construct the bool query used for user searches.
+            $body['query']['bool']['must'] = $this->constructQueryMust($terms, $fuzzy);
+            $body['query']['bool']['should'] = $this->constructQueryShould();
 
-        $mustNot = $this->constructQueryMustNotExists();
-        if (!empty($mustNot))
-            $body['query']['bool']['must_not'] = $mustNot;
+            $mustNot = $this->constructQueryMustNotExists();
+            if (!empty($mustNot))
+                $body['query']['bool']['must_not'] = $mustNot;
 
-        // Create filters that will limit the query results.
-        $queryFilters = $this->constructQueryFilters($public, $roots, $leafs, $sharedSearchingEnabled);
-        if (count($queryFilters) > 0)
-            $body['query']['bool']['filter'] = $queryFilters;
+            // Create filters that will limit the query results.
+            $queryFilters = $this->constructQueryFilters($public, $roots, $leafs, $sharedSearchingEnabled);
+            if (count($queryFilters) > 0)
+                $body['query']['bool']['filter'] = $queryFilters;
+
+            // Specify which fields will have hit highlighting.
+            $highlightParams = $this->constructHighlightParams($viewId);
+            if (!empty($highlightParams))
+                $body['highlight'] = $highlightParams;
+        }
 
         // Construct the aggregations that will provide facet values.
         $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $sharedSearchingEnabled);
-
-        // Specify which fields will have hit highlighting.
-        $highlightParams = $this->constructHighlightParams($viewId);
-        if (!empty($highlightParams))
-            $body['highlight'] = $highlightParams;
 
         // Specify if sorting by column. If not, sorting is by relevance based on score.
         if (!empty($sort))

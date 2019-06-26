@@ -117,6 +117,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         // Boolean fields.
         $this->addBooleanFieldToMappingProperties('item.public');
+        $this->addBooleanFieldToMappingProperties('url.cover');
 
         // Numeric fields.
         $this->addNumericFieldToMappingProperties('file.audio');
