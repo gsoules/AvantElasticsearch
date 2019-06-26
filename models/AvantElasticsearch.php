@@ -65,7 +65,6 @@ class AvantElasticsearch
 
             // Explicitly specify that the shared index should be queried.
             $indexName = AvantElasticsearch::getNameOfSharedIndex();
-            $indexName = 'mdi';
             $avantElasticsearchQueryBuilder->setIndexName($indexName);
 
             $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
