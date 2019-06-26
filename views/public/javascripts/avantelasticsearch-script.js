@@ -23,7 +23,7 @@ function constructSuggestions(data)
             titles.push(title);
             var value = FIND_URL + encodeURI(title);
             suggestions.push({"label": title, "value": value});
-            console.log('ADD:' + title + ' : ' + value);
+            //console.log('ADD:' + title + ' : ' + value);
         }
     }
     return suggestions;
