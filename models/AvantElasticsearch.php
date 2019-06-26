@@ -53,6 +53,7 @@ class AvantElasticsearch
     {
         return array($this->createFieldText($text));
     }
+
     public static function generateContributorStatistics()
     {
         $stats = '';
@@ -64,6 +65,7 @@ class AvantElasticsearch
 
             // Explicitly specify that the shared index should be queried.
             $indexName = AvantElasticsearch::getNameOfSharedIndex();
+            $indexName = 'mdi';
             $avantElasticsearchQueryBuilder->setIndexName($indexName);
 
             $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
@@ -105,7 +107,8 @@ class AvantElasticsearch
                 // Generate the headers
                 $header = "<table id='search-stats-table'>";
                 $header .= '<tr>';
-                $header .= '<td><strong>Contributor Name</strong></td>';
+                $header .= '<td><strong>Organization</strong></td>';
+                $header .= '<td><strong>Id</strong></td>';
                 $header .= '<td><strong>Items</strong></td>';
                 $header .= '<td><strong>Images</strong></td>';
                 $header .= '<td><strong>Docs</strong></td>';
@@ -132,7 +135,8 @@ class AvantElasticsearch
 
                     $rows .= '<tr>';
                     $contributor = $bucket['key'];
-                    $rows .= "<td>$contributor ($contributorId)</td>";
+                    $rows .= "<td>$contributor</td>";
+                    $rows .= "<td>$contributorId</td>";
                     $rows .= "<td>$itemCount</td>";
                     $rows .= "<td>$imageCount</td>";
                     $rows .= "<td>$documentCount</td>";
@@ -151,6 +155,7 @@ class AvantElasticsearch
                 // Generate the Totals row.
                 $itemTotal = number_format($itemTotal);
                 $totals = '<tr>';
+                $totals .= '<td><strong></strong>';
                 $totals .= '<td><strong>Totals</strong>';
                 $totals .= "<td><strong>$itemTotal</strong></td>";
                 $totals .= "<td><strong>$imageTotal</strong></td>";
