@@ -51,12 +51,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         ];
 
         // Add the document to the index.
-        if (!$this->avantElasticsearchClient->indexDocument($params))
-        {
-            // TO-DO: Report this error to the user or log it and email it to the admin.
-            $errorMessage = $this->avantElasticsearchClient->getLastError();
-            throw new Exception($errorMessage);
-        }
+        $this->avantElasticsearchClient->indexDocument($params);
     }
 
     protected function cacheInstallationParameters()
