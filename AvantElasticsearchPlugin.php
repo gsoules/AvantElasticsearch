@@ -143,19 +143,15 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         // Emit the Javascript for Elasticsearch suggestions while typing in the search box.
         $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
         $activeIndexName = $avantElasticsearchQueryBuilder->getNameOfActiveIndex();
-        $localIndexName = AvantElasticsearch::getNameOfLocalIndex();
-        $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
         $findUrl = url('find?query=');
         $suggestUrl = 'https://' . ElasticsearchConfig::getOptionValueForHost();
+        $suggestUrl .= '/' . $activeIndexName . '/_search';
         $query = $avantElasticsearchQueryBuilder->constructSuggestQueryParams(1, 12);
 
         echo get_view()->partial('avantelasticsearch-script.php', array(
             'query' => $query,
             'suggestUrl' => $suggestUrl,
-            'findUrl' => $findUrl,
-            'activeIndex' => $activeIndexName,
-            'localIndex' => $localIndexName,
-            'sharedIndex' => $sharedIndexName));
+            'findUrl' => $findUrl));
     }
 
     public function hookPublicHead($args)
@@ -163,5 +159,8 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
         // Needed to support autocomplete in the simple search textbox.
         queue_css_file('jquery-ui');
         queue_css_file('avantelasticsearch');
+
+        if ($this->AvantSearchUsesElasticsearch())
+            queue_js_file('avantelasticsearch-script');
     }
 }
