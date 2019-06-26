@@ -297,18 +297,15 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function getImageUrl($itemData, $thumbnail)
+    protected function getCoverImageUrl($itemData, $thumbnail)
     {
-        $itemImageUrl = $this->getItemImageFileUrl($itemData, $thumbnail);
+        $itemImageUrl = '';
+        $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['id']);
 
-        if (empty($itemImageUrl))
+        if (!empty($coverImageIdentifier))
         {
-            $coverImageIdentifier = ItemPreview::getCoverImageIdentifier($itemData['id']);
-            if (!empty($coverImageIdentifier))
-            {
-                $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
-                $itemImageUrl = empty($coverImageItem) ? '' : ItemPreview::getItemFileUrl($coverImageItem, $thumbnail);
-            }
+            $coverImageItem = ItemMetadata::getItemFromIdentifier($coverImageIdentifier);
+            $itemImageUrl = empty($coverImageItem) ? '' : ItemPreview::getItemFileUrl($coverImageItem, $thumbnail);
         }
 
         return $itemImageUrl;
@@ -518,14 +515,29 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $itemPath = $this->installation['item_path'] . $itemData['id'];
         $serverUrl = $this->installation['server_url'];
         $itemUrl = $serverUrl . $itemPath;
-        $thumbUrl = $this->getImageUrl($itemData, true);
-        $imageUrl = $this->getImageUrl($itemData, false);
+
+        $isCoverImage = false;
+        $thumbnail = true;
+        $thumbUrl = $this->getItemImageFileUrl($itemData, $thumbnail);
+        if (empty($thumbUrl))
+        {
+            $thumbUrl = $this->getCoverImageUrl($itemData, $thumbnail);
+            $isCoverImage = !empty($thumbUrl);
+        }
+
+        $thumbnail = false;
+        $imageUrl = $this->getItemImageFileUrl($itemData, $thumbnail);
+        if (empty($imageUrl))
+        {
+            $imageUrl = $this->getCoverImageUrl($itemData, $thumbnail);
+        }
 
         $urlData['item'] = $itemUrl;
         if (!empty($thumbUrl))
         {
             $urlData['thumb'] = $thumbUrl;
             $urlData['image'] = $imageUrl;
+            $urlData['cover'] = $isCoverImage;
         }
 
         return $urlData;
