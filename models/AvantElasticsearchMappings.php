@@ -12,7 +12,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     protected function addBoostFields()
     {
-        // Make a copy of the Title and Description fields using the standard analyzer instead of the English analyzer.
+        // Make a copy of the Title texts and the Description using the standard analyzer instead of the English analyzer.
         // This yields the best possible search results on Title and Description content because it allows boosting on
         // hits in these fields where the search terms exactly match the original text without the stemming done by the
         // English analyzer. The English analyzer increases results because it can match more loosely, e.g. it will
@@ -22,10 +22,12 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // Be aware that the item.* fields are initialized by AvantElasticsearchDocument::getItemAttributes(). If you
         // add another field here, add it there as well.
 
-        // Note: It seems that it should be possible to get the same boost behavior by adding a 'standard' text field
-        // which uses the 'standard' analyzer in addTextAndKeywordFieldToMappingProperties()) instead of creating these
-        // copies, but that did not work. Boosting element.title.standard and element.description.standard seemed to
+        // Note: It seems that it should be possible to get the same boost behavior for Description by adding a
+        // 'standard' text field which uses the 'standard' analyzer in addTextAndKeywordFieldToMappingProperties())
+        // instead of creating a copy, but that did not work. Boosting element.description.standard seemed to
         // have no effect at all. As such, we'll do it this way until such time as we can figure out a better way.
+        // This is a non-issue for Title because element.title a multi-value field containing an array of titles
+        // whereas item.title is a single value field with the title texts catentated.
         //
         $this->addTextFieldToMappingProperties('item.title', 'standard');
         $this->addTextFieldToMappingProperties('item.description', 'standard');
@@ -101,9 +103,15 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         $mappingType = $this->getDocumentMappingType();
 
+        // Provide both an element and sort mapping for every field. The element mapping is used for searching and the
+        // sort mapping is used exclusively for sorting. Also, an element field contain all the values for a multi-value
+        // element whereas a sort field only contains the first value of a multi-value element.
         foreach ($fieldNames as $fieldName)
         {
             $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
+
+            if ($fieldName != 'description')
+                $this->addKeywordFieldToMappingProperties("sort.$fieldName");
         }
 
         // Specify special fields that will be used to influence document scores by boosting.
@@ -145,7 +153,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('pdf.file-url');
         $this->addKeywordFieldToMappingProperties('sort.address-number');
         $this->addKeywordFieldToMappingProperties('sort.address-street');
-        $this->addKeywordFieldToMappingProperties('sort.identifier');
         $this->addKeywordFieldToMappingProperties('url.image');
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');

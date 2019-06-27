@@ -17,6 +17,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     private $installation;
 
     /* @var $avantElasticsearchFacets AvantElasticsearchFacets */
+    protected $allTitlesString = '';
     protected $avantElasticsearchFacets;
     protected $descriptionString;
     protected $facetDefinitions;
@@ -27,7 +28,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $itemHasIdentifier = false;
     protected $itemTypeIsReference = false;
     protected $itemSubjectIsPeople = false;
-    protected $titleString = '';
     protected $titleFieldTexts = null;
     protected $year = 0;
 
@@ -59,7 +59,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         if (!empty($fileText))
             $this->setField('pdf', $fileText);
 
-        $itemAttributes = $this->getItemAttributes($itemData, $this->titleString, $this->year, $this->descriptionString);
+        $itemAttributes = $this->getItemAttributes($itemData, $this->allTitlesString, $this->year, $this->descriptionString);
         $this->setField('item', $itemAttributes);
 
         $fileCounts = $this->getFileCounts($itemData);
@@ -72,17 +72,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function catentateElementTexts($fieldTexts)
     {
-        // Get the element's text and catentate them into a single string separate by EOL breaks.
-        // Though Elasticsearch supports multiple field values stored in arrays, it does not support
-        // sorting based on the first value as is required by AvantSearch when a user sorts by column.
-        // By catenating the values, sorting will work as desired.
-
+        // Get the element's text and catentate them into a single string separating each by a space.
         $catenatedText = '';
         foreach ($fieldTexts as $fieldText)
         {
             if (!empty($catenatedText))
             {
-                $catenatedText .= ES_DOCUMENT_EOL;
+                $catenatedText .= ' ';
             }
             $catenatedText .= $fieldText['text'];
         }
@@ -166,23 +162,46 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected function createFieldDataForElement($elementId, $fieldTexts)
     {
         // Get the element's field name.
-        $elasticsearchFieldName = $this->installation['installation_elements'][$elementId];
+        $fieldName = $this->installation['installation_elements'][$elementId];
 
         // Strip any HTML tags from the field's text value(s).
         $this->removeHtmlTagsFromFieldText($fieldTexts);
 
-        // Save the element's text value(s) as single string.
-        $fieldTextsString = $this->catentateElementTexts($fieldTexts);
-        $this->elementData[$elasticsearchFieldName] = $fieldTextsString;
+        foreach ($fieldTexts as $index => $fieldText)
+        {
+            $fieldTextValue = $fieldText['text'];
+
+            if ($fieldName == 'place' && strpos($fieldTextValue, 'MDI, ') === 0)
+            {
+                // TO-DO: Remove this temporary logic after SWHPL removes the MDI prefix from its Place elements.
+                $fieldTextValue = substr($fieldTextValue, 5);
+            }
+
+            if ($index == 0 && $fieldName != 'description')
+            {
+                // This is the first value for an Omeka element that can have multiple values or the only value for a
+                // single-value element. Convert the value to lowercase and remove any non alphanumeric characters
+                // and leading spaces to allow case insensitive sorting and so that values with leading non alphanumeric
+                // characters will sort correctly and not appear at the top. Note also, because element fields, as
+                // opposed to sort fields, contain their data in an array of values, even if there's only a single
+                // value, they cannot be used for sorting because there's no way to get Elastcisearch to sort based only
+                // on the the first value in the array. Thus this solution allows sorting in general, but also provides
+                // better sorting because of the lower casing and leading character stripping.
+                $sortText = preg_replace('/[^a-z\d ]/i', '', strtolower(trim($fieldTextValue)));
+                $this->sortData[$fieldName] = $sortText;
+            }
+
+            $this->elementData[$fieldName][] = $fieldTextValue;
+        }
 
         // Set flags to indicate if this field requires special handling.
-        $this->setSpecialFieldFlags($elasticsearchFieldName, $fieldTextsString, $fieldTexts);
+        $this->setSpecialFieldFlags($fieldName, $fieldTexts);
 
         // Create the various kinds of data associated with this field.
-        $this->createHtmlData($elasticsearchFieldName, $fieldTexts);
-        $this->createIntegerElementSortData($elasticsearchFieldName, $fieldTextsString);
-        $this->createAddressElementSortData($elasticsearchFieldName, $fieldTexts);
-        $this->createFacetDataForField($elasticsearchFieldName, $fieldTexts);
+        $this->createHtmlData($fieldName, $fieldTexts);
+        $this->createIntegerElementSortData($fieldName, $fieldTexts[0]['text']);
+        $this->createAddressElementSortData($fieldName, $fieldTexts);
+        $this->createFacetDataForField($fieldName, $fieldTexts);
     }
 
     protected function createHtmlData($elasticsearchFieldName, $fieldTexts)
@@ -228,15 +247,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     protected function createSpecialFieldsData($itemFieldTexts)
     {
-        if ($this->installation['alias-id'] != 0)
+        if ($this->installation['alias_id'] != 0)
         {
             // This installation does not use the Identifier element because it has an Identifier Alias
             // configured in AvantCommon. Get the alias value and use it as the identifier field value.
-            $id = $this->installation['alias-id'];
+            $id = $this->installation['alias_id'];
             $aliasText = isset($itemFieldTexts[$id][0]['text']) ? $itemFieldTexts[$id][0]['text'] : BLANK_FIELD_TEXT;
-            $this->elementData['identifier'] = $aliasText;
+            $this->elementData['identifier'][0] = $aliasText;
         }
-
 
         // Create a field-text to represent an unspecified date, place, or subject.
         if (!$this->itemHasDate)
@@ -383,7 +401,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'description' => $descriptionString,
             'public' => (bool)$itemData['public'],
             'contributor' => $this->installation['contributor'],
-            'contributor-id' => $this->installation['contributor-id']
+            'contributor-id' => $this->installation['contributor_id']
         );
 
         if ($year > 0)
@@ -457,7 +475,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             {
                 // This installation does not have its files at the root of the 'original' folder. Check to see if
                 // the files are located in a sub directory having the item identifier as its name.
-                $itemIdentifier = $this->elementData['identifier'];
+                $itemIdentifier = $this->elementData['identifier'][0];
                 $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $fileName);
                 if (!file_exists($filepath))
                 {
@@ -585,43 +603,54 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->installation = $installation;
     }
 
-    protected function setSpecialFieldFlags($elasticsearchFieldName, $fieldTextsString, $fieldTexts)
+    protected function setSpecialFieldFlags($fieldName, $fieldTexts)
     {
-        if ($elasticsearchFieldName == 'title')
+        if ($fieldName == 'title')
         {
-            $this->titleString = $fieldTextsString;
-            if (strlen($this->titleString) == 0)
+            // Create a single string containing the item's one or more titles.
+            $this->allTitlesString = $this->catentateElementTexts($fieldTexts);
+
+            if (strlen($this->allTitlesString) == 0)
             {
-                $this->titleString = UNTITLED_ITEM;
+                $this->allTitlesString = UNTITLED_ITEM;
             }
+
+            // Also keep the array of separate titles.
             $this->titleFieldTexts = $fieldTexts;
         }
-
-        if ($elasticsearchFieldName == 'description')
-            $this->descriptionString = $fieldTextsString;
-
-        if ($elasticsearchFieldName == 'identifier')
-            $this->itemHasIdentifier = true;
-
-        if ($elasticsearchFieldName == 'date')
+        else
         {
-            $this->itemHasDate = true;
-            $this->year = intval($this->getYearFromDate($fieldTextsString));
-        }
+            $fieldText = $fieldTexts[0]['text'];
 
-        if ($elasticsearchFieldName == 'place')
-            $this->itemHasPlace = true;
+            switch ($fieldName)
+            {
+                case 'description':
+                    $this->descriptionString = $fieldText;
+                    break;
 
-        if ($elasticsearchFieldName == 'subject')
-        {
-            $this->itemHasSubject = true;
-            $this->itemSubjectIsPeople = strpos($fieldTextsString, 'People') !== false;
-        }
+                case 'identifier':
+                    $this->itemHasIdentifier = true;
+                    break;
 
-        if ($elasticsearchFieldName == 'type')
-        {
-            $this->itemHasType = true;
-            $this->itemTypeIsReference = $fieldTextsString == 'Reference';
+                case 'date':
+                    $this->itemHasDate = true;
+                    $this->year = intval($this->getYearFromDate($fieldText));
+                    break;
+
+                case 'place':
+                    $this->itemHasPlace = true;
+                    break;
+
+                case 'subject':
+                    $this->itemHasSubject = true;
+                    $this->itemSubjectIsPeople = strpos($fieldText, 'People') !== false;
+                    break;
+
+                case 'type':
+                    $this->itemHasType = true;
+                    $this->itemTypeIsReference = $fieldText == 'Reference';
+                    break;
+            }
         }
     }
 }

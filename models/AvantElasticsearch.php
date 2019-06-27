@@ -3,12 +3,6 @@
 require __DIR__ . '/../vendor/autoload.php';
 use Elasticsearch\ClientBuilder;
 
-// Use this constant as newline character when creating and reading an Elasticsearch document. Don't use PHP_EOL
-// because its value differs between Linux (\n) and Windows (\r\n). The difference should not matter in production
-// which is Linux, but it's a problem during development when using both platforms because if you create the document
-// on one platform, you can't read it correctly on the other.
-define ('ES_DOCUMENT_EOL', "\n");
-
 // Count facet values that are blank so that the user can see how many results have no value for a particular field.
 // This way the user knows that the facet values shown are not representative of all the results. The text value is
 // what gets recorded in the index whereas the substitute is what the user sees. This allows us to change the latter
