@@ -418,7 +418,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Specify which fields the query will return.
         $body['_source'] = $this->constructSourceFields($viewId, $indexId);
 
-        if (strpos($terms, '::') === 0 && !empty(current_user()))
+        if (strpos($terms, '::') === 0)
         {
             // Construct an admin query using Elasticsearch Query String Syntax.
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax
