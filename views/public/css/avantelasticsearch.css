@@ -33,7 +33,7 @@
     border: 1px solid #e8e8e8;
 }
 
-#facet-sidebar > ul {
+#search-facet-sections > ul {
     padding-left: 0;
     font-size:14px;
     margin-top: 0;
@@ -41,10 +41,33 @@
     list-style-type:none;
 }
 
-.facet-sections-title {
+#search-facet-button
+{
+    cursor: pointer;
+}
+
+#search-facet-button,
+#search-facet-title{
     color: #636363;
     font-size:16px;
     padding: 6px 6px 6px 8px;
+}
+
+.search-facet-closed::after,
+.search-facet-open::after {
+    font-family: "FontAwesome";
+    padding-left: 6px;
+    float: right;
+    font-weight: bold;
+    font-size:18px;
+}
+
+.search-facet-closed::after {
+    content: "\f105";
+}
+
+.search-facet-open::after {
+    content: "\f107";
 }
 
 .facet-section,

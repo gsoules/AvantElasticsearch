@@ -487,10 +487,13 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->setFacetsTableActions();
 
         $title = __('Refine your search');
-        $html = "<div class='facet-sections-title'>$title</div>";
+        $html = "<div id='search-facet-title'>$title</div>";
+        $html .= "<div id='search-facet-button' class='search-facet-closed'>$title</div>";
 
         // Display all the facet entries.
+        $html .= "<div id='search-facet-sections'>";
         $html .= $this->emitHtmlForFacetSections();
+        $html .= "</div>";
 
         return $html;
     }
