@@ -243,7 +243,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                     $updatedQueryString .= "&advanced[$index][element_id]=" . urlencode($advancedArg['element_id']);
                     $updatedQueryString .= "&advanced[$index][type]=" . urlencode($advancedArg['type']);
-                    $updatedQueryString .= "&advanced[$index][terms]=" . urlencode($advancedArg['terms']);
+
+                    // Test if the terms arg is present. It won't be for conditions Empty and Not Empty.
+                    if (isset($advancedArg['terms']))
+                        $updatedQueryString .= "&advanced[$index][terms]=" . urlencode($advancedArg['terms']);
                 }
             }
             else
