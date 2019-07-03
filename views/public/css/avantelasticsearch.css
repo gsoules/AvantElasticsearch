@@ -28,9 +28,10 @@
     margin-top: 0;
 }
 
-#elasticsearch-sidebar {
+#search-facets {
     border-radius: 5px;
-    border: 1px solid #e8e8e8;
+    border: 1px solid #a4a4a4;
+    margin-bottom: 8px;
 }
 
 #search-facet-sections > ul {
