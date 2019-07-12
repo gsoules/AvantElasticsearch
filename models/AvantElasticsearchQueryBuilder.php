@@ -546,6 +546,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function constructTagsFilter()
     {
+        // This methods supports Digital Archive 2.0 where 'tags' was a separate query string arg instead of an
+        // Advanced Search pseudo element.
+
         $tags = AvantCommon::queryStringArg('tags', '');
 
         if (empty($tags))
