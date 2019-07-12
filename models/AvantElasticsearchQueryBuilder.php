@@ -401,7 +401,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    public function constructSearchQuery($query, $limit, $sort, $public, $sharedSearchingEnabled, $fuzzy)
+    public function constructSearchQuery($query, $limit, $sort, $indexId, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -409,7 +409,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $offset = ($page - 1) * $limit;
         $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
         $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
-        $indexId = isset($query['index']) ? $query['index'] : 'Title';
+
 
         // Get keywords that were specified on the Advanced Search page.
         $terms = isset($query['keywords']) ? $query['keywords'] : '';
