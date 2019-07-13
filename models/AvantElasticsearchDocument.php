@@ -171,12 +171,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             $fieldTextValue = $fieldText['text'];
 
-            if ($fieldName == 'place' && strpos($fieldTextValue, 'MDI, ') === 0)
-            {
-                // TO-DO: Remove this temporary logic after SWHPL removes the MDI prefix from its Place elements.
-                $fieldTextValue = substr($fieldTextValue, 5);
-            }
-
             if ($index == 0 && $fieldName != 'description')
             {
                 // This is the first value for an Omeka element that can have multiple values or the only value for a
