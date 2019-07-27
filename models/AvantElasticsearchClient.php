@@ -282,11 +282,16 @@ class AvantElasticsearchClient extends AvantElasticsearch
 
     protected function reportException()
     {
+        $queryArgs = urldecode(http_build_query($_GET));
         $message = $this->lastException->getMessage();
+
         $trace = $this->lastException->getTraceAsString();
+        date_default_timezone_set("America/New_York");
+
         $subject = 'Exception in ES client on ' . date("Y-m-d H:i:s");
         $body = $this->lastError;
         $body = str_replace('<br/>', PHP_EOL, $body);
+        $body .= PHP_EOL . 'QUERY:' . PHP_EOL . $queryArgs;
         $body .= PHP_EOL . 'JSON:' . PHP_EOL . $message;
         $body .= PHP_EOL . 'TRACE:' . PHP_EOL . $trace;
 
