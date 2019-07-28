@@ -346,6 +346,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                         'item.title^20',
                         'item.description^10',
                         'element.*',
+                        'local.*',
                         'tags',
                         'pdf.text-*'
                     ]

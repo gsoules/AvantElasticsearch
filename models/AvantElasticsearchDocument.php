@@ -33,6 +33,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     // Arrays for collecting multiple values.
     protected $elementData = [];
+    protected $localData = [];
     protected $sortData = [];
     protected $facetData = [];
     protected $htmlFields = [];
@@ -66,6 +67,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->setField('file', $fileCounts);
 
         $this->setField('element', $this->elementData);
+        $this->setField('local', $this->localData);
         $this->setField('sort', $this->sortData);
         $this->setField('facet', $this->facetData);
     }
@@ -85,13 +87,21 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $catenatedText;
     }
 
-    public function copyItemElementValuesToDocument($itemData)
+    public function copyItemElementValuesToDocument($itemData, $filterLocalData)
     {
         $itemFieldTexts = $itemData['field_texts'];
 
+        $sharedFieldsNames = $this->getSharedIndexFieldNames();
+        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+        $privateFieldsNames = array();
+        foreach ($privateElementsData as $privateElementName)
+        {
+            $privateFieldsNames[] = $this->convertElementNameToElasticsearchFieldName($privateElementName);
+        }
+
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
-            $this->createFieldDataForElement($elementId, $fieldTexts);
+            $this->createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldsNames);
         }
 
         $this->createFacetDataForContributor();
@@ -159,7 +169,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createFieldDataForElement($elementId, $fieldTexts)
+    protected function createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldNames)
     {
         // Get the element's field name.
         $fieldName = $this->installation['installation_elements'][$elementId];
@@ -171,7 +181,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             $fieldTextValue = $fieldText['text'];
 
-            if ($index == 0 && $fieldName != 'description')
+            if ($index == 0)
             {
                 // This is the first value for an Omeka element that can have multiple values or the only value for a
                 // single-value element. Convert the value to lowercase and remove any non alphanumeric characters
@@ -185,7 +195,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->sortData[$fieldName] = $sortText;
             }
 
-            $this->elementData[$fieldName][] = $fieldTextValue;
+            $isLocalData = $filterLocalData && !in_array($fieldName, $sharedFieldsNames);
+
+            if ($isLocalData)
+            {
+                if (!in_array($fieldName, $privateFieldNames))
+                {
+                    // Make this non-shared, but no private element searchable in the shared index.
+                    $this->localData[$fieldName][] = $fieldTextValue;
+                }
+            }
+            else
+            {
+                $this->elementData[$fieldName][] = $fieldTextValue;
+            }
         }
 
         // Set flags to indicate if this field requires special handling.

@@ -26,7 +26,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->avantElasticsearchClient = new AvantElasticsearchClient();
     }
 
-    public function addItemToIndex($item)
+    public function addItemToIndex($item, $filterLocalData)
     {
         // This method adds a new item to the index or updates an existing item in the index.
         $this->cacheInstallationParameters();
@@ -41,7 +41,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['files_data'] = $itemFilesData;
         $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $item->public;
-        $document = $this->createDocumentFromItemMetadata($itemData);
+        $document = $this->createDocumentFromItemMetadata($itemData, $filterLocalData);
 
         $params = [
             'id' => $document->id,
@@ -116,7 +116,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createDocumentFromItemMetadata($itemData)
+    public function createDocumentFromItemMetadata($itemData, $filterLocalData)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($itemData['identifier']);
@@ -130,7 +130,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($itemData);
+        $document->copyItemElementValuesToDocument($itemData, $filterLocalData);
 
         return $document;
     }
@@ -497,6 +497,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $sharedFieldsNames = $this->getSharedIndexFieldNames();
 
+        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+        $privateFieldsNames = array();
+        foreach ($privateElementsData as $privateElementName)
+        {
+            $privateFieldsNames[] = $this->convertElementNameToElasticsearchFieldName($privateElementName);
+        }
+
         $localFieldNames = array_diff($allFieldNames, $sharedFieldsNames);
 
         foreach($this->batchDocuments as $index => $document)
@@ -510,7 +517,21 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             // Remove the non-shared fields from the document.
             foreach ($localFieldNames as $fieldName)
             {
-                unset($document->body->element->$fieldName);
+                if (isset($document->body->element->$fieldName))
+                {
+                    if (!in_array($fieldName, $privateFieldsNames))
+                    {
+                        // Move this non-private local non-shared field to the local elements so it's searchable
+                        // even though it does not appear as a field in any shared Table View.
+                        $document->body->local[$fieldName] = $document->body->element->$fieldName;
+                    }
+
+                    // Remove the element field for this local non-shared field.
+                    unset($document->body->element->$fieldName);
+
+                    // Remove the sort field for this local non-shared field.
+                    unset($document->body->sort->$fieldName);
+                }
             }
         }
 
@@ -555,6 +576,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Get all the elements and all element texts.
         $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
         $fieldTexts = array();
+
+        $sharedFieldsNames = $this->getSharedIndexFieldNames();
 
         // Loop over the elements and for each one, find its text value(s).
         foreach ($this->installation['installation_elements'] as $elementId => $elasticsearchFieldName)
@@ -725,7 +748,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             // Create an Elasticsearch document for this item and encode it as JSON.
             $itemData = $this->createItemData($index, $identifierElementId);
-            $this->document = $this->createDocumentFromItemMetadata($itemData);
+            $this->document = $this->createDocumentFromItemMetadata($itemData, false);
             $this->writeDocumentToJsonData($index);
             $this->freeSqlData($itemData['id'], $index);
         }

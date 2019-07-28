@@ -109,9 +109,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         foreach ($fieldNames as $fieldName)
         {
             $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
-
-            if ($fieldName != 'description')
-                $this->addKeywordFieldToMappingProperties("sort.$fieldName");
+            $this->addKeywordFieldToMappingProperties("sort.$fieldName");
         }
 
         // Specify special fields that will be used to influence document scores by boosting.
@@ -161,9 +159,19 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // by the item with the most PDF file attachments (only PDFs that are searchable). For example, most items
         // will have zero or one PDF attachment, but if there's an item with 10 PDFs, fields up to pdf-text-9 will
         // created and mapped when that item is indexed.
-        $template = (object) array(
+        $templatePdf = (object) array(
             'pdf_text' => [
                 'path_match' => 'pdf.text-*',
+                    'mapping' => [
+                        'type' => 'text',
+                        'analyzer' => 'english'
+                    ]
+                ]
+            );
+
+        $templateLocal = (object) array(
+            'local_text' => [
+                'path_match' => 'local.*',
                     'mapping' => [
                         'type' => 'text',
                         'analyzer' => 'english'
@@ -174,7 +182,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $mappings = [
             $mappingType => [
                 'properties' => $this->properties,
-                'dynamic_templates' => [$template]
+                'dynamic_templates' => [$templatePdf, $templateLocal]
             ]
         ];
 
