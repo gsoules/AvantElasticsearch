@@ -15,14 +15,15 @@ define('MB_BYTES', 1024 * 1024);
 
 class AvantElasticsearch
 {
-    protected $indexOnlyPublicElements = true;
     protected $rootCauseReason = '';
 
     // Should only be accessed via a getter or setter.
     private $indexName;
 
     // Used for caching and therefore should not be accessed directly by subclasses.
-    private $elementsForIndex = array();
+    private $fieldNamesOfAllElements = array();
+    private $fieldNamesOfPrivateElements = array();
+    private $fieldNamesOfSharedElements = array();
 
     public function __construct()
     {
@@ -238,16 +239,11 @@ class AvantElasticsearch
         return get_class($e) . '<br/>' . $message;
     }
 
-    public function getElementsUsedByThisInstallation($public = false)
+    public function getFieldNamesOfAllElements()
     {
-        // Determine if the elements are already cached. Note that they might be in cache, but don't
-        // match the public option,  in which case, they need to be fetched again per the option.
-        $getElementsFromDatabase = empty($this->elementsForIndex) || $this->indexOnlyPublicElements != $public;
-
-        if ($getElementsFromDatabase)
+        if (empty($this->fieldNamesOfAllElements))
         {
-            $this->indexOnlyPublicElements = $public;
-
+            // The elements are not cached. Get them from the database.
             $db = get_db();
             $table = "{$db->prefix}elements";
 
@@ -256,32 +252,59 @@ class AvantElasticsearch
             FROM $table";
 
             $elements = $db->query($sql)->fetchAll();
-
-            // Get a list of the private elements, but exclude Identifier which might be private if using an Alias.
-            $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-            $identifierElementId = ItemMetadata::getIdentifierElementId();
-            unset($privateElementsData[$identifierElementId]);
-
             $unusedElementsData = CommonConfig::getOptionDataForUnusedElements();
-
-            $this->elementsForIndex = array();
+            $this->fieldNamesOfAllElements = array();
 
             foreach ($elements as $element)
             {
                 $elementId = $element['id'];
 
                 $ignoreUnused = array_key_exists($elementId, $unusedElementsData);
-                $ignore = $ignoreUnused || ($this->indexOnlyPublicElements && array_key_exists($elementId, $privateElementsData));
-                if ($ignore)
+                if ($ignoreUnused)
                 {
                     continue;
                 }
 
-                $this->elementsForIndex[$elementId] = $this->convertElementNameToElasticsearchFieldName($element['name']);
+                $this->fieldNamesOfAllElements[$elementId] = $this->convertElementNameToElasticsearchFieldName($element['name']);
             }
+
+            asort($this->fieldNamesOfAllElements);
         }
 
-        return $this->elementsForIndex;
+        return $this->fieldNamesOfAllElements;
+    }
+
+    public function getFieldNamesOfPrivateElements()
+    {
+        if (empty($this->fieldNamesOfPrivateElements))
+        {
+            // The elements are not cached. Get them from the database.
+            $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
+            foreach ($privateElementsData as $elementId => $privateElementName)
+            {
+                $this->fieldNamesOfPrivateElements[$elementId] = $this->convertElementNameToElasticsearchFieldName($privateElementName);
+            }
+            asort($this->fieldNamesOfPrivateElements);
+        }
+
+        return $this->fieldNamesOfPrivateElements;
+    }
+
+    protected function getFieldNamesOfSharedElements()
+    {
+        if (empty($this->fieldNamesOfSharedElements))
+        {
+            $config = AvantElasticsearch::getAvantElasticsearcConfig();
+            $elementsList = $config ? $config->shared_elements : array();
+            $elementNames = array_map('trim', explode(',', $elementsList));
+            foreach ($elementNames as $elementName)
+            {
+                $this->fieldNamesOfSharedElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+            }
+            asort($this->fieldNamesOfSharedElements);
+        }
+
+        return $this->fieldNamesOfSharedElements;
     }
 
     public function getNameOfActiveIndex()
@@ -300,19 +323,6 @@ class AvantElasticsearch
         $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
         $configuration = new Zend_Config_Ini($configFile, 'config');
         return $configuration->shared_index_name;
-    }
-
-    protected function getSharedIndexFieldNames()
-    {
-        $config = AvantElasticsearch::getAvantElasticsearcConfig();
-        $elementsList = $config ? $config->shared_elements : array();
-        $elementNames = array_map('trim', explode(',', $elementsList));
-        $fieldNames = array();
-        foreach ($elementNames as $elementName)
-        {
-            $fieldNames[] = $this->convertElementNameToElasticsearchFieldName($elementName);
-        }
-        return $fieldNames;
     }
 
     public function getYearFromDate($dateText)

@@ -90,14 +90,14 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         if ($isSharedIndex)
         {
-            $fieldNames = $this->getSharedIndexFieldNames();
+            $fieldNames = $this->getFieldNamesOfSharedElements();
         }
         else
         {
-            $elementNames = $this->getElementsUsedByThisInstallation();
-            foreach ($elementNames as $elementName)
+            $elementNames = $this->getFieldNamesOfAllElements();
+            foreach ($elementNames as $elementId => $elementName)
             {
-                $fieldNames[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+                $fieldNames[$elementId] = $this->convertElementNameToElasticsearchFieldName($elementName);
             }
         }
 

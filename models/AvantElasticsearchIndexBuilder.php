@@ -64,7 +64,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // the time to create 10,000 documents was reduced by 75%.
 
         $this->installation['integer_sort_fields'] = array_map('strtolower', SearchConfig::getOptionDataForIntegerSorting());
-        $this->installation['installation_elements'] = $this->getElementsUsedByThisInstallation();
+        $this->installation['all_contributor_fields'] = $this->getFieldNamesOfAllElements();
+        $this->installation['private_contributor_fields'] = $this->getFieldNamesOfPrivateElements();
+        $this->installation['shared_index_fields'] = $this->getFieldNamesOfSharedElements();
         $this->installation['contributor'] = ElasticsearchConfig::getOptionValueForContributor();
         $this->installation['contributor_id'] = ElasticsearchConfig::getOptionValueForContributorId();
         $this->installation['alias_id'] = CommonConfig::getOptionDataForIdentifierAlias();
@@ -292,7 +294,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return true;
     }
 
-    protected function fetchFilesData($public = false)
+    protected function fetchFilesData()
     {
         try
         {
@@ -313,11 +315,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                   {$db->prefix}items AS items ON items.id = item_id
             ";
 
-            if ($public)
-            {
-                $sql .= " WHERE items.public = 1";
-            }
-
             $files = $db->query($sql)->fetchAll();
         }
         catch (Exception $e)
@@ -336,7 +333,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemFilesData;
     }
 
-    protected function fetchItemsData($public = false)
+    protected function fetchItemsData()
     {
         try
         {
@@ -351,11 +348,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                   $table
             ";
 
-            if ($public)
-            {
-                $sql .= " WHERE public = 1";
-            }
-
             $sql .=  " ORDER BY id";
 
             $items = $db->query($sql)->fetchAll();
@@ -367,7 +359,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $items;
     }
 
-    protected function fetchFieldTextsForRangeOfItems($firstItemId, $lastItemId, $public = false)
+    protected function fetchFieldTextsForRangeOfItems($firstItemId, $lastItemId)
     {
         // This method gets all element texts for all items in the database. It returns them as an array of item-field-texts.
         // * Each item-field-texts contains an array of field-texts, one for each of the item's elements.
@@ -407,11 +399,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                   record_type = 'Item' AND record_id >= $firstItemId AND record_id <= $lastItemId
             ";
 
-            if ($public)
-            {
-                $sql .= " AND public = 1";
-            }
-
             $results = $db->query($sql)->fetchAll();
         }
         catch (Exception $e)
@@ -422,14 +409,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         foreach ($results as $index => $result)
         {
             $elementId = $result['element_id'];
-
-            $elementsForIndex = $this->getElementsUsedByThisInstallation($public);
-            if ($public && !array_key_exists($elementId, $elementsForIndex))
-            {
-                // Ignore private elements.
-                continue;
-            }
-
             $itemId = $result['record_id'];
             $text = $result['text'];
             $html = $result['html'];
@@ -476,35 +455,35 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemTagsData;
     }
 
-    protected function filterPublicItemsAndPrivateElements()
+    protected function filterBatchDocuments($isSharedInde)
     {
-        // This method removes all non-public items, and non-shared fields from the documents that will go into the
-        // shared index. This is necessary to support the overall indexing approach which is to:
-        // * Export all items and all fields into a single JSON data file.
-        // * Import all items and all fields into the local index.
-        // * Import only shared fields from public items into the shared index.
+        if (!$isSharedInde)
+            return;
+
+        // This method is only used when creating a shared index. It:
+        // - Removes all non-public items from the batch of documents
+        // - Removes private elements
+        // - Separates public and shared elements from public and not-shared elements
+        //
+        // This filtering is necessary to support the overall indexing approach which is to:
+        // * Export all items and all fields into a single JSON data file containing 100% of the contributor's data
+        // * Import only the non-private fields of public items into the shared index (this method)
+        // * Import all items and all fields into the local index (not this method)
+        //
         // This export once, import twice approach makes it possible to update or create a new local index without
         // affecting the shared index, and vice-versa, using the same export file. An alternative approach of creating
         // separate local and shared export files would eliminate the need for this method, but would incur the
         // cost of doing two exports and having to manage two export files, making sure always to import the right one.
 
-        $allFieldNames = array();
-        $elementNames = $this->getElementsUsedByThisInstallation();
-        foreach ($elementNames as $elementName)
-        {
-            $allFieldNames[] = $this->convertElementNameToElasticsearchFieldName($elementName);
-        }
+        $allFieldNames = $this->getFieldNamesOfAllElements();
+        $privateFieldNames = $this->getFieldNamesOfPrivateElements();
 
-        $sharedFieldsNames = $this->getSharedIndexFieldNames();
+        // Get the names of fields that all contributors are able to share with each other.
+        $sharedFieldsNames = $this->getFieldNamesOfSharedElements();
 
-        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-        $privateFieldsNames = array();
-        foreach ($privateElementsData as $privateElementName)
-        {
-            $privateFieldsNames[] = $this->convertElementNameToElasticsearchFieldName($privateElementName);
-        }
-
-        $localFieldNames = array_diff($allFieldNames, $sharedFieldsNames);
+        // Derive the list of non-private fields that this contributor uses, but that are not shared.
+        // These fields don't appear in shared search results, but they are searched.
+        $nonSharedFields = array_diff($allFieldNames, $sharedFieldsNames);
 
         foreach($this->batchDocuments as $index => $document)
         {
@@ -514,24 +493,29 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 unset($this->batchDocuments[$index]);
             }
 
-            // Remove the non-shared fields from the document.
-            foreach ($localFieldNames as $fieldName)
+            foreach ($nonSharedFields as $fieldName)
             {
-                if (isset($document->body->element->$fieldName))
+                if (!isset($document->body->element->$fieldName))
+                    continue;
+
+                if (!in_array($fieldName, $privateFieldNames))
                 {
-                    if (!in_array($fieldName, $privateFieldsNames))
-                    {
-                        // Move this non-private local non-shared field to the local elements so it's searchable
-                        // even though it does not appear as a field in any shared Table View.
-                        $document->body->local[$fieldName] = $document->body->element->$fieldName;
-                    }
-
-                    // Remove the element field for this local non-shared field.
-                    unset($document->body->element->$fieldName);
-
-                    // Remove the sort field for this local non-shared field.
-                    unset($document->body->sort->$fieldName);
+                    // Copy the value of this non-private, non-shared field to '_doc.properties.local'.
+                    // For example, if element.foo is not a shared field, copy element.foo to local.foo. Note that because
+                    // the set of non-shared fields varies from contributor to contributor, and because the mappings for the
+                    // shared index is only done once by the contributor who administers Elasticsearch, it's not possible
+                    // to know the names of the non-shared fields among all the contributors. To deal with this, method
+                    // AvantElasticsearchMappings::constructElasticsearchMappings uses the dynamic_templates feature to
+                    // map these non-shared fields to be type text and thus prevent Elasticsearch from dynamically mapping
+                    // them to another type based on the field's content (e.g. mapping to date or integer).
+                    $document->body->local[$fieldName] = $document->body->element->$fieldName;
                 }
+
+                // Remove this field from '_doc.properties.element' e.g. remove element.foo.
+                unset($document->body->element->$fieldName);
+
+                // Remove the sort field for this local non-shared field e.g. remove sort.foo.
+                unset($document->body->sort->$fieldName);
             }
         }
 
@@ -577,10 +561,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $allElementTexts = get_db()->getTable('ElementText')->findByRecord($item);
         $fieldTexts = array();
 
-        $sharedFieldsNames = $this->getSharedIndexFieldNames();
-
         // Loop over the elements and for each one, find its text value(s).
-        foreach ($this->installation['installation_elements'] as $elementId => $elasticsearchFieldName)
+        foreach ($this->installation['all_contributor_fields'] as $elementId => $fieldName)
         {
             foreach ($allElementTexts as $elementText)
             {
@@ -783,11 +765,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Read the index file into an array of AvantElasticsearchDocument objects.
         $this->batchDocuments = json_decode(file_get_contents($dataFileName), false);
 
-        if ($isSharedIndex)
-        {
-            // Filter out content that does not go into the shared index.
-            $this->filterPublicItemsAndPrivateElements();
-        }
+        // Perform any necessary filtering on non-shared, non-public, or private data.
+        $this->filterBatchDocuments($isSharedIndex);
 
         $this->batchDocumentsCount = count($this->batchDocuments);
 

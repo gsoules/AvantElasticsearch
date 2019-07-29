@@ -87,21 +87,28 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $catenatedText;
     }
 
+    protected function convertFieldValueToSortText($fieldTextValue)
+    {
+        // Convert the value to lowercase and remove any non alphanumeric characters and leading spaces to allow
+        // case-insensitive sorting and so that values with leading non alphanumeric characters will sort correctly and
+        // not appear at the top. Note also, because element fields, as opposed to sort fields, contain their data in an
+        // array of values, even if there's only a single value, they cannot be used for sorting because there's no way
+        // to get Elastcisearch to sort based only on the the first value in the array. This solution allows sorting
+        // in general, but also provides better sorting because of the lower casing and leading character stripping.
+        $sortText = preg_replace('/[^a-z\d ]/i', '', strtolower(trim($fieldTextValue)));
+        return $sortText;
+    }
+
     public function copyItemElementValuesToDocument($itemData, $filterLocalData)
     {
         $itemFieldTexts = $itemData['field_texts'];
 
-        $sharedFieldsNames = $this->getSharedIndexFieldNames();
-        $privateElementsData = CommonConfig::getOptionDataForPrivateElements();
-        $privateFieldsNames = array();
-        foreach ($privateElementsData as $privateElementName)
-        {
-            $privateFieldsNames[] = $this->convertElementNameToElasticsearchFieldName($privateElementName);
-        }
+        $sharedFieldsNames = $this->installation['shared_index_fields'];
+        $privateFieldNames = $this->installation['private_contributor_fields'];
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
-            $this->createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldsNames);
+            $this->createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldNames);
         }
 
         $this->createFacetDataForContributor();
@@ -172,7 +179,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected function createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldNames)
     {
         // Get the element's field name.
-        $fieldName = $this->installation['installation_elements'][$elementId];
+        $fieldName = $this->installation['all_contributor_fields'][$elementId];
 
         // Strip any HTML tags from the field's text value(s).
         $this->removeHtmlTagsFromFieldText($fieldTexts);
@@ -183,15 +190,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
             if ($index == 0)
             {
-                // This is the first value for an Omeka element that can have multiple values or the only value for a
-                // single-value element. Convert the value to lowercase and remove any non alphanumeric characters
-                // and leading spaces to allow case insensitive sorting and so that values with leading non alphanumeric
-                // characters will sort correctly and not appear at the top. Note also, because element fields, as
-                // opposed to sort fields, contain their data in an array of values, even if there's only a single
-                // value, they cannot be used for sorting because there's no way to get Elastcisearch to sort based only
-                // on the the first value in the array. Thus this solution allows sorting in general, but also provides
-                // better sorting because of the lower casing and leading character stripping.
-                $sortText = preg_replace('/[^a-z\d ]/i', '', strtolower(trim($fieldTextValue)));
+                // This is the first or the only value for an Omeka element. Use its value for sorting this element.
+                $sortText = $this->convertFieldValueToSortText($fieldTextValue);
                 $this->sortData[$fieldName] = $sortText;
             }
 
