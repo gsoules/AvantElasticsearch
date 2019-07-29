@@ -26,7 +26,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->avantElasticsearchClient = new AvantElasticsearchClient();
     }
 
-    public function addItemToIndex($item, $filterLocalData)
+    public function addItemToIndex($item, $excludePrivateFields)
     {
         // This method adds a new item to the index or updates an existing item in the index.
         $this->cacheInstallationParameters();
@@ -41,7 +41,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['files_data'] = $itemFilesData;
         $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $item->public;
-        $document = $this->createDocumentFromItemMetadata($itemData, $filterLocalData);
+        $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
 
         $params = [
             'id' => $document->id,
@@ -65,8 +65,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $this->installation['integer_sort_fields'] = array_map('strtolower', SearchConfig::getOptionDataForIntegerSorting());
         $this->installation['all_contributor_fields'] = $this->getFieldNamesOfAllElements();
-        $this->installation['private_contributor_fields'] = $this->getFieldNamesOfPrivateElements();
-        $this->installation['shared_index_fields'] = $this->getFieldNamesOfSharedElements();
+        $this->installation['private_fields'] = $this->getFieldNamesOfPrivateElements();
+        $this->installation['common_fields'] = $this->getFieldNamesOfCommonElements();
+        $this->installation['local_fields'] = $this->getFieldNamesOfLocalElements();
         $this->installation['contributor'] = ElasticsearchConfig::getOptionValueForContributor();
         $this->installation['contributor_id'] = ElasticsearchConfig::getOptionValueForContributorId();
         $this->installation['alias_id'] = CommonConfig::getOptionDataForIdentifierAlias();
@@ -118,7 +119,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $documentBatchParams;
     }
 
-    public function createDocumentFromItemMetadata($itemData, $filterLocalData)
+    public function createDocumentFromItemMetadata($itemData, $excludePrivateFields)
     {
         // Create a new document.
         $documentId = $this->getDocumentIdForItem($itemData['identifier']);
@@ -132,7 +133,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $document->setAvantElasticsearchFacets($avantElasticsearchFacets);
 
        // Populate the document fields with the item's element values;
-        $document->copyItemElementValuesToDocument($itemData, $filterLocalData);
+        $document->copyItemElementValuesToDocument($itemData, $excludePrivateFields);
 
         return $document;
     }
@@ -463,7 +464,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // This method is only used when creating a shared index. It:
         // - Removes all non-public items from the batch of documents
         // - Removes private elements
-        // - Separates public and shared elements from public and not-shared elements
         //
         // This filtering is necessary to support the overall indexing approach which is to:
         // * Export all items and all fields into a single JSON data file containing 100% of the contributor's data
@@ -475,15 +475,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // separate local and shared export files would eliminate the need for this method, but would incur the
         // cost of doing two exports and having to manage two export files, making sure always to import the right one.
 
-        $allFieldNames = $this->getFieldNamesOfAllElements();
-        $privateFieldNames = $this->getFieldNamesOfPrivateElements();
-
-        // Get the names of fields that all contributors are able to share with each other.
-        $sharedFieldsNames = $this->getFieldNamesOfSharedElements();
-
-        // Derive the list of non-private fields that this contributor uses, but that are not shared.
-        // These fields don't appear in shared search results, but they are searched.
-        $nonSharedFields = array_diff($allFieldNames, $sharedFieldsNames);
+        $commonFieldNames = $this->getFieldNamesOfCommonElements();
 
         foreach($this->batchDocuments as $index => $document)
         {
@@ -491,32 +483,20 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             {
                 // Remove the document for this non-public item.
                 unset($this->batchDocuments[$index]);
+                continue;
             }
 
-            foreach ($nonSharedFields as $fieldName)
+            // Remove sorting for all but the common fields.
+            foreach ($document->body->sort as $fieldName => $sortValue)
             {
-                if (!isset($document->body->element->$fieldName))
-                    continue;
-
-                if (!in_array($fieldName, $privateFieldNames))
+                if (!in_array($fieldName, $commonFieldNames))
                 {
-                    // Copy the value of this non-private, non-shared field to '_doc.properties.local'.
-                    // For example, if element.foo is not a shared field, copy element.foo to local.foo. Note that because
-                    // the set of non-shared fields varies from contributor to contributor, and because the mappings for the
-                    // shared index is only done once by the contributor who administers Elasticsearch, it's not possible
-                    // to know the names of the non-shared fields among all the contributors. To deal with this, method
-                    // AvantElasticsearchMappings::constructElasticsearchMappings uses the dynamic_templates feature to
-                    // map these non-shared fields to be type text and thus prevent Elasticsearch from dynamically mapping
-                    // them to another type based on the field's content (e.g. mapping to date or integer).
-                    $document->body->local[$fieldName] = $document->body->element->$fieldName;
+                    unset($document->body->sort->$fieldName);
                 }
-
-                // Remove this field from '_doc.properties.element' e.g. remove element.foo.
-                unset($document->body->element->$fieldName);
-
-                // Remove the sort field for this local non-shared field e.g. remove sort.foo.
-                unset($document->body->sort->$fieldName);
             }
+
+            // Remove all the private fields.
+            unset($document->body->private);
         }
 
         // Reindex the array to remove gaps.
@@ -730,7 +710,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
             // Create an Elasticsearch document for this item and encode it as JSON.
             $itemData = $this->createItemData($index, $identifierElementId);
-            $this->document = $this->createDocumentFromItemMetadata($itemData, false);
+            $excludePrivateFields = false;
+            $this->document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
             $this->writeDocumentToJsonData($index);
             $this->freeSqlData($itemData['id'], $index);
         }

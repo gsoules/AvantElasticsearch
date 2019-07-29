@@ -95,7 +95,8 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
                 if ($item->public)
                 {
                     // Save or add this public item to the shared index.
-                    $avantElasticsearchIndexBuilder->addItemToIndex($item, true);
+                    $excludePrivateFields = true;
+                    $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
                 }
                 else
                 {
@@ -115,7 +116,8 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
             {
                 // Save or add the item to the local index. Both public and non-public items get saved/added.
                 $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfLocalIndex());
-                $avantElasticsearchIndexBuilder->addItemToIndex($item, false);
+                $excludePrivateFields = false;
+                $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
             }
         }
     }

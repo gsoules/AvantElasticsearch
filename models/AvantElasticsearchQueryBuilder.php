@@ -16,7 +16,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         $this->avantElasticsearchFacets = new AvantElasticsearchFacets();
     }
 
-    protected function constructAggregationsParams($viewId, $indexId, $sharedSearchingEnabled)
+    protected function constructAggregationsParams($sharedSearchingEnabled)
     {
         // Create the aggregations portion of the query to indicate which facet values to return.
         // All requested facet values are returned for the entire set of results.
@@ -154,7 +154,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $highlight =
                 ['fields' =>
                     [
-                        'element.description' =>
+                        'common.description' =>
                             (object)[
                                 'number_of_fragments' => 4,
                                 'fragment_size' => 150,
@@ -195,7 +195,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         else if ($fieldName == 'contributor')
             $field = 'item.contributor-id';
         else
-            $field = "element.$fieldName";
+            $field = $this->getQualifiedFieldNameFor($fieldName);
 
         $fieldLowerCase = "$field.lowercase";
 
@@ -345,13 +345,19 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'fields' => [
                         'item.title^20',
                         'item.description^10',
-                        'element.*',
+                        'common.*',
                         'local.*',
                         'tags',
                         'pdf.text-*'
                     ]
                 ]
             ];
+
+            $searchPrivateFields = !empty(current_user());
+            if ($searchPrivateFields)
+            {
+                $mustQuery["simple_query_string"]["fields"][] = 'private.*';
+            }
         }
 
         return $mustQuery;
@@ -376,7 +382,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             else if ($fieldName == 'contributor')
                 $field = 'item.contributor-id';
             else
-                $field = "element.$fieldName";
+                $field = $this->getQualifiedFieldNameFor($fieldName);
 
             $mustNot[] = [
                 "exists" => [
@@ -392,7 +398,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         $shouldQuery = [
             "match" => [
-                "element.type" => [
+                "common.type" => [
                     "query" => "reference",
                     "boost" => 5
                 ]
@@ -402,7 +408,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    public function constructSearchQuery($query, $limit, $sort, $indexId, $public, $sharedSearchingEnabled, $fuzzy)
+    public function constructSearchQuery($query, $limit, $sort, $indexFieldName, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -420,7 +426,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $terms = isset($query['query']) ? $query['query'] : '';
 
         // Specify which fields the query will return.
-        $body['_source'] = $this->constructSourceFields($viewId, $indexId);
+        $body['_source'] = $this->constructSourceFields($viewId, $this->convertElementNameToElasticsearchFieldName($indexFieldName));
 
         if (strpos($terms, '::') === 0)
         {
@@ -428,7 +434,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax
             // Examples:
             //    ::file.total:>10 = find items that have more than 10 files attached to them
-            //    ::item.public:false AND element.status:ok = find non-public items that have a status of 'ok'
+            //    ::item.public:false AND private.status:ok = find non-public items that have a status of 'ok'
             //    ::url.cover:true = find items that are using a cover image
             $q = substr($terms, 2);
             $body['query'] = array('query_string' => ['query' => $q]);
@@ -455,7 +461,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         // Construct the aggregations that will provide facet values.
-        $body['aggregations'] = $this->constructAggregationsParams($viewId, $indexId, $sharedSearchingEnabled);
+        $body['aggregations'] = $this->constructAggregationsParams($sharedSearchingEnabled);
 
         // Specify if sorting by column. If not, sorting is by relevance based on score.
         if (!empty($sort))
@@ -475,7 +481,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $params;
     }
 
-    protected function constructSourceFields($viewId, $indexId)
+    protected function constructSourceFields($viewId, $indexFieldName)
     {
         $fields = array();
 
@@ -483,7 +489,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
         {
             $fields = [
-                'element.*',
+                'common.*',
+                'local.*',
+                'private.*',
                 'item.*',
                 'file.*',
                 'tags',
@@ -495,11 +503,13 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
         else if ($viewId == SearchResultsViewFactory::GRID_VIEW_ID)
         {
+            // Include the Type and Subject for the logic that chooses the proper placeholder image (based on item
+            // type and subject) when the item has no image of its own).
             $fields = [
-                'element.title',
-                'element.identifier',
-                'element.type',
-                'element.subject',
+                'common.title',
+                'common.identifier',
+                'common.type',
+                'common.subject',
                 'item.*',
                 'file.*',
                 'url.*'
@@ -507,10 +517,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
         else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
         {
-            $indexFieldName = $this->convertElementNameToElasticsearchFieldName($indexId);
             $fields = [
-                'element.' . $indexFieldName,
-                'element.identifier',
+                'common.' . $indexFieldName,
+                'local.' . $indexFieldName,
+                'private.' . $indexFieldName,
+                'common.identifier',
                 'url.item'
             ];
         }
@@ -658,6 +669,18 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         return '';
+    }
+
+    protected function getQualifiedFieldNameFor($fieldName)
+    {
+        if (in_array($fieldName, $this->getFieldNamesOfCommonElements()))
+            return "common.$fieldName";
+        else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
+            return "local.$fieldName";
+        else if (in_array($fieldName, $this->getFieldNamesOfPrivateElements()))
+            return "private.$fieldName";
+        else
+            return $fieldName;
     }
 
     public function isUsingSharedIndex()

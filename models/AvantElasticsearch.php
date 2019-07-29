@@ -22,8 +22,9 @@ class AvantElasticsearch
 
     // Used for caching and therefore should not be accessed directly by subclasses.
     private $fieldNamesOfAllElements = array();
+    private $fieldNamesOfLocalElements = array();
     private $fieldNamesOfPrivateElements = array();
-    private $fieldNamesOfSharedElements = array();
+    private $fieldNamesOfCommonElements = array();
 
     public function __construct()
     {
@@ -274,6 +275,37 @@ class AvantElasticsearch
         return $this->fieldNamesOfAllElements;
     }
 
+    protected function getFieldNamesOfCommonElements()
+    {
+        if (empty($this->fieldNamesOfCommonElements))
+        {
+            $config = AvantElasticsearch::getAvantElasticsearcConfig();
+            $elementsList = $config ? $config->shared_elements : array();
+            $elementNames = array_map('trim', explode(',', $elementsList));
+            foreach ($elementNames as $elementName)
+            {
+                $this->fieldNamesOfCommonElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+            }
+            asort($this->fieldNamesOfCommonElements);
+        }
+
+        return $this->fieldNamesOfCommonElements;
+    }
+
+    protected function getFieldNamesOfLocalElements()
+    {
+        if (empty($this->fieldNamesOfLocalElements))
+        {
+            $allFields = $this->getFieldNamesOfAllElements();
+            $commonFields = $this->getFieldNamesOfCommonElements();
+            $privateFields = $this->getFieldNamesOfPrivateElements();
+            $this->fieldNamesOfLocalElements = array_diff($allFields, $commonFields, $privateFields);
+            asort($this->fieldNamesOfLocalElements);
+        }
+
+        return $this->fieldNamesOfLocalElements;
+    }
+
     public function getFieldNamesOfPrivateElements()
     {
         if (empty($this->fieldNamesOfPrivateElements))
@@ -288,23 +320,6 @@ class AvantElasticsearch
         }
 
         return $this->fieldNamesOfPrivateElements;
-    }
-
-    protected function getFieldNamesOfSharedElements()
-    {
-        if (empty($this->fieldNamesOfSharedElements))
-        {
-            $config = AvantElasticsearch::getAvantElasticsearcConfig();
-            $elementsList = $config ? $config->shared_elements : array();
-            $elementNames = array_map('trim', explode(',', $elementsList));
-            foreach ($elementNames as $elementName)
-            {
-                $this->fieldNamesOfSharedElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
-            }
-            asort($this->fieldNamesOfSharedElements);
-        }
-
-        return $this->fieldNamesOfSharedElements;
     }
 
     public function getNameOfActiveIndex()

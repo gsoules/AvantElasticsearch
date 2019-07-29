@@ -86,30 +86,40 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     public function constructElasticsearchMappings($isSharedIndex)
     {
-        $fieldNames = array();
-
-        if ($isSharedIndex)
-        {
-            $fieldNames = $this->getFieldNamesOfSharedElements();
-        }
-        else
-        {
-            $elementNames = $this->getFieldNamesOfAllElements();
-            foreach ($elementNames as $elementId => $elementName)
-            {
-                $fieldNames[$elementId] = $this->convertElementNameToElasticsearchFieldName($elementName);
-            }
-        }
-
-        $mappingType = $this->getDocumentMappingType();
+        $commonFields = $this->getFieldNamesOfCommonElements();
+        $localFields = $this->getFieldNamesOfLocalElements();
+        $privateFields = $this->getFieldNamesOfPrivateElements();
 
         // Provide both an element and sort mapping for every field. The element mapping is used for searching and the
         // sort mapping is used exclusively for sorting. Also, an element field contain all the values for a multi-value
         // element whereas a sort field only contains the first value of a multi-value element.
-        foreach ($fieldNames as $fieldName)
+        foreach ($commonFields as $fieldName)
         {
-            $this->addTextAndKeywordFieldToMappingProperties("element.$fieldName");
+            $this->addTextAndKeywordFieldToMappingProperties("common.$fieldName");
             $this->addKeywordFieldToMappingProperties("sort.$fieldName");
+        }
+
+        if (!$isSharedIndex)
+        {
+            foreach ($localFields as $fieldName)
+            {
+                $this->addTextAndKeywordFieldToMappingProperties("local.$fieldName");
+                $this->addKeywordFieldToMappingProperties("sort.$fieldName");
+            }
+
+            foreach ($privateFields as $fieldName)
+            {
+                $this->addTextAndKeywordFieldToMappingProperties("private.$fieldName");
+                $this->addKeywordFieldToMappingProperties("sort.$fieldName");
+            }
+        }
+
+        if (in_array('address', $commonFields) || !$isSharedIndex)
+        {
+            // Address is a special field that any installation can use, but unless it is a Common field
+            // only emit these special address sorting fields for a local index.
+            $this->addKeywordFieldToMappingProperties('sort.address-number');
+            $this->addKeywordFieldToMappingProperties('sort.address-street');
         }
 
         // Specify special fields that will be used to influence document scores by boosting.
@@ -149,8 +159,6 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('item.contributor-id');
         $this->addKeywordFieldToMappingProperties('pdf.file-name');
         $this->addKeywordFieldToMappingProperties('pdf.file-url');
-        $this->addKeywordFieldToMappingProperties('sort.address-number');
-        $this->addKeywordFieldToMappingProperties('sort.address-street');
         $this->addKeywordFieldToMappingProperties('url.image');
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');
@@ -178,6 +186,8 @@ class AvantElasticsearchMappings extends AvantElasticsearch
                     ]
                 ]
             );
+
+        $mappingType = $this->getDocumentMappingType();
 
         $mappings = [
             $mappingType => [

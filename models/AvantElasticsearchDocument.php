@@ -32,8 +32,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $year = 0;
 
     // Arrays for collecting multiple values.
-    protected $elementData = [];
-    protected $localData = [];
+    protected $commonElementData = [];
+    protected $localElementData = [];
+    protected $privateElementData = [];
     protected $sortData = [];
     protected $facetData = [];
     protected $htmlFields = [];
@@ -48,7 +49,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->type = $this->getDocumentMappingType();
     }
 
-    protected function addItemDataToDocumentBody($itemData)
+    protected function addItemDataToDocumentBody($itemData, $excludePrivateFields)
     {
         if (!empty($this->htmlFields))
             $this->setField('html-fields', $this->htmlFields);
@@ -66,10 +67,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $fileCounts = $this->getFileCounts($itemData);
         $this->setField('file', $fileCounts);
 
-        $this->setField('element', $this->elementData);
-        $this->setField('local', $this->localData);
+        $this->setField('common', $this->commonElementData);
+        $this->setField('local', $this->localElementData);
         $this->setField('sort', $this->sortData);
         $this->setField('facet', $this->facetData);
+
+        if (!$excludePrivateFields)
+            $this->setField('private', $this->privateElementData);
     }
 
     protected function catentateElementTexts($fieldTexts)
@@ -96,19 +100,18 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // to get Elastcisearch to sort based only on the the first value in the array. This solution allows sorting
         // in general, but also provides better sorting because of the lower casing and leading character stripping.
         $sortText = preg_replace('/[^a-z\d ]/i', '', strtolower(trim($fieldTextValue)));
-        return $sortText;
+
+        // Return just up to the first 100 characters which is plenty for sorting purposes.
+        return substr($sortText, 0, 100);
     }
 
-    public function copyItemElementValuesToDocument($itemData, $filterLocalData)
+    public function copyItemElementValuesToDocument($itemData, $excludePrivateFields)
     {
         $itemFieldTexts = $itemData['field_texts'];
 
-        $sharedFieldsNames = $this->installation['shared_index_fields'];
-        $privateFieldNames = $this->installation['private_contributor_fields'];
-
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
-            $this->createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldNames);
+            $this->createFieldDataForElement($elementId, $fieldTexts, $excludePrivateFields);
         }
 
         $this->createFacetDataForContributor();
@@ -116,7 +119,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createSuggestionsData();
         $this->createTagData($itemData);
 
-        $this->addItemDataToDocumentBody($itemData);
+        $this->addItemDataToDocumentBody($itemData, $excludePrivateFields);
     }
 
     protected function createAddressElementSortData($elasticsearchFieldName, $fieldText)
@@ -176,13 +179,18 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createFieldDataForElement($elementId, $fieldTexts, $filterLocalData, $sharedFieldsNames, $privateFieldNames)
+    protected function createFieldDataForElement($elementId, $fieldTexts, $excludePrivateFields)
     {
         // Get the element's field name.
         $fieldName = $this->installation['all_contributor_fields'][$elementId];
 
         // Strip any HTML tags from the field's text value(s).
         $this->removeHtmlTagsFromFieldText($fieldTexts);
+
+        // Get the field names from the installation cache instead of calling the functions that get the names.
+        $commonFields = $this->installation['common_fields'];
+        $localFields = $this->installation['local_fields'];
+        $privateFields = $this->installation['private_fields'];
 
         foreach ($fieldTexts as $index => $fieldText)
         {
@@ -195,19 +203,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->sortData[$fieldName] = $sortText;
             }
 
-            $isLocalData = $filterLocalData && !in_array($fieldName, $sharedFieldsNames);
-
-            if ($isLocalData)
+            if (in_array($fieldName, $commonFields))
             {
-                if (!in_array($fieldName, $privateFieldNames))
-                {
-                    // Make this non-shared, but no private element searchable in the shared index.
-                    $this->localData[$fieldName][] = $fieldTextValue;
-                }
+                $this->commonElementData[$fieldName][] = $fieldTextValue;
             }
-            else
+            else if (in_array($fieldName, $localFields))
             {
-                $this->elementData[$fieldName][] = $fieldTextValue;
+                $this->localElementData[$fieldName][] = $fieldTextValue;
+            }
+            else if (!$excludePrivateFields && in_array($fieldName, $privateFields))
+            {
+                $this->privateElementData[$fieldName][] = $fieldTextValue;
             }
         }
 
@@ -270,7 +276,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // configured in AvantCommon. Get the alias value and use it as the identifier field value.
             $id = $this->installation['alias_id'];
             $aliasText = isset($itemFieldTexts[$id][0]['text']) ? $itemFieldTexts[$id][0]['text'] : BLANK_FIELD_TEXT;
-            $this->elementData['identifier'][0] = $aliasText;
+            $this->commonElementData['identifier'][0] = $aliasText;
         }
 
         // Create a field-text to represent an unspecified date, place, or subject.
@@ -492,7 +498,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             {
                 // This installation does not have its files at the root of the 'original' folder. Check to see if
                 // the files are located in a sub directory having the item identifier as its name.
-                $itemIdentifier = $this->elementData['identifier'][0];
+                $itemIdentifier = $this->commonElementData['identifier'][0];
                 $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $fileName);
                 if (!file_exists($filepath))
                 {
