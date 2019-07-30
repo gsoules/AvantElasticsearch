@@ -193,21 +193,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $leafs = array();
         $otherArgs = array();
 
-        foreach ($query as $arg => $value)
+        if (!empty($query))
         {
-            switch ($arg)
+            foreach ($query as $arg => $value)
             {
-                case 'query';
-                    $terms = $value;
-                    break;
-                case 'root':
-                    $roots = $value;
-                    break;
-                case 'leaf':
-                    $leafs = $value;
-                    break;
-                default:
-                    $otherArgs[$arg] = $value;
+                switch ($arg)
+                {
+                    case 'query';
+                        $terms = $value;
+                        break;
+                    case 'root':
+                        $roots = $value;
+                        break;
+                    case 'leaf':
+                        $leafs = $value;
+                        break;
+                    default:
+                        $otherArgs[$arg] = $value;
+                }
             }
         }
 
