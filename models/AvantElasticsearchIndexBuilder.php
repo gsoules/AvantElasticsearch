@@ -463,17 +463,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // This method is only used when creating a shared index. It:
         // - Removes all non-public items from the batch of documents
-        // - Removes private elements
+        // - Removes private elements from each document
         //
         // This filtering is necessary to support the overall indexing approach which is to:
-        // * Export all items and all fields into a single JSON data file containing 100% of the contributor's data
-        // * Import only the non-private fields of public items into the shared index (this method)
-        // * Import all items and all fields into the local index (not this method)
+        // * 1.  Export all items and all fields into a single JSON data file containing 100% of the contributor's data
+        // * 2a. Import only the non-private fields of public items into the shared index (using this method)
+        // * 2b. Import all items and all fields into the local index (no filtering)
         //
-        // This export once, import twice approach makes it possible to update or create a new local index without
-        // affecting the shared index, and vice-versa, using the same export file. An alternative approach of creating
-        // separate local and shared export files would eliminate the need for this method, but would incur the
-        // cost of doing two exports and having to manage two export files, making sure always to import the right one.
+        // This export once, import twice approach makes it possible to create/update both the local and shared indexes
+        // from the same export file (versus having one export file for the local index and another for the shared index).
 
         $commonFieldNames = $this->getFieldNamesOfCommonElements();
 

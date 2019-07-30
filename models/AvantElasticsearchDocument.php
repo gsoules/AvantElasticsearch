@@ -203,6 +203,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->sortData[$fieldName] = $sortText;
             }
 
+            // Copy the text to its corresponding field:
+            // -  common: fields that are common to all contributors
+            // -   local: fields that are unique to individual contributors
+            // - private: fields that are private for individual contributors
             if (in_array($fieldName, $commonFields))
             {
                 $this->commonElementData[$fieldName][] = $fieldTextValue;
