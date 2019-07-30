@@ -428,9 +428,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Specify which fields the query will return.
         $body['_source'] = $this->constructSourceFields($viewId, $this->convertElementNameToElasticsearchFieldName($indexElementName));
 
-        if (strpos($terms, '::') === 0)
+        if (strpos($terms, '::') === 0 && !empty(current_user()))
         {
             // Construct an admin query using Elasticsearch Query String Syntax.
+            // This feature is restricted to logged in users because it searches all data including non-public items and private elements.
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax
             // Examples:
             //    ::file.total:>10 = find items that have more than 10 files attached to them
