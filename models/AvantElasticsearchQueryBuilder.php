@@ -408,7 +408,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    public function constructSearchQuery($query, $limit, $sort, $indexFieldName, $public, $sharedSearchingEnabled, $fuzzy)
+    public function constructSearchQuery($query, $limit, $sort, $indexElementName, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
         $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
@@ -426,7 +426,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $terms = isset($query['query']) ? $query['query'] : '';
 
         // Specify which fields the query will return.
-        $body['_source'] = $this->constructSourceFields($viewId, $this->convertElementNameToElasticsearchFieldName($indexFieldName));
+        $body['_source'] = $this->constructSourceFields($viewId, $this->convertElementNameToElasticsearchFieldName($indexElementName));
 
         if (strpos($terms, '::') === 0)
         {
