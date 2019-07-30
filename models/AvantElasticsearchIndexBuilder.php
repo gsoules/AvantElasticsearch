@@ -762,7 +762,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function performBulkIndexImportBatches()
     {
-        $limit = MB_BYTES * 2;
+        $limit = MB_BYTES * 1;
         $start = 0;
         $end = 0;
         $last = $this->batchDocumentsCount - 1;
