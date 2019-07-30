@@ -275,12 +275,12 @@ class AvantElasticsearch
         return $this->fieldNamesOfAllElements;
     }
 
-    protected function getFieldNamesOfCommonElements()
+    public function getFieldNamesOfCommonElements()
     {
         if (empty($this->fieldNamesOfCommonElements))
         {
             $config = AvantElasticsearch::getAvantElasticsearcConfig();
-            $elementsList = $config ? $config->shared_elements : array();
+            $elementsList = $config ? $config->common_elements : array();
             $elementNames = array_map('trim', explode(',', $elementsList));
             foreach ($elementNames as $elementName)
             {
