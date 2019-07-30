@@ -241,7 +241,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $query;
     }
 
-    protected function constructQueryFilters($public, array $roots, array $leafs, $sharedSearchingEnabled)
+    protected function constructQueryFilters($queryArgs, $public, $roots, $leafs, $sharedSearchingEnabled)
     {
         // Get filters that are already set for applied facets.
         $queryFilters = $this->avantElasticsearchFacets->getFacetFilters($roots, $leafs);
@@ -255,15 +255,16 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $queryFilters[] = array('exists' => ['field' => "url.image"]);
 
         // Construct a query for each Advanced Search filter.
-        $advancedFilters = $this->getAdvancedFilters();
-        foreach ($advancedFilters as $advanced)
+        $advancedQueryArgs = isset($queryArgs['advanced']) ? $queryArgs['advanced'] : array();
+
+        foreach ($advancedQueryArgs as $advancedArg)
         {
-            $condition = $this->getAdvancedCondition($advanced);
+            $condition = $this->getAdvancedCondition($advancedArg);
             if (empty($condition) || $condition == 'is empty')
                 continue;
 
-            $fieldName = $this->getAdvancedFieldName($advanced);
-            $terms = $this->getAdvancedTerms($advanced);
+            $fieldName = $this->getAdvancedFieldName($advancedArg);
+            $terms = $this->getAdvancedTerms($advancedArg);
 
             $conditionFilter = $this->constructQueryCondition($fieldName, $condition, $terms);
             if (!empty($conditionFilter))
@@ -363,14 +364,15 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $mustQuery;
     }
 
-    protected function constructQueryMustNotExists()
+    protected function constructQueryMustNotExists($queryArgs)
     {
         // This method is used only to support the Is Empty filter for Advanced Search. Unlike Is Not Empty which is
         // implemented using an Elasticsearch query filter, Is Empty is implemented in the must_not portion of the query.
 
         $mustNot = array();
 
-        $advancedFilters = $this->getAdvancedFilters();
+        $advancedFilters = isset($queryArgs['advanced']) ? $queryArgs['advanced'] : array();
+
         foreach ($advancedFilters as $advanced)
         {
             if ($this->getAdvancedCondition($advanced) != 'is empty')
@@ -408,22 +410,22 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    public function constructSearchQuery($query, $limit, $sort, $indexElementName, $public, $sharedSearchingEnabled, $fuzzy)
+    public function constructSearchQuery($queryArgs, $limit, $sort, $indexElementName, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
-        $leafs = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : [];
-        $page = isset($query['page']) ? $query['page'] : 1;
+        $leafs = isset($queryArgs[FACET_KIND_LEAF]) ? $queryArgs[FACET_KIND_LEAF] : [];
+        $page = isset($queryArgs['page']) ? $queryArgs['page'] : 1;
         $offset = ($page - 1) * $limit;
-        $roots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : [];
-        $viewId = isset($query['view']) ? $query['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
+        $roots = isset($queryArgs[FACET_KIND_ROOT]) ? $queryArgs[FACET_KIND_ROOT] : [];
+        $viewId = isset($queryArgs['view']) ? $queryArgs['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
 
 
         // Get keywords that were specified on the Advanced Search page.
-        $terms = isset($query['keywords']) ? $query['keywords'] : '';
+        $terms = isset($queryArgs['keywords']) ? $queryArgs['keywords'] : '';
 
         // Check if keywords came from the Simple Search text box.
         if (empty($terms))
-            $terms = isset($query['query']) ? $query['query'] : '';
+            $terms = isset($queryArgs['query']) ? $queryArgs['query'] : '';
 
         // Specify which fields the query will return.
         $body['_source'] = $this->constructSourceFields($viewId, $this->convertElementNameToElasticsearchFieldName($indexElementName));
@@ -446,12 +448,12 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $body['query']['bool']['must'] = $this->constructQueryMust($terms, $fuzzy);
             $body['query']['bool']['should'] = $this->constructQueryShould();
 
-            $mustNot = $this->constructQueryMustNotExists();
+            $mustNot = $this->constructQueryMustNotExists($queryArgs);
             if (!empty($mustNot))
                 $body['query']['bool']['must_not'] = $mustNot;
 
             // Create filters that will limit the query results.
-            $queryFilters = $this->constructQueryFilters($public, $roots, $leafs, $sharedSearchingEnabled);
+            $queryFilters = $this->constructQueryFilters($queryArgs, $public, $roots, $leafs, $sharedSearchingEnabled);
             if (count($queryFilters) > 0)
                 $body['query']['bool']['filter'] = $queryFilters;
 
@@ -628,11 +630,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         return $this->convertElementNameToElasticsearchFieldName($elementName);
-    }
-
-    protected function getAdvancedFilters()
-    {
-        return isset($_GET['advanced']) ? $_GET['advanced'] : array();
     }
 
     protected function getAdvancedTerms($advanced)
