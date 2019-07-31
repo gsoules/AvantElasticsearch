@@ -413,10 +413,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     public function constructSearchQuery($queryArgs, $limit, $sort, $indexElementName, $public, $sharedSearchingEnabled, $fuzzy)
     {
         // Get parameter values or defaults.
-        $leafs = isset($queryArgs[FACET_KIND_LEAF]) ? $queryArgs[FACET_KIND_LEAF] : [];
+        $leafs = isset($queryArgs[AvantElasticsearchFacets::FACET_KIND_LEAF]) ? $queryArgs[AvantElasticsearchFacets::FACET_KIND_LEAF] : [];
         $page = isset($queryArgs['page']) ? $queryArgs['page'] : 1;
         $offset = ($page - 1) * $limit;
-        $roots = isset($queryArgs[FACET_KIND_ROOT]) ? $queryArgs[FACET_KIND_ROOT] : [];
+        $roots = isset($queryArgs[AvantElasticsearchFacets::FACET_KIND_ROOT]) ? $queryArgs[AvantElasticsearchFacets::FACET_KIND_ROOT] : [];
         $viewId = isset($queryArgs['view']) ? $queryArgs['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
 
 

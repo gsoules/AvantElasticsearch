@@ -1,12 +1,12 @@
 <?php
 
-// Root refers to the top value in a hierarchy facet.
-// Leaf refers to either the elided leaf value in a hierarchy facet or simply the value in a non-hierarchy facet.
-define('FACET_KIND_ROOT', 'root');
-define('FACET_KIND_LEAF', 'leaf');
-
 class AvantElasticsearchFacets extends AvantElasticsearch
 {
+    // Root refers to the top value in a hierarchy facet.
+    // Leaf refers to either the elided leaf value in a hierarchy facet or simply the value in a non-hierarchy facet.
+    const FACET_KIND_ROOT = 'root';
+    const FACET_KIND_LEAF = 'leaf';
+
     protected $appliedFacets = array();
     protected $facetDefinitions = array();
     protected $facetsTable = array();
@@ -178,7 +178,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             foreach ($facetValues as $facetValue)
             {
-                $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+                $kind = $isRoot ? self::FACET_KIND_ROOT : self::FACET_KIND_LEAF;
                 $queryStringArgs .= '&' . urlencode("{$kind}_{$facetName}[]") . '=' . urlencode($facetValue);
             }
         }
@@ -289,7 +289,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $args = explode('&', $queryString);
 
         // Create the arg to be added.
-        $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+        $kind = $isRoot ? self::FACET_KIND_ROOT : self::FACET_KIND_LEAF;
         $facetArg = "{$kind}_{$facetToAddGroup}[]";
         $argToAdd = "$facetArg=$facetToAddValue";
 
@@ -310,7 +310,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $arg = urldecode($rawArg);
 
             // Construct the name/value of the arg to be remove.
-            $kind = $isRoot ? FACET_KIND_ROOT : FACET_KIND_LEAF;
+            $kind = $isRoot ? self::FACET_KIND_ROOT : self::FACET_KIND_LEAF;
             $facetArg = "{$kind}_{$facetToRemoveGroup}[]";
             $argToRemove = "$facetArg=$facetToRemoveValue";
 
@@ -547,10 +547,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     protected function extractAppliedFacetsFromSearchRequest($query)
     {
-        $appliedFacets = array(FACET_KIND_ROOT => array(), FACET_KIND_LEAF => array());
+        $appliedFacets = array(self::FACET_KIND_ROOT => array(), self::FACET_KIND_LEAF => array());
 
-        $queryStringRoots = isset($query[FACET_KIND_ROOT]) ? $query[FACET_KIND_ROOT] : array();
-        $queryStringFacets = isset($query[FACET_KIND_LEAF]) ? $query[FACET_KIND_LEAF] : array();
+        $queryStringRoots = isset($query[self::FACET_KIND_ROOT]) ? $query[self::FACET_KIND_ROOT] : array();
+        $queryStringFacets = isset($query[self::FACET_KIND_LEAF]) ? $query[self::FACET_KIND_LEAF] : array();
 
         foreach ($queryStringRoots as $group => $facetValues)
         {
@@ -559,7 +559,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             foreach ($facetValues as $facetValue)
             {
-                $appliedFacets[FACET_KIND_ROOT][$group][] = $facetValue;
+                $appliedFacets[self::FACET_KIND_ROOT][$group][] = $facetValue;
             }
         }
 
@@ -570,7 +570,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
             foreach ($facetValues as $facetValue)
             {
-                $appliedFacets[FACET_KIND_LEAF][$group][] = $facetValue;
+                $appliedFacets[self::FACET_KIND_LEAF][$group][] = $facetValue;
             }
         }
 
@@ -664,7 +664,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             $leaf = $lastPart;
         }
 
-        return array(FACET_KIND_ROOT => $root, FACET_KIND_LEAF => $leaf);
+        return array(self::FACET_KIND_ROOT => $root, self::FACET_KIND_LEAF => $leaf);
     }
 
     protected function getFacetValueForDate($text)
@@ -712,11 +712,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                 if ($showRoot)
                 {
-                    $values[] = array(FACET_KIND_ROOT => $hierarchy[FACET_KIND_ROOT], FACET_KIND_LEAF => $hierarchy[FACET_KIND_LEAF]);
+                    $values[] = array(self::FACET_KIND_ROOT => $hierarchy[self::FACET_KIND_ROOT], self::FACET_KIND_LEAF => $hierarchy[self::FACET_KIND_LEAF]);
                 }
                 else
                 {
-                    $values[] = $hierarchy[FACET_KIND_LEAF];
+                    $values[] = $hierarchy[self::FACET_KIND_LEAF];
                 }
             }
             else
