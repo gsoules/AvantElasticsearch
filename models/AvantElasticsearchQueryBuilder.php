@@ -299,7 +299,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         {
             if ($fuzzy)
             {
-                // Determine if the request if for a phrase match -- the terms are wrapped in double quotes.
+                // Determine if the request is for a phrase match -- the terms are wrapped in double quotes.
                 $phraseMatch = strpos($terms, '"') === 0 && strrpos($terms, '"') === strlen($terms) - 1;
 
                 if ($phraseMatch)
