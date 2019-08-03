@@ -269,14 +269,14 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $this->createFacet('subject', 'Subject', true, true);
         $this->createFacet('type', 'Type', true, true);
 
+        $this->createFacet('contributor', 'Contributor');
+        $this->facetDefinitions['contributor']['shared'] = true;
+        $this->facetDefinitions['contributor']['sort'] = false;
+
         $this->createFacet('date', 'Date');
         $this->facetDefinitions['date']['is_date'] = true;
 
         $this->createFacet('place', 'Place', true);
-
-        $this->createFacet('contributor', 'Contributor');
-        $this->facetDefinitions['contributor']['shared'] = true;
-        $this->facetDefinitions['contributor']['sort'] = false;
 
         // Tags are fully supported, but for now don't show this facet since tags are not heavily/consistently used.
         $this->createFacet('tag', 'Tags');
