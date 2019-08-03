@@ -417,7 +417,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         // Verify that the page arg is valid.
         $page = isset($queryArgs['page']) ? intval($queryArgs['page']) : 1;
-        $page = $page == 0 ? 1 : $page;
+        $page = $page == 0 ? 1 : abs($page);
 
         $offset = ($page - 1) * $limit;
         $roots = isset($queryArgs[AvantElasticsearchFacets::FACET_KIND_ROOT]) ? $queryArgs[AvantElasticsearchFacets::FACET_KIND_ROOT] : [];
