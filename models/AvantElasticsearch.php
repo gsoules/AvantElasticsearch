@@ -388,14 +388,11 @@ class AvantElasticsearch
             // Search the shared index because the local index is disabled.
             $useSharedIndex = true;
         }
-        else if (isset($_REQUEST['site']))
-        {
-            $useSharedIndex = intval($_REQUEST['site']) == 1;
-        }
         else
         {
-            // Both indexes are enabled, but there is no query string arg or cookie. Default to searching the local index.
-            $useSharedIndex = false;
+            // Both indexes are enabled.
+            $siteId = AvantCommon::queryStringArgOrCookie('site', 'SITE-ID', 0);
+            $useSharedIndex = $siteId == 1;
         }
 
         return $useSharedIndex;
