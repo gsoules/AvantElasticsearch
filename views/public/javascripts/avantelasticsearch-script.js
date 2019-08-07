@@ -1,6 +1,8 @@
 function constructSuggestQuery(term)
 {
-    return SUGGEST_QUERY.replace('%s', term);
+    // Remove quotes so that they don't invalidate the json code that the term gets inserted into.
+    var cleanTerm = term.replace(/['"]+/g, '');
+    return SUGGEST_QUERY.replace('%s', cleanTerm);
 }
 
 function constructSuggestions(data)
@@ -23,7 +25,6 @@ function constructSuggestions(data)
             titles.push(title);
             var value = FIND_URL + encodeURI(title);
             suggestions.push({"label": title, "value": value});
-            //console.log('ADD:' + title + ' : ' + value);
         }
     }
     return suggestions;
