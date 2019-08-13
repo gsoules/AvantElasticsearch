@@ -193,7 +193,16 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             }
         }
         else if ($fieldName == 'contributor')
+        {
             $field = 'item.contributor-id';
+        }
+        else if ($fieldName == 'public')
+        {
+            $field = 'item.public';
+            $terms = strtolower(trim($terms));
+            if ($terms != 'true' && $terms != 'false')
+                $terms = 'false';
+        }
         else
             $field = $this->getQualifiedFieldNameFor($fieldName);
 
