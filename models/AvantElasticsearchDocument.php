@@ -377,7 +377,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $video = 0;
 
         // This test for applicable mime types is overly simplistic given how many
-        // mime types exist, but it's sufficient for statistics gatering purposes.
+        // mime types exist, but it's sufficient for statistics gathering purposes.
         foreach ($itemData['files_data'] as $fileData)
         {
             $mimeType = $fileData['mime_type'];
