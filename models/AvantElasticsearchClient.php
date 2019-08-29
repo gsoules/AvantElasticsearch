@@ -284,6 +284,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
     {
         $queryArgs = urldecode(http_build_query($_GET));
         $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '<not set>';
+        $referrer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '<not set>';
         $message = $this->lastException->getMessage();
         $code = $this->lastException->getCode();
 
@@ -295,11 +296,12 @@ class AvantElasticsearchClient extends AvantElasticsearch
         $body = str_replace('<br/>', PHP_EOL, $body);
         $body .= PHP_EOL . PHP_EOL . 'CODE:' . PHP_EOL . $code;
         $body .= PHP_EOL . PHP_EOL . 'QUERY:' . PHP_EOL . $queryArgs;
+        $body .= PHP_EOL . PHP_EOL . 'HTTP_REFERER:' . PHP_EOL . $referrer;
         $body .= PHP_EOL . PHP_EOL . 'REQUEST URI:' . PHP_EOL . $requestUri;
         $body .= PHP_EOL . PHP_EOL . 'JSON:' . PHP_EOL . $message;
         $body .= PHP_EOL . PHP_EOL . 'TRACE:' . PHP_EOL . $trace;
 
-        AvantCommon::sendEmailToAdministrator($subject, $body);
+        AvantCommon::sendEmailToAdministrator('ES Error', $subject, $body);
     }
 
     public function search($params)
