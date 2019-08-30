@@ -33,6 +33,52 @@ class AvantElasticsearch
         $this->indexName = '';
     }
 
+    public function afterSaveItem($args)
+    {
+        // This method is called when the admin either saves an existing item or adds a new item to the Omeka database.
+
+        // Determine which indexes are enabled.
+        $sharedIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE) == true;
+        $localIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_LOCAL) == true;
+
+        if ($sharedIndexIsEnabled || $localIndexIsEnabled)
+        {
+            $item = $args['record'];
+            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
+
+            if ($sharedIndexIsEnabled)
+            {
+                $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfSharedIndex());
+                if ($item->public)
+                {
+                    // Save or add this public item to the shared index.
+                    $excludePrivateFields = true;
+                    $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
+                }
+                else
+                {
+                    if ($args['insert'] == false)
+                    {
+                        // This non-public item is being saved. Attempt to delete it from the shared index. It's an
+                        // 'attempt' because we don't know if the item is in the shared index, but if it is, it needs to
+                        // get deleted. This logic handles the case where the items was public, but the admin just now
+                        // unchecked the public box and saved the item. If that's not the case, the delete has no effect.
+                        $failedAttemptOk = true;
+                        $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $failedAttemptOk);
+                    }
+                }
+            }
+
+            if ($localIndexIsEnabled)
+            {
+                // Save or add the item to the local index. Both public and non-public items get saved/added.
+                $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfLocalIndex());
+                $excludePrivateFields = false;
+                $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
+            }
+        }
+    }
+
     public function convertElementNameToElasticsearchFieldName($elementName)
     {
         // Convert the element name to lowercase and strip away spaces and other non-alphanumberic characters

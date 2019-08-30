@@ -78,48 +78,17 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookAfterSaveItem($args)
     {
-        // This method is called when the admin either saves an existing item or adds a new item to the Omeka database.
-
-        // Determine which indexes are enabled.
-        $sharedIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE) == true;
-        $localIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_LOCAL) == true;
-
-        if ($sharedIndexIsEnabled || $localIndexIsEnabled)
+        if (plugin_is_active('AvantS3'))
         {
-            $item = $args['record'];
-            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
-
-            if ($sharedIndexIsEnabled)
-            {
-                $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfSharedIndex());
-                if ($item->public)
-                {
-                    // Save or add this public item to the shared index.
-                    $excludePrivateFields = true;
-                    $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
-                }
-                else
-                {
-                    if ($args['insert'] == false)
-                    {
-                        // This non-public item is being saved. Attempt to delete it from the shared index. It's an
-                        // 'attempt' because we don't know if the item is in the shared index, but if it is, it needs to
-                        // get deleted. This logic handles the case where the items was public, but the admin just now
-                        // unchecked the public box and saved the item. If that's not the case, the delete has no effect.
-                        $failedAttemptOk = true;
-                        $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $failedAttemptOk);
-                    }
-                }
-            }
-
-            if ($localIndexIsEnabled)
-            {
-                // Save or add the item to the local index. Both public and non-public items get saved/added.
-                $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfLocalIndex());
-                $excludePrivateFields = false;
-                $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
-            }
+            // Let AvantS3's after_save_item hook handle the save. This is to ensure that AvantS3 does its
+            // work first, e.g. to attach a PDF file, before AvantElasticsearch does its work, e.g. index
+            // an item's PDF file attachments. If we don't this, a newly attached PDF won't get indexed until
+            // the next time an item is saved.
+            return;
         }
+
+        $avantElasticsearch = new AvantElasticsearch();
+        $avantElasticsearch->afterSaveItem($args);
     }
 
     public function hookConfig()
