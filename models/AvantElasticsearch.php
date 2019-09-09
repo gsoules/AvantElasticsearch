@@ -96,7 +96,7 @@ class AvantElasticsearch
         return array($this->createFieldText($text));
     }
 
-    public static function generateContributorStatistics()
+    public static function generateContributorStatistics($indexName)
     {
         $stats = '';
         $avantElasticsearchClient = new AvantElasticsearchClient();
@@ -106,7 +106,6 @@ class AvantElasticsearch
             $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
 
             // Explicitly specify that the shared index should be queried.
-            $indexName = AvantElasticsearch::getNameOfSharedIndex();
             $avantElasticsearchQueryBuilder->setIndexName($indexName);
 
             $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
@@ -148,7 +147,7 @@ class AvantElasticsearch
                 // Generate the headers
                 $header = "<table id='search-stats-table'>";
                 $header .= '<tr>';
-                $header .= '<td><strong>Organization</strong></td>';
+                $header .= '<td class="contributor-table-organization"><strong>Organization</strong></td>';
                 $header .= '<td><strong>Id</strong></td>';
                 $header .= '<td><strong>Items</strong></td>';
                 $header .= '<td><strong>Images</strong></td>';
@@ -176,7 +175,7 @@ class AvantElasticsearch
 
                     $rows .= '<tr>';
                     $contributor = $bucket['key'];
-                    $rows .= "<td>$contributor</td>";
+                    $rows .= "<td class=\"contributor-table-organization\">$contributor</td>";
                     $rows .= "<td>$contributorId</td>";
                     $rows .= "<td>$itemCount</td>";
                     $rows .= "<td>$imageCount</td>";
