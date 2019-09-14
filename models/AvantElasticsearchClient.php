@@ -33,7 +33,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         // We don't know the appropriate timeout (seconds), but lowering it to 10 seems to have allowed the
         // "No alive nodes" exception to occur during bulk indexing operations which can take several seconds.
         // Also, the occasional calls to a slow host like googleapis.com might contribute to the problem.
-        $timeout = isset($options['timeout']) ? $options['timeout'] : 60;
+        $timeout = isset($options['timeout']) ? $options['timeout'] : 90;
 
         $nobody = isset($options['nobody']) ? $options['nobody'] : false;
 
