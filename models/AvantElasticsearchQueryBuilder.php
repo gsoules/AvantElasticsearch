@@ -427,11 +427,16 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         // Verify that the page arg is valid.
         $page = isset($queryArgs['page']) ? intval($queryArgs['page']) : 1;
         $page = $page == 0 ? 1 : abs($page);
-
         $offset = ($page - 1) * $limit;
+
+        // Prevent the "Result window is too large" error from occurring if query string value for page is too large.
+        if ($offset + $limit > AvantSearch::MAX_SEARCH_RESULTS)
+        {
+            $offset = AvantSearch::MAX_SEARCH_RESULTS - $limit;
+        }
+
         $roots = isset($queryArgs[AvantElasticsearchFacets::FACET_KIND_ROOT]) ? $queryArgs[AvantElasticsearchFacets::FACET_KIND_ROOT] : [];
         $viewId = isset($queryArgs['view']) ? $queryArgs['view'] : SearchResultsViewFactory::TABLE_VIEW_ID;
-
 
         // Get keywords that were specified on the Advanced Search page.
         $terms = isset($queryArgs['keywords']) ? $queryArgs['keywords'] : '';
