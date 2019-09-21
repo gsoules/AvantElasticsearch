@@ -147,7 +147,7 @@ class AvantElasticsearch
                 // Generate the headers
                 $header = "<table id='search-stats-table'>";
                 $header .= '<tr>';
-                $header .= '<td class="contributor-table-organization"><strong>Organization</strong></td>';
+                $header .= '<td class="contributor-table-organization"><strong>Contributor</strong></td>';
                 $header .= '<td><strong>Id</strong></td>';
                 $header .= '<td><strong>Items</strong></td>';
                 $header .= '<td><strong>Images</strong></td>';
