@@ -314,6 +314,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                   $table
                 INNER JOIN
                   {$db->prefix}items AS items ON items.id = item_id
+                ORDER BY
+                  $table.order  
             ";
 
             $files = $db->query($sql)->fetchAll();
