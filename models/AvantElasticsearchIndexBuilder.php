@@ -63,7 +63,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Instead, whenever possible, make the calls just once here so that they get cached. By caching this data,
         // the time to create 10,000 documents was reduced by 75%.
 
-        $this->installation['integer_sort_fields'] = array_map('strtolower', SearchConfig::getOptionDataForIntegerSorting());
+        $integerSortFields = SearchConfig::getOptionDataForIntegerSorting();
+        foreach ($integerSortFields as $index => $elementName)
+            $integerSortFields[$index] = $this->convertElementNameToElasticsearchFieldName($elementName);
+        $this->installation['integer_sort_fields'] = $integerSortFields;
+
         $this->installation['all_contributor_fields'] = $this->getFieldNamesOfAllElements();
         $this->installation['private_fields'] = $this->getFieldNamesOfPrivateElements();
         $this->installation['common_fields'] = $this->getFieldNamesOfCommonElements();

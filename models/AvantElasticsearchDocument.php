@@ -267,8 +267,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         if (in_array($elasticsearchFieldName, $this->installation['integer_sort_fields']))
         {
-            // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
-            $this->sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
+            if (is_numeric($textString))
+            {
+                // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
+                $this->sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
+            }
         }
     }
 
