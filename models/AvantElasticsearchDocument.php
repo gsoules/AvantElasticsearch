@@ -109,9 +109,32 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         $itemFieldTexts = $itemData['field_texts'];
 
+        // Determine if certain element values should be translated to common vocabulary equivalents.
+        // It is only done for the shared index and only the the Subject and Type elements.
+        $commonVocabularyEnabled = plugin_is_active('AvantVocabulary') && $this->index == self::getNameOfSharedIndex();
+        $subjectElementId = $commonVocabularyEnabled ? ItemMetadata::getElementIdForElementName('Subject') : 0;
+        $typeElementId = $commonVocabularyEnabled ? ItemMetadata::getElementIdForElementName('Type') : 0;
+
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
-            $this->createFieldDataForElement($elementId, $fieldTexts, $excludePrivateFields);
+            $originalFieldTexts = $fieldTexts;
+            $useCommonVocabulary = $commonVocabularyEnabled && $elementId == $subjectElementId || $elementId == $typeElementId;
+            if ($useCommonVocabulary)
+            {
+                // Translate each of this element's values to their common vocabulary equivalents as though
+                // the translations were the original values. This fools the indexing and facet logic into
+                // using the translated values for common facets without affecting the actual element values.
+                $avantVocabulary = new AvantVocabulary();
+                foreach ($fieldTexts as $index => $fieldText)
+                {
+                    $fieldTexts[$index]['text'] = $avantVocabulary->getCommonTerm($fieldText['text']);
+                }
+            }
+            else
+            {
+                $originalFieldTexts = [];
+            }
+            $this->createFieldDataForElement($elementId, $fieldTexts, $originalFieldTexts, $excludePrivateFields);
         }
 
         $this->createFacetDataForContributor();
@@ -179,7 +202,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createFieldDataForElement($elementId, $fieldTexts, $excludePrivateFields)
+    protected function createFieldDataForElement($elementId, $fieldTexts, $originalFieldTexts, $excludePrivateFields)
     {
         // Get the element's field name.
         $fieldName = $this->installation['all_contributor_fields'][$elementId];
@@ -210,6 +233,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             if (in_array($fieldName, $commonFields))
             {
                 $this->commonElementData[$fieldName][] = $fieldTextValue;
+
+                // Determine if the field values for this element were mapped to a common vocabulary by seeing if any
+                // original texts were passed. If yes, and if the mapped and original texts are different, add the
+                // original value to the local elements. This way the mapped value will end up in the common elements
+                // and the original will end up in the local elements, so both will be searchable.
+                $usingCommonVocabulary = count($originalFieldTexts) > 0;
+                if ($usingCommonVocabulary)
+                {
+                    $originalFieldTextValue = $originalFieldTexts[$index]['text'];
+                    if ($originalFieldTextValue != $fieldTextValue)
+                    {
+                        $this->localElementData[$fieldName][] = $originalFieldTextValue;
+                    }
+                }
             }
             else if (in_array($fieldName, $localFields))
             {
@@ -286,7 +323,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $this->commonElementData['identifier'][0] = $aliasText;
         }
 
-        // Create a field-text to represent an unspecified date, place, or subject.
+        // Create a field-text to represent an unspecified date, place, subject, or type.
         if (!$this->itemHasDate)
         {
             $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
@@ -475,7 +512,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $fileName .= '.jpg';
         }
         $webPath = $filePath . DIRECTORY_SEPARATOR . $imageFileType . DIRECTORY_SEPARATOR . $fileName;
-        return $webPath;
+
+        // Return a path with all forward slashes to avoid having mixed slashes in the URL.
+        return str_replace('\\', '/', $webPath);
     }
 
     protected function getItemFileText($itemData)
