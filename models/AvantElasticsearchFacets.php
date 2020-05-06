@@ -338,7 +338,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         $facetEntryHtml = $this->createFacetEntryHtml($entry, $isRoot);
 
         $facetApplied = $entry['action'] == 'remove' ? true : $facetApplied;
-        $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot, false);
+        $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot);
 
         // Emit hierarchy leaf entries for this facet entry.
         if (isset($entry['leafs']))
