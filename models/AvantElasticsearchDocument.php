@@ -127,7 +127,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $avantVocabulary = new AvantVocabulary();
                 foreach ($fieldTexts as $index => $fieldText)
                 {
-                    $fieldTexts[$index]['text'] = $avantVocabulary->getCommonTerm($fieldText['text']);
+                    $fieldTexts[$index]['text'] = $avantVocabulary->getMappedTermForLocalTerm($elementId, $fieldText['text']);
                 }
             }
             else
