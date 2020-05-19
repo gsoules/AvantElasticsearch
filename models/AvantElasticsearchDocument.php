@@ -112,13 +112,24 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // Determine if certain element values should be translated to common vocabulary equivalents.
         // It is only done for the shared index and only the the Subject and Type elements.
         $commonVocabularyEnabled = plugin_is_active('AvantVocabulary') && $this->index == self::getNameOfSharedIndex();
-        $subjectElementId = $commonVocabularyEnabled ? ItemMetadata::getElementIdForElementName('Subject') : 0;
-        $typeElementId = $commonVocabularyEnabled ? ItemMetadata::getElementIdForElementName('Type') : 0;
+
+        $kindTable = [];
+        if ($commonVocabularyEnabled)
+        {
+            $typeElementId = ItemMetadata::getElementIdForElementName('Type');
+            $subjectElementId = ItemMetadata::getElementIdForElementName('Subject');
+            $placeElementId = ItemMetadata::getElementIdForElementName('Place');
+
+            $kindTable[$typeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_TYPE;
+            $kindTable[$subjectElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_SUBJECT;
+            $kindTable[$placeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_PLACE;
+        }
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
             $originalFieldTexts = $fieldTexts;
-            $useCommonVocabulary = $commonVocabularyEnabled && $elementId == $subjectElementId || $elementId == $typeElementId;
+            $useCommonVocabulary = $commonVocabularyEnabled && array_key_exists($elementId, $kindTable);
+
             if ($useCommonVocabulary)
             {
                 // Translate each of this element's values to their common vocabulary equivalents as though
@@ -127,7 +138,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $avantVocabulary = new AvantVocabulary();
                 foreach ($fieldTexts as $index => $fieldText)
                 {
-                    $fieldTexts[$index]['text'] = $avantVocabulary->getMappedTermForLocalTerm($elementId, $fieldText['text']);
+                    $fieldTexts[$index]['text'] = $avantVocabulary->getCommonTermForLocalTerm($kindTable[$elementId], $fieldText['text']);
                 }
             }
             else
