@@ -644,18 +644,17 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             }
             else
             {
-                if ($partsCount == 3)
+                if ($partsCount >= 3)
                 {
+                    // Limit the hierarchy to three levels by truncating. We used to elide the middle terms when there
+                    // were four or more levels in order to keep the leaf term visible. With that approach,
+                    // 'Vessels, Boat, Sailboat, Sloop, Friendship' became 'Vessels, Boat, Friendship' but that caused
+                    // 'Sailboat' and 'Friendship' to appear at the same level in the facets which was wrong and
+                    // confusing. Now the term becomes 'Vessels, Boat, Sailboat'.
+
                     // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
+                    // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Negative'
                     $leaf .= ",$parts[1],$parts[2]";
-                }
-                else
-                {
-                    if ($partsCount > 3)
-                    {
-                        // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Glass Plate'
-                        $leaf .= ",$parts[1],$lastPart";
-                    }
                 }
             }
         }
