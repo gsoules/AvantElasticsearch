@@ -110,20 +110,10 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $itemFieldTexts = $itemData['field_texts'];
 
         // Determine if certain element values should be translated to common vocabulary equivalents.
-        // It is only done for the shared index and only the the Subject and Type elements.
+        // It is only done for the shared index and only the the Type, Subject, and Place elements.
         $commonVocabularyEnabled = plugin_is_active('AvantVocabulary') && $this->index == self::getNameOfSharedIndex();
 
-        $kindTable = [];
-        if ($commonVocabularyEnabled)
-        {
-            $typeElementId = ItemMetadata::getElementIdForElementName('Type');
-            $subjectElementId = ItemMetadata::getElementIdForElementName('Subject');
-            $placeElementId = ItemMetadata::getElementIdForElementName('Place');
-
-            $kindTable[$typeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_TYPE;
-            $kindTable[$subjectElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_SUBJECT;
-            $kindTable[$placeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_PLACE;
-        }
+        $kindTable = $this->installation['vocabularies']['kinds'];
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {

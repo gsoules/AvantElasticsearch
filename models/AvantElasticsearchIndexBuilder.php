@@ -19,11 +19,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $sqlFilesData;
     protected $sqlItemsData;
     protected $sqlTagsData;
+    protected $vocabularies;
 
     public function __construct()
     {
         parent::__construct();
         $this->avantElasticsearchClient = new AvantElasticsearchClient();
+        $this->vocabularies = $this->createVocabularies();
     }
 
     public function addItemToIndex($item, $excludePrivateFields)
@@ -77,6 +79,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->installation['alias_id'] = CommonConfig::getOptionDataForIdentifierAlias();
         $this->installation['item_path'] = public_url('items/show/');
         $this->installation['files_path'] = public_url('files');
+        $this->installation['vocabularies'] = $this->vocabularies;
 
         $serverUrlHelper = new Zend_View_Helper_ServerUrl;
         $this->installation['server_url'] = $serverUrlHelper->serverUrl();
@@ -220,6 +223,32 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return true;
+    }
+
+    public function createVocabularies()
+    {
+        if (!plugin_is_active('AvantVocabulary'))
+            return null;
+
+        $kindTable = [];
+        $typeElementId = ItemMetadata::getElementIdForElementName('Type');
+        $subjectElementId = ItemMetadata::getElementIdForElementName('Subject');
+        $placeElementId = ItemMetadata::getElementIdForElementName('Place');
+
+        $kindTable[$typeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_TYPE;
+        $kindTable[$subjectElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_SUBJECT;
+        $kindTable[$placeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_PLACE;
+
+        $maps[AvantVocabulary::VOCABULARY_TERM_KIND_TYPE] = null;
+        $maps[AvantVocabulary::VOCABULARY_TERM_KIND_SUBJECT] = null;
+        $maps[AvantVocabulary::VOCABULARY_TERM_KIND_PLACE] = null;
+
+        $vocabularies = [
+            'kinds' => $kindTable,
+            'maps' => $maps
+        ];
+
+        return $vocabularies;
     }
 
     public function deleteItemFromIndex($item, $failedAttemptOk = false)
