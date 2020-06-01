@@ -113,22 +113,36 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // It is only done for the shared index and only the the Type, Subject, and Place elements.
         $commonVocabularyEnabled = plugin_is_active('AvantVocabulary') && $this->index == self::getNameOfSharedIndex();
 
-        $kindTable = $this->installation['vocabularies']['kinds'];
+        $vocabularyKinds = $this->installation['vocabularies']['kinds'];
+        $vocabularyMappings = $this->installation['vocabularies']['mappings'];
 
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
             $originalFieldTexts = $fieldTexts;
-            $useCommonVocabulary = $commonVocabularyEnabled && array_key_exists($elementId, $kindTable);
+            $useCommonVocabulary = $commonVocabularyEnabled && array_key_exists($elementId, $vocabularyKinds);
 
             if ($useCommonVocabulary)
             {
                 // Translate each of this element's values to their common vocabulary equivalents as though
-                // the translations were the original values. This fools the indexing and facet logic into
-                // using the translated values for common facets without affecting the actual element values.
-                $avantVocabulary = new AvantVocabulary();
+                // the translations were the original values. This makes the indexing and facet logic use
+                // the mapped values for common terms without affecting the local element values.
+                $kind = $vocabularyKinds[$elementId];
+                $mappings = $vocabularyMappings[$kind];
                 foreach ($fieldTexts as $index => $fieldText)
                 {
-                    $fieldTexts[$index]['text'] = $avantVocabulary->getCommonTermForLocalTerm($kindTable[$elementId], $fieldText['text']);
+                    $commonTerm = '';
+                    $localTerm = $fieldText['text'];
+                    if (array_key_exists($localTerm, $mappings))
+                    {
+                        $commonTerm = $mappings[$localTerm];
+                    }
+                    else
+                    {
+                        // This should never happen, but for now, detect if it does.
+                        $commonTerm = 'UNTRACKED';
+                    }
+                    $commonTerm = $commonTerm ? $commonTerm : 'UNMAPPED';
+                    $fieldTexts[$index]['text'] = $commonTerm;
                 }
             }
             else

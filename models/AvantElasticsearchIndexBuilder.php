@@ -227,25 +227,34 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function createVocabularies()
     {
+        // This method creates arrays that provide fast access to vocabulary data so that code that needs
+        // that data does not have to perform expensive SQL queries to get it. All the work is done here
+        // just once when AvantElasticsearcIndexBuilder is constructed.
+
         if (!plugin_is_active('AvantVocabulary'))
             return null;
 
-        $kindTable = [];
-        $typeElementId = ItemMetadata::getElementIdForElementName('Type');
-        $subjectElementId = ItemMetadata::getElementIdForElementName('Subject');
-        $placeElementId = ItemMetadata::getElementIdForElementName('Place');
+        // Get a table that associates vocabulary kinds with element Ids.
+        $kindTable = AvantVocabulary::getVocabularyKinds();
 
-        $kindTable[$typeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_TYPE;
-        $kindTable[$subjectElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_SUBJECT;
-        $kindTable[$placeElementId] = AvantVocabulary::VOCABULARY_TERM_KIND_PLACE;
+        // Query the database to get an array of local_term / common_term pairs for each kind.
+        foreach ($kindTable as $kind)
+        {
+            $pairs[$kind] = get_db()->getTable('VocabularyLocalTerms')->getLocalToCommonTermMap($kind);
+        }
 
-        $maps[AvantVocabulary::VOCABULARY_TERM_KIND_TYPE] = null;
-        $maps[AvantVocabulary::VOCABULARY_TERM_KIND_SUBJECT] = null;
-        $maps[AvantVocabulary::VOCABULARY_TERM_KIND_PLACE] = null;
+        // Convert the pairs into an array for each kind where the index is the local term and the value is the common term.
+        foreach ($pairs as $kind => $mappingsForKind)
+        {
+            foreach ($mappingsForKind as $mapping)
+            {
+                $mappings[$kind][$mapping['local_term']] = $mapping['common_term'];
+            }
+        }
 
         $vocabularies = [
             'kinds' => $kindTable,
-            'maps' => $maps
+            'mappings' => $mappings
         ];
 
         return $vocabularies;
