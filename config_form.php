@@ -22,7 +22,8 @@ if ($avantElasticserachClient->ready())
 }
 else
 {
-    $healthReport = __('Unable to create AvantElasticsearchClient');
+    if (!empty($host) && !empty($region) && !empty($key) && !empty($secret))
+        $healthReport = __('Unable to create AvantElasticsearchClient');
 }
 $healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '"';
 
