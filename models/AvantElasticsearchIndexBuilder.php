@@ -244,11 +244,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         // Convert the pairs into an array for each kind where the index is the local term and the value is the common term.
+        // If there is no local term, the common term is used for the local term.
         foreach ($pairs as $kind => $mappingsForKind)
         {
             foreach ($mappingsForKind as $mapping)
             {
-                $mappings[$kind][$mapping['local_term']] = $mapping['common_term'];
+                $commonTerm = $mapping['common_term'];
+                $localTerm = $mapping['local_term'] ? $mapping['local_term'] : $commonTerm;
+                $mappings[$kind][$localTerm] = $commonTerm;
             }
         }
 
