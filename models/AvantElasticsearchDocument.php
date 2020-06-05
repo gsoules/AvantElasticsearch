@@ -36,7 +36,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $localElementData = [];
     protected $privateElementData = [];
     protected $sortData = [];
-    protected $facetData = [];
+    protected $facetDataCommon = [];
+    protected $facetDataLocal = [];
     protected $htmlFields = [];
 
     public function __construct($indexName, $documentId)
@@ -70,7 +71,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->setField('common', $this->commonElementData);
         $this->setField('local', $this->localElementData);
         $this->setField('sort', $this->sortData);
-        $this->setField('facet', $this->facetData);
+        $this->setField('facet-common', $this->facetDataCommon);
+        $this->setField('facet-local', $this->facetDataLocal);
 
         if (!$excludePrivateFields)
             $this->setField('private', $this->privateElementData);
@@ -109,9 +111,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         $itemFieldTexts = $itemData['field_texts'];
 
-        // Determine if certain element values should be translated to common vocabulary equivalents.
-        // It is only done for the shared index and only the the Type, Subject, and Place elements.
-        $commonVocabularyEnabled = plugin_is_active('AvantVocabulary') && $this->index == self::getNameOfSharedIndex();
+        $commonVocabularyEnabled = plugin_is_active('AvantVocabulary');
 
         $vocabularyKinds = $this->installation['vocabularies']['kinds'];
         $vocabularyMappings = $this->installation['vocabularies']['mappings'];
@@ -180,7 +180,34 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createFacetDataForField($elasticsearchFieldName, $fieldTexts)
+    protected function createFacetData($facetValue, $elasticsearchFieldName, $facetData)
+    {
+        if (is_array($facetValue))
+        {
+            // When the value is an array, the components are always root and leaf.
+            // Add the root and leaf values to the facets array.
+            $rootName = $facetValue['root'];
+            $leafName = $facetValue['leaf'];
+            $facetData["$elasticsearchFieldName.root"][] = $rootName;
+            $facetData["$elasticsearchFieldName.leaf"][] = $leafName;
+
+            // If the leaf has a grandchild, add the root and first child name to the facets array.
+            // This will allow the user to use facets to filter by root, by first child, or by leaf.
+            $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
+            if ($rootAndFirstChild != $leafName)
+            {
+                $facetData["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
+            }
+        }
+        else
+        {
+            $facetData[$elasticsearchFieldName][] = $facetValue;
+        }
+
+        return $facetData;
+    }
+
+    protected function createFacetDataForField($elasticsearchFieldName, $fieldTextsCommon, $fieldTextsLocal = null)
     {
         if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
         {
@@ -188,32 +215,21 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             return;
         }
 
-        $facetValuesForElement = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts);
+        if (!$fieldTextsLocal)
+            $fieldTextsLocal = $fieldTextsCommon;
 
-        // Get each of the element's values either as text, or as root/leaf pairs.
-        foreach ($facetValuesForElement as $facetValue)
+        // Create the common facets.
+        $facetValuesForElementCommon = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTextsCommon);
+        foreach ($facetValuesForElementCommon as $facetValue)
         {
-            if (is_array($facetValue))
-            {
-                // When the value is an array, the components are always root and leaf.
-                // Add the root and leaf values to the facets array.
-                $rootName = $facetValue['root'];
-                $leafName = $facetValue['leaf'];
-                $this->facetData["$elasticsearchFieldName.root"][] = $rootName;
-                $this->facetData["$elasticsearchFieldName.leaf"][] = $leafName;
+            $this->facetDataCommon = $this->createFacetData($facetValue, $elasticsearchFieldName, $this->facetDataCommon);
+        }
 
-                // If the leaf has a grandchild, add the root and first child name to the facets array.
-                // This will allow the user to use facets to filter by root, by first child, or by leaf.
-                $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
-                if ($rootAndFirstChild != $leafName)
-                {
-                    $this->facetData["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
-                }
-            }
-            else
-            {
-                $this->facetData[$elasticsearchFieldName][] = $facetValue;
-            }
+        // Create the local facets.
+        $facetValuesForElementLocal = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTextsLocal);
+        foreach ($facetValuesForElementLocal as $facetValue)
+        {
+            $this->facetDataLocal = $this->createFacetData($facetValue, $elasticsearchFieldName, $this->facetDataLocal);
         }
     }
 
@@ -280,7 +296,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createHtmlData($fieldName, $fieldTexts);
         $this->createIntegerElementSortData($fieldName, $fieldTexts[0]['text']);
         $this->createAddressElementSortData($fieldName, $fieldTexts);
-        $this->createFacetDataForField($fieldName, $fieldTexts);
+        $this->createFacetDataForField($fieldName, $fieldTexts, $originalFieldTexts);
     }
 
     protected function createHtmlData($elasticsearchFieldName, $fieldTexts)
@@ -339,28 +355,26 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
 
         // Create a field-text to represent an unspecified date, place, subject, or type.
+        $blankFieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
+
         if (!$this->itemHasDate)
         {
-            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
-            $this->createFacetDataForField('date', $fieldTexts);
+            $this->createFacetDataForField('date', $blankFieldTexts);
         }
 
         if (!$this->itemHasPlace)
         {
-            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
-            $this->createFacetDataForField('place', $fieldTexts);
+            $this->createFacetDataForField('place', $blankFieldTexts);
         }
 
         if (!$this->itemHasSubject)
         {
-            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
-            $this->createFacetDataForField('subject', $fieldTexts);
+            $this->createFacetDataForField('subject', $blankFieldTexts);
         }
 
         if (!$this->itemHasType)
         {
-            $fieldTexts = $this->createFieldTexts(BLANK_FIELD_TEXT);
-            $this->createFacetDataForField('type', $fieldTexts);
+            $this->createFacetDataForField('type', $blankFieldTexts);
         }
     }
 
@@ -392,7 +406,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $tagsData = $itemData['tags_data'];
         if (!empty($tagsData))
         {
-            $this->facetData['tag'] = $tagsData;
+            $this->facetDataLocal['tag'] = $tagsData;
             $this->setField('tags', $tagsData);
         }
     }

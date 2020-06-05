@@ -503,12 +503,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemTagsData;
     }
 
-    protected function filterBatchDocuments($isSharedInde)
+    protected function filterBatchDocuments($isSharedIndex, $commonFieldNames)
     {
-        if (!$isSharedInde)
-            return;
-
-        // This method is only used when creating a shared index. It:
+        // When used to create a shared index, this method:
         // - Removes all non-public items from the batch of documents
         // - Removes private elements from each document
         //
@@ -520,32 +517,51 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // This export once, import twice approach makes it possible to create/update both the local and shared indexes
         // from the same export file (versus having one export file for the local index and another for the shared index).
 
-        $commonFieldNames = $this->getFieldNamesOfCommonElements();
-
         foreach($this->batchDocuments as $index => $document)
         {
-            if (!$document->body->item->public)
+            if ($isSharedIndex)
             {
-                // Remove the document for this non-public item.
-                unset($this->batchDocuments[$index]);
-                continue;
-            }
-
-            // Remove sorting for all but the common fields.
-            foreach ($document->body->sort as $fieldName => $sortValue)
-            {
-                if (!in_array($fieldName, $commonFieldNames))
+                if (!$document['body']['item']['public'])
                 {
-                    unset($document->body->sort->$fieldName);
+                    // Remove the document for this non-public item.
+                    unset($this->batchDocuments[$index]);
+                    continue;
                 }
+
+                // Remove sorting for all but the common fields.
+                foreach ($document['body']['sort'] as $fieldName => $sortValue)
+                {
+                    if (!in_array($fieldName, $commonFieldNames))
+                    {
+                        unset($document['body']['sort'][$fieldName]);
+                    }
+                }
+
+                // Remove all the private fields.
+                unset($document['body']['private']);
             }
 
-            // Remove all the private fields.
-            unset($document->body->private);
+            // Set the body->facet to the appropriate facet.
+            if ($isSharedIndex)
+            {
+                $document['body']['facet'] = $document['body']['facet-common'];
+            }
+            else
+            {
+                $document['body']['facet'] = $document['body']['facet-local'];
+            }
+            unset($document['body']['facet-common']);
+            unset($document['body']['facet-local']);
+
+            // Convert the array into an object.
+            $this->batchDocuments[$index] = (object)$document;
         }
 
-        // Reindex the array to remove gaps.
-        $this->batchDocuments = array_values($this->batchDocuments);
+        if ($isSharedIndex)
+        {
+            // Reindex the array to remove gaps.
+            $this->batchDocuments = array_values($this->batchDocuments);
+        }
     }
 
     protected function freeSqlData($itemId, $index)
@@ -788,11 +804,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
         }
 
-        // Read the index file into an array of AvantElasticsearchDocument objects.
-        $this->batchDocuments = json_decode(file_get_contents($dataFileName), false);
+        // Read the index file into an array of AvantElasticsearchDocument arrays.
+        $this->batchDocuments = json_decode(file_get_contents($dataFileName), true);
 
         // Perform any necessary filtering on non-shared, non-public, or private data.
-        $this->filterBatchDocuments($isSharedIndex);
+        // Also choose either the common or local facet.
+        // Convert the AvantElasticsearchDocument arrays into objects.
+        $commonFieldNames = $this->getFieldNamesOfCommonElements();
+        $this->filterBatchDocuments($isSharedIndex, $commonFieldNames);
 
         $this->batchDocumentsCount = count($this->batchDocuments);
 
