@@ -380,9 +380,26 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 }
 
                 // Record this leaf's entry, level, and action.
+                $level = $isGrandchild ? 3 : 2;
                 $leafEntryListItems[$index]['entry'] = $leafEntry;
-                $leafEntryListItems[$index]['level'] = $isGrandchild ? 3 : 2;
+                $leafEntryListItems[$index]['level'] = $level;
                 $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+
+                if ($level == 3)
+                {
+                    $name = $leafEntry['name'];
+                    $pos = strpos($leafEntry['name'], ',');
+                    if ($pos !== false)
+                    {
+                        $isGrandchild = true;
+                        $leafEntry['name'] = substr($name, $pos + 1);
+
+                        $level = 4;
+                        $leafEntryListItems[$index]['entry'] = $leafEntry;
+                        $leafEntryListItems[$index]['level'] = $level;
+                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                    }
+                }
             }
 
             // Check for the special case where the user applied a child facet such as 'Image,Photograph'
@@ -650,26 +667,37 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             $leaf = $root;
 
-            if ($partsCount == 2)
+            if ($partsCount >= 2)
             {
-                // Example: 'Image,Photograph' => 'Image,Photograph'
-                $leaf .= ",$parts[1]";
-            }
-            else
-            {
-                if ($partsCount >= 3)
+                foreach ($parts as $index => $part)
                 {
-                    // Limit the hierarchy to three levels by truncating. We used to elide the middle terms when there
-                    // were four or more levels in order to keep the leaf term visible. With that approach,
-                    // 'Vessels, Boat, Sailboat, Sloop, Friendship' became 'Vessels, Boat, Friendship' but that caused
-                    // 'Sailboat' and 'Friendship' to appear at the same level in the facets which was wrong and
-                    // confusing. Now the term becomes 'Vessels, Boat, Sailboat'.
+                    if ($index == 0)
+                        continue;
 
-                    // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
-                    // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Negative'
-                    $leaf .= ",$parts[1],$parts[2]";
+                    $leaf .= ",$part";
                 }
             }
+
+//            if ($partsCount == 2)
+//            {
+//                // Example: 'Image,Photograph' => 'Image,Photograph'
+//                $leaf .= ",$parts[1]";
+//            }
+//            else
+//            {
+//                if ($partsCount >= 3)
+//                {
+//                    // Limit the hierarchy to three levels by truncating. We used to elide the middle terms when there
+//                    // were four or more levels in order to keep the leaf term visible. With that approach,
+//                    // 'Vessels, Boat, Sailboat, Sloop, Friendship' became 'Vessels, Boat, Friendship' but that caused
+//                    // 'Sailboat' and 'Friendship' to appear at the same level in the facets which was wrong and
+//                    // confusing. Now the term becomes 'Vessels, Boat, Sailboat'.
+//
+//                    // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
+//                    // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Negative'
+//                    $leaf .= ",$parts[1],$parts[2]";
+//                }
+//            }
         }
         else
         {
@@ -827,20 +855,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         }
 
         return $filterBarFacets;
-    }
-
-    public function getRootAndFirstChildNameFromLeafName($leafName)
-    {
-        // Get the root and its first child from the leaf name.
-        $rootName = $this->getRootNameFromLeafName($leafName);
-        $firstChildName = '';
-        $remainder = substr($leafName, strlen($rootName) + 1);
-        if (strlen($remainder) > 0)
-        {
-            $firstChildName = ',' . $this->getRootNameFromLeafName($remainder);
-        }
-
-        return $rootName . $firstChildName;
     }
 
     protected function getRootNameFromLeafName($leafName)

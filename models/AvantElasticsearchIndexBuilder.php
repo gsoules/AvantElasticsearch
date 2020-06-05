@@ -756,7 +756,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         if (!$this->fetchDataFromSqlDatabase())
             return;
 
-        $itemsCount = $limit == 0 ? count($this->sqlItemsData) : $limit;
+        $maxCount = count($this->sqlItemsData);
+        $itemsCount = $limit == 0 ? $maxCount : min($limit, $maxCount);
+
         $this->json = '';
         $this->fileStats = array();
         $identifierElementId = ItemMetadata::getIdentifierElementId();

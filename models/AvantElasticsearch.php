@@ -9,7 +9,7 @@ use Elasticsearch\ClientBuilder;
 // without having to reindex. Doing this also makes it easy for administrators to identify missing data.
 define('BLANK_FIELD_TEXT', '[blank]');
 define('BLANK_FIELD_SUBSTITUTE', 'none');
-define('UNMAPPED_FIELD_TEXT', 'UNMAPPED');
+define('UNMAPPED_FIELD_TEXT', '[unmapped]');
 
 // Used for reporting statistics.
 define('MB_BYTES', 1024 * 1024);

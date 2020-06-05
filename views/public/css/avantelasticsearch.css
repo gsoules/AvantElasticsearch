@@ -95,7 +95,8 @@
 .facet-entry-1-root,
 .facet-entry-1-leaf,
 .facet-entry-2,
-.facet-entry-3 {
+.facet-entry-3,
+.facet-entry-4 {
     font-size: 13px;
     padding-top: 2px;
     color: #777777;
@@ -116,6 +117,10 @@
 
 .facet-entry-3 {
     padding-left: 31px;
+}
+
+.facet-entry-4 {
+    padding-left: 42px;
 }
 
 #facet-contributor > li {

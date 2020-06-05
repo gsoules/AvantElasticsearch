@@ -128,6 +128,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // the mapped values for common terms without affecting the local element values.
                 $kind = $vocabularyKinds[$elementId];
                 $mappings = $vocabularyMappings[$kind];
+                $seenUnmapped = false;
                 foreach ($fieldTexts as $index => $fieldText)
                 {
                     $localTerm = $fieldText['text'];
@@ -141,7 +142,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                         $commonTerm = 'UNTRACKED';
                     }
                     $commonTerm = $commonTerm ? $commonTerm : UNMAPPED_FIELD_TEXT;
-                    $fieldTexts[$index]['text'] = $commonTerm;
+                    if ($commonTerm == UNMAPPED_FIELD_TEXT)
+                        if ($seenUnmapped)
+                            continue;
+                        else
+                            $seenUnmapped = true;
+                     $fieldTexts[$index]['text'] = $commonTerm;
                 }
             }
             else
@@ -187,16 +193,41 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Add the root and leaf values to the facets array.
             $rootName = $facetValue['root'];
             $leafName = $facetValue['leaf'];
-            $facetData["$elasticsearchFieldName.root"][] = $rootName;
-            $facetData["$elasticsearchFieldName.leaf"][] = $leafName;
+
+            if (isset($facetData["$elasticsearchFieldName.root"]) && in_array($rootName, $facetData["$elasticsearchFieldName.root"]))
+                $x = 1;
+            else
+                $facetData["$elasticsearchFieldName.root"][] = $rootName;
+
+            if (isset($facetData["$elasticsearchFieldName.leaf"]) && in_array($leafName, $facetData["$elasticsearchFieldName.leaf"]))
+                $x = 2;
+            else
+               $facetData["$elasticsearchFieldName.leaf"][] = $leafName;
+
+            $parts = array_map('trim', explode(',', $leafName));
+            $count = count($parts);
+            if ($count > 2)
+            {
+                $partial = "$parts[0],$parts[1]";
+                $facetData["$elasticsearchFieldName.leaf"][] = $partial;
+                foreach ($parts as $index => $part)
+                {
+                    if ($index < 2)
+                        continue;
+                    if ($index == $count - 1)
+                        break;
+                    $partial .= ",$part";
+                    $facetData["$elasticsearchFieldName.leaf"][] = $partial;
+                }
+            }
 
             // If the leaf has a grandchild, add the root and first child name to the facets array.
             // This will allow the user to use facets to filter by root, by first child, or by leaf.
-            $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
-            if ($rootAndFirstChild != $leafName)
-            {
-                $facetData["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
-            }
+//            $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
+//            if ($rootAndFirstChild != $leafName)
+//            {
+//                $facetData["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
+//            }
         }
         else
         {
@@ -205,6 +236,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         return $facetData;
     }
+
+//    public function getRootAndFirstChildNameFromLeafName($leafName)
+//    {
+//        // Get the root and its first child from the leaf name.
+//        $rootName = $this->getRootNameFromLeafName($leafName);
+//        $firstChildName = '';
+//        $remainder = substr($leafName, strlen($rootName) + 1);
+//        if (strlen($remainder) > 0)
+//        {
+//            $firstChildName = ',' . $this->getRootNameFromLeafName($remainder);
+//        }
+//
+//        return $rootName . $firstChildName;
+//    }
 
     protected function createFacetDataForField($elasticsearchFieldName, $fieldTextsCommon, $fieldTextsLocal = null)
     {
