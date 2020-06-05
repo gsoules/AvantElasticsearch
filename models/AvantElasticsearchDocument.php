@@ -128,7 +128,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // the mapped values for common terms without affecting the local element values.
                 $kind = $vocabularyKinds[$elementId];
                 $mappings = $vocabularyMappings[$kind];
-                $seenUnmapped = false;
                 foreach ($fieldTexts as $index => $fieldText)
                 {
                     $localTerm = $fieldText['text'];
@@ -141,13 +140,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                         // This should never happen, but for now, detect if it does.
                         $commonTerm = 'UNTRACKED';
                     }
-                    $commonTerm = $commonTerm ? $commonTerm : UNMAPPED_FIELD_TEXT;
-                    if ($commonTerm == UNMAPPED_FIELD_TEXT)
-                        if ($seenUnmapped)
-                            continue;
-                        else
-                            $seenUnmapped = true;
-                     $fieldTexts[$index]['text'] = $commonTerm;
+                    $commonTerm = $commonTerm ? $commonTerm : $localTerm;
+                    $fieldTexts[$index]['text'] = $commonTerm;
                 }
             }
             else
@@ -192,42 +186,35 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // When the value is an array, the components are always root and leaf.
             // Add the root and leaf values to the facets array.
             $rootName = $facetValue['root'];
+            $rootIndex = "$elasticsearchFieldName.root";
             $leafName = $facetValue['leaf'];
+            $leafIndex = "$elasticsearchFieldName.leaf";
 
-            if (isset($facetData["$elasticsearchFieldName.root"]) && in_array($rootName, $facetData["$elasticsearchFieldName.root"]))
-                $x = 1;
-            else
-                $facetData["$elasticsearchFieldName.root"][] = $rootName;
+            if (!isset($facetData[$rootIndex]) || !in_array($rootName, $facetData[$rootIndex]))
+                $facetData[$rootIndex][] = $rootName;
 
-            if (isset($facetData["$elasticsearchFieldName.leaf"]) && in_array($leafName, $facetData["$elasticsearchFieldName.leaf"]))
-                $x = 2;
-            else
-               $facetData["$elasticsearchFieldName.leaf"][] = $leafName;
+            if (!isset($facetData[$leafIndex]) || !in_array($leafName, $facetData[$leafIndex]))
+               $facetData[$leafIndex][] = $leafName;
 
+            // Now add intermediate portions of the hierarchy. For example, if the root is 'Object' and the leaf is
+            // 'Object,Recreational,Gear,Football' then add 'Object,Recreational' and 'Object,Recreational,Gear'
+            // so that every level of the hierarchy has its own facet that can be searched.
             $parts = array_map('trim', explode(',', $leafName));
             $count = count($parts);
             if ($count > 2)
             {
-                $partial = "$parts[0],$parts[1]";
-                $facetData["$elasticsearchFieldName.leaf"][] = $partial;
+                $partial = $parts[0];
                 foreach ($parts as $index => $part)
                 {
-                    if ($index < 2)
+                    if ($index < 1)
                         continue;
                     if ($index == $count - 1)
                         break;
                     $partial .= ",$part";
-                    $facetData["$elasticsearchFieldName.leaf"][] = $partial;
+                    if (!in_array($partial, $facetData[$leafIndex]))
+                        $facetData[$leafIndex][] = $partial;
                 }
             }
-
-            // If the leaf has a grandchild, add the root and first child name to the facets array.
-            // This will allow the user to use facets to filter by root, by first child, or by leaf.
-//            $rootAndFirstChild = $this->avantElasticsearchFacets->getRootAndFirstChildNameFromLeafName($leafName);
-//            if ($rootAndFirstChild != $leafName)
-//            {
-//                $facetData["$elasticsearchFieldName.leaf"][] = $rootAndFirstChild;
-//            }
         }
         else
         {
@@ -236,20 +223,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         return $facetData;
     }
-
-//    public function getRootAndFirstChildNameFromLeafName($leafName)
-//    {
-//        // Get the root and its first child from the leaf name.
-//        $rootName = $this->getRootNameFromLeafName($leafName);
-//        $firstChildName = '';
-//        $remainder = substr($leafName, strlen($rootName) + 1);
-//        if (strlen($remainder) > 0)
-//        {
-//            $firstChildName = ',' . $this->getRootNameFromLeafName($remainder);
-//        }
-//
-//        return $rootName . $firstChildName;
-//    }
 
     protected function createFacetDataForField($elasticsearchFieldName, $fieldTextsCommon, $fieldTextsLocal = null)
     {
