@@ -428,6 +428,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
+    public static function extractTextFromPdf($filepath)
+    {
+        $path = escapeshellarg($filepath);
+
+        // Attempt to extract the PDF file's text.
+        //   The -nopgbrk option tells pdftotext not to emit formfeeds (\f) for page breaks.
+        //   The trailing '-' at the end of the command says to emit the text to stdout instead of to a text file.
+        $command = "pdftotext -enc UTF-8 -nopgbrk $path -";
+        $pdfText = shell_exec($command);
+
+        return $pdfText;
+    }
+
     protected function getCoverImageUrl($itemData, $thumbnail)
     {
         $itemImageUrl = '';
@@ -440,19 +453,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
 
         return $itemImageUrl;
-    }
-
-    public static function extractTextFromPdf($filepath)
-    {
-        $path = escapeshellarg($filepath);
-
-        // Attempt to extract the PDF file's text.
-        //   The -nopgbrk option tells pdftotext not to emit formfeeds (\f) for page breaks.
-        //   The trailing '-' at the end of the command says to emit the text to stdout instead of to a text file.
-        $command = "pdftotext -enc UTF-8 -nopgbrk $path -";
-        $pdfText = shell_exec($command);
-
-        return $pdfText;
     }
 
     protected function getFileCounts($itemData)
@@ -719,6 +719,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         $this->avantElasticsearchFacets = $avantElasticsearchFacets;
         $this->facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
+    }
+
+    public function setFacetData($isSharedIndex)
+    {
+        unset($this->body['facet-common']);
+        unset($this->body['facet-local']);
+        return $this->setField('facet', $isSharedIndex ? $this->facetDataCommon : $this->facetDataLocal);
     }
 
     public function setField($key, $value)

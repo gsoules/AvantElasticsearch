@@ -28,7 +28,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->vocabularies = $this->createVocabularies();
     }
 
-    public function addItemToIndex($item, $excludePrivateFields)
+    public function addItemToIndex($item, $isSharedIndex, $excludePrivateFields)
     {
         // This method adds a new item to the index or updates an existing item in the index.
         $this->cacheInstallationParameters();
@@ -44,6 +44,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $item->public;
         $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
+
+        $document->setFacetData($isSharedIndex);
 
         $params = [
             'id' => $document->id,

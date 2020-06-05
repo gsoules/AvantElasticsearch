@@ -384,7 +384,7 @@ class AvantElasticsearch
             {
                 // Save or add this public item to the shared index.
                 $excludePrivateFields = true;
-                $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
+                $avantElasticsearchIndexBuilder->addItemToIndex($item, true, $excludePrivateFields);
             }
             else
             {
@@ -405,7 +405,7 @@ class AvantElasticsearch
             // Save or add the item to the local index. Both public and non-public items get saved/added.
             $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfLocalIndex());
             $excludePrivateFields = false;
-            $avantElasticsearchIndexBuilder->addItemToIndex($item, $excludePrivateFields);
+            $avantElasticsearchIndexBuilder->addItemToIndex($item, false, $excludePrivateFields);
         }
     }
 
