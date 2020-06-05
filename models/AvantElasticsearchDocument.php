@@ -690,11 +690,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
     }
 
-    public function setElementsUsedByThisInstallation($elements)
-    {
-        $this->elementsUsedByThisInstallation = $elements;
-    }
-
     public function setField($key, $value)
     {
         $this->body[$key] = $value;
