@@ -49,6 +49,14 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $html = '';
 
+        if ($facetText == UNMAPPED_FIELD_TEXT)
+        {
+            // This is a local facet value that is not mapped to a common facet. Don't show it.
+            // If we decide to to show unmapped fields, or need to see them for debugging, comment
+            // out the return and possibly change UNMAPPED_FIELD_TEXT to something more friendly.
+            return $html;
+        }
+
         if ($action == 'add')
         {
             $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetText, $rootPath, $isRoot);
@@ -336,6 +344,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $isRoot = $facetDefinition['is_root_hierarchy'];
         $facetEntryHtml = $this->createFacetEntryHtml($entry, $isRoot);
+        if (empty($facetEntryHtml))
+        {
+            // This should only happen for an unmapped facet in a shared index.
+            return $html;
+        }
 
         $facetApplied = $entry['action'] == 'remove' ? true : $facetApplied;
         $html .= $this->emitHtmlForFacetEntryListItem($facetEntryHtml, $entry['action'], 1, $isRoot);

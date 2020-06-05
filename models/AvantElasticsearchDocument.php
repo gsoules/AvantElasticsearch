@@ -130,7 +130,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $mappings = $vocabularyMappings[$kind];
                 foreach ($fieldTexts as $index => $fieldText)
                 {
-                    $commonTerm = '';
                     $localTerm = $fieldText['text'];
                     if (array_key_exists($localTerm, $mappings))
                     {
@@ -141,7 +140,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                         // This should never happen, but for now, detect if it does.
                         $commonTerm = 'UNTRACKED';
                     }
-                    $commonTerm = $commonTerm ? $commonTerm : 'UNMAPPED';
+                    $commonTerm = $commonTerm ? $commonTerm : UNMAPPED_FIELD_TEXT;
                     $fieldTexts[$index]['text'] = $commonTerm;
                 }
             }
