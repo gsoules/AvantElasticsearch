@@ -308,24 +308,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
     public function editQueryStringToRemoveFacetArg($queryString, $facetToRemoveGroup, $facetToRemoveValue, $isRoot)
     {
         // Construct the name/value of the arg to be remove.
-        $kind = $isRoot ? self::FACET_KIND_ROOT : self::FACET_KIND_LEAF;
-        $facetArg = "{$kind}_{$facetToRemoveGroup}[]";
-        $argToRemove = "$facetArg=$facetToRemoveValue";
+        $argToRemove = "{$facetToRemoveGroup}[]={$facetToRemoveValue}";
 
+        // Looo over each arg in the query string.
         $args = explode('&', $queryString);
-
         foreach ($args as $index => $rawArg)
         {
             // Remove any %# encoding from the arg so it can be compared to the arg to be removed.
             $arg = urldecode($rawArg);
 
-            // Remove the arg to remove and any of its child args. The child args have $argToRemove as a prefix.
-            // It works this way to allow the user to remove a parent facet and all its child facets without
-            // having to remove the children individually. This lets you drill down into a hierarchy, but then
-            // come back up anywhere in the middle without having to go up one level at a time.
+            // Remove the 'root_' or 'leaf_' prefix from the arg.
+            $arg = substr($arg, 5);
+
+            // Remove the arg to be remove and all of its child args. The child args have $argToRemove as a prefix.
+            // This lets you drill down into a hierarchy, but then come back up anywhere in the middle without
+            // having to go up one level at a time.
             $prefixLength = strlen($argToRemove);
-            $argStartsWithArgToRemove = substr($arg, 0, $prefixLength) == $argToRemove;
-            if ($argStartsWithArgToRemove)
+            $argIsChildOfArgToRemove = substr($arg, 0, $prefixLength) == $argToRemove;
+            if ($argIsChildOfArgToRemove)
             {
                 unset($args[$index]);
             }
@@ -739,7 +739,19 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $this->queryStringWithApplieFacets = $this->createQueryStringWithFacets($query);
 
-        // Add all the leaf facets to the filter bar facets.
+        // Add root facets to the filter bar.
+        foreach ($appliedRootFacets as $rootFacetGroup => $rootFacetNames)
+        {
+            foreach ($rootFacetNames as $rootFacetName)
+            {
+                $groupName = $this->facetDefinitions[$rootFacetGroup]['name'];
+                $resetUrl = $this->getUrlForRemoveFilter($rootFacetGroup, $rootFacetName, true);
+                $filterBarFacets[$groupName]['reset-url'][] = $resetUrl;
+                $filterBarFacets[$groupName]['reset-text'][] = "$groupName: $rootFacetName";
+            }
+        }
+
+        // Add leaf facets to the filter bar.
         foreach ($appliedLeafFacets as $leafFacetGroup => $leafFacetNames)
         {
             foreach ($leafFacetNames as $index => $leafFacetName)
@@ -752,38 +764,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 $filterBarFacets[$groupName]['reset-url'][] = $resetUrl;
                 $filterBarFacets[$groupName]['reset-text'][] = "$groupName: $facetToRemoveName";
                 $filterBarFacets[$groupName]['root-name'][] = $parts[0];
-            }
-        }
-
-        // Add only those root facets that don't have one of their leafs applied.
-        foreach ($appliedRootFacets as $rootFacetGroup => $rootFacetNames)
-        {
-            foreach ($rootFacetNames as $rootFacetName)
-            {
-                $groupName = $this->facetDefinitions[$rootFacetGroup]['name'];
-                $skipThisRoot = false;
-
-                // Check to see if this root is the root of a leaf that's applied
-                if (isset($filterBarFacets[$groupName]['root-name']))
-                {
-                    foreach ($filterBarFacets[$groupName]['root-name'] as $leafRootName)
-                    {
-                        if ($leafRootName == $rootFacetName)
-                        {
-                            // One of this root's leafs is applied so ignore this root.
-                            $skipThisRoot = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!$skipThisRoot)
-                {
-                    // It's okay to add this root since none of its leaf facets are applied.
-                    $resetUrl = $this->getUrlForRemoveFilter($rootFacetGroup, $rootFacetName, true);
-                    $filterBarFacets[$groupName]['reset-url'][] = $resetUrl;
-                    $filterBarFacets[$groupName]['reset-text'][] = "$groupName: $rootFacetName";
-                }
             }
         }
 
@@ -887,14 +867,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
                         if ($leafIsApplied)
                         {
-                            // Since this leaf facet is applied, don't show the remove-X for the root facet. This is to
-                            // avoid the confusion of allowing the user to remove the root facet while the search results
-                            // are still limited by the leaf facet which would have no effect because the leaf facet is
-                            // more restrictive than the root facet. By disabling the root's remove=X, the user must
-                            // first 'undo' the application of the leaf facet which will then restore the remove-X for
-                            // the root facet.
                             $actionKind = 'remove';
-                            $this->facetsTable[$rootFacetGroup][$facetIndex]['action'] = 'none';
                         }
                         else
                         {
