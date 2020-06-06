@@ -307,6 +307,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
     public function editQueryStringToRemoveFacetArg($queryString, $facetToRemoveGroup, $facetToRemoveValue, $isRoot)
     {
+        // Construct the name/value of the arg to be remove.
+        $kind = $isRoot ? self::FACET_KIND_ROOT : self::FACET_KIND_LEAF;
+        $facetArg = "{$kind}_{$facetToRemoveGroup}[]";
+        $argToRemove = "$facetArg=$facetToRemoveValue";
+
         $args = explode('&', $queryString);
 
         foreach ($args as $index => $rawArg)
@@ -314,15 +319,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             // Remove any %# encoding from the arg so it can be compared to the arg to be removed.
             $arg = urldecode($rawArg);
 
-            // Construct the name/value of the arg to be remove.
-            $kind = $isRoot ? self::FACET_KIND_ROOT : self::FACET_KIND_LEAF;
-            $facetArg = "{$kind}_{$facetToRemoveGroup}[]";
-            $argToRemove = "$facetArg=$facetToRemoveValue";
-
-            if ($arg == $argToRemove)
+            // Remove the arg to remove and any of its child args. The child args have $argToRemove as a prefix.
+            // It works this way to allow the user to remove a parent facet and all its child facets without
+            // having to remove the children individually. This lets you drill down into a hierarchy, but then
+            // come back up anywhere in the middle without having to go up one level at a time.
+            $prefixLength = strlen($argToRemove);
+            $argStartsWithArgToRemove = substr($arg, 0, $prefixLength) == $argToRemove;
+            if ($argStartsWithArgToRemove)
             {
                 unset($args[$index]);
-                break;
             }
         }
 
@@ -384,21 +389,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $leafEntryListItems[$index]['action'] = $leafEntry['action'];
                 }
             }
-//
-//            // Check for the special case where the user applied a child facet such as 'Image,Photograph'
-//            // and then applied a grandchild facet like 'Glass Plate'. In this case, don't show a remove-X
-//            // for the child facet, only for the grandchild.
-//            if (count($leafEntryListItems) == 2)
-//            {
-//                if (isset($leafEntryListItems[0]) && $leafEntryListItems[0]['level'] == 2 && $leafEntryListItems[1]['level'] == 3)
-//                {
-//                    if ($leafEntryListItems[0]['action'] == 'remove')
-//                    {
-//                        $leafEntryListItems[0]['action'] = 'none';
-//                        $leafEntryListItems[0]['entry']['action'] = 'none';
-//                    }
-//                }
-//            }
 
             // Emit the HTML for the leafs.
             foreach ($leafEntryListItems as $listItem)
@@ -754,17 +744,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         {
             foreach ($leafFacetNames as $index => $leafFacetName)
             {
-                // Check for the special case where the user applied a child facet such as 'Image,Photograph' and then
-                // applied a grandchild facet like 'Glass Plate'. In this case, don't show the child, only the grandchild.
-                if (count($leafFacetNames) == 2 && $index == 0)
-                {
-                    if (strpos($leafFacetNames[1], $leafFacetNames[0] . ',') === 0)
-                    {
-                        // The 0th value is the child and the 1st is the grandchild. Ignore the child.
-                        continue;
-                    }
-                }
-
                 $groupName = $this->facetDefinitions[$leafFacetGroup]['name'];
                 $facetToRemoveRootPath = $leafFacetName;
                 $parts = explode(',', $facetToRemoveRootPath);
