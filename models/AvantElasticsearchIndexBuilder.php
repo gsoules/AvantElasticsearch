@@ -244,7 +244,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             // vocabularies whereas 'facet-local' contains facets for the local vocabularies. Both are
             // contained in the raw data, but only one or the other goes into the document as 'facet'.
             $facet = $isSharedIndex ? 'facet-common' : 'facet-local';
-            $document['body']['facet'] = $document['body']['facet'] = $document['body'][$facet];;
+            $document['body']['facet'] = $document['body'][$facet];;
             unset($document['body']['facet-common']);
             unset($document['body']['facet-local']);
 

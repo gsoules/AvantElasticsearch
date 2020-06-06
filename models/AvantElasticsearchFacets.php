@@ -49,6 +49,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $html = '';
 
+        if ($facetText == UNMAPPED_LOCAL_TERM)
+        {
+            return $html;
+        }
+
         if ($action == 'add')
         {
             $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetText, $rootPath, $isRoot);
@@ -379,21 +384,21 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $leafEntryListItems[$index]['action'] = $leafEntry['action'];
                 }
             }
-
-            // Check for the special case where the user applied a child facet such as 'Image,Photograph'
-            // and then applied a grandchild facet like 'Glass Plate'. In this case, don't show a remove-X
-            // for the child facet, only for the grandchild.
-            if (count($leafEntryListItems) == 2)
-            {
-                if (isset($leafEntryListItems[0]) && $leafEntryListItems[0]['level'] == 2 && $leafEntryListItems[1]['level'] == 3)
-                {
-                    if ($leafEntryListItems[0]['action'] == 'remove')
-                    {
-                        $leafEntryListItems[0]['action'] = 'none';
-                        $leafEntryListItems[0]['entry']['action'] = 'none';
-                    }
-                }
-            }
+//
+//            // Check for the special case where the user applied a child facet such as 'Image,Photograph'
+//            // and then applied a grandchild facet like 'Glass Plate'. In this case, don't show a remove-X
+//            // for the child facet, only for the grandchild.
+//            if (count($leafEntryListItems) == 2)
+//            {
+//                if (isset($leafEntryListItems[0]) && $leafEntryListItems[0]['level'] == 2 && $leafEntryListItems[1]['level'] == 3)
+//                {
+//                    if ($leafEntryListItems[0]['action'] == 'remove')
+//                    {
+//                        $leafEntryListItems[0]['action'] = 'none';
+//                        $leafEntryListItems[0]['entry']['action'] = 'none';
+//                    }
+//                }
+//            }
 
             // Emit the HTML for the leafs.
             foreach ($leafEntryListItems as $listItem)

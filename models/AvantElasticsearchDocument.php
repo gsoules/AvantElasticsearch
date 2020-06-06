@@ -116,11 +116,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $vocabularyKinds = $this->installation['vocabularies']['kinds'];
         $vocabularyMappings = $this->installation['vocabularies']['mappings'];
 
-        foreach ($itemFieldTexts as $elementId => $fieldTexts)
+        foreach ($itemFieldTexts as $elementId => $fieldTextsCommon)
         {
-            $originalFieldTexts = $fieldTexts;
-            $useCommonVocabulary = $commonVocabularyEnabled && array_key_exists($elementId, $vocabularyKinds);
+            // Make a copy of the field texts before the code that follows updates $fieldTextsCommon with common values.
+            $fieldTextsLocal = $fieldTextsCommon;
 
+            $useCommonVocabulary = $commonVocabularyEnabled && array_key_exists($elementId, $vocabularyKinds);
             if ($useCommonVocabulary)
             {
                 // Translate each of this element's values to their common vocabulary equivalents as though
@@ -128,7 +129,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // the mapped values for common terms without affecting the local element values.
                 $kind = $vocabularyKinds[$elementId];
                 $mappings = $vocabularyMappings[$kind];
-                foreach ($fieldTexts as $index => $fieldText)
+                foreach ($fieldTextsLocal as $index => $fieldText)
                 {
                     $localTerm = $fieldText['text'];
                     if (array_key_exists($localTerm, $mappings))
@@ -140,15 +141,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                         // This should never happen, but for now, detect if it does.
                         $commonTerm = 'UNTRACKED';
                     }
-                    $commonTerm = $commonTerm ? $commonTerm : $localTerm;
-                    $fieldTexts[$index]['text'] = $commonTerm;
+                    if (empty($commonTerm))
+                        $commonTerm = UNMAPPED_LOCAL_TERM;
+
+                    $fieldTextsCommon[$index]['text'] = $commonTerm;
                 }
             }
             else
             {
-                $originalFieldTexts = [];
+                $fieldTextsLocal = [];
             }
-            $this->createFieldDataForElement($elementId, $fieldTexts, $originalFieldTexts, $excludePrivateFields);
+            $this->createFieldDataForElement($elementId, $fieldTextsCommon, $fieldTextsLocal, $excludePrivateFields);
         }
 
         $this->createFacetDataForContributor();
@@ -250,27 +253,27 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
     }
 
-    protected function createFieldDataForElement($elementId, $fieldTexts, $originalFieldTexts, $excludePrivateFields)
+    protected function createFieldDataForElement($elementId, $fieldTextsCommon, $fieldTextsLocal, $excludePrivateFields)
     {
         // Get the element's field name.
         $fieldName = $this->installation['all_contributor_fields'][$elementId];
 
         // Strip any HTML tags from the field's text value(s).
-        $this->removeHtmlTagsFromFieldText($fieldTexts);
+        $this->removeHtmlTagsFromFieldText($fieldTextsCommon);
 
         // Get the field names from the installation cache instead of calling the functions that get the names.
         $commonFields = $this->installation['common_fields'];
         $localFields = $this->installation['local_fields'];
         $privateFields = $this->installation['private_fields'];
 
-        foreach ($fieldTexts as $index => $fieldText)
+        foreach ($fieldTextsCommon as $index => $fieldText)
         {
-            $fieldTextValue = $fieldText['text'];
+            $fieldTextValueCommon = $fieldText['text'];
 
-            if ($index == 0)
+            if ($index == 0 && $fieldTextValueCommon != UNMAPPED_LOCAL_TERM)
             {
                 // This is the first or the only value for an Omeka element. Use its value for sorting this element.
-                $sortText = $this->convertFieldValueToSortText($fieldTextValue);
+                $sortText = $this->convertFieldValueToSortText($fieldTextValueCommon);
                 $this->sortData[$fieldName] = $sortText;
             }
 
@@ -280,40 +283,42 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // - private: fields that are private for individual contributors
             if (in_array($fieldName, $commonFields))
             {
-                $this->commonElementData[$fieldName][] = $fieldTextValue;
+                if ($fieldTextValueCommon != UNMAPPED_LOCAL_TERM)
+                    $this->commonElementData[$fieldName][] = $fieldTextValueCommon;
 
-                // Determine if the field values for this element were mapped to a common vocabulary by seeing if any
-                // original texts were passed. If yes, and if the mapped and original texts are different, add the
-                // original value to the local elements. This way the mapped value will end up in the common elements
-                // and the original will end up in the local elements, so both will be searchable.
-                $usingCommonVocabulary = count($originalFieldTexts) > 0;
-                if ($usingCommonVocabulary)
+                // Determine if the field value for this element is mapped to a common vocabulary by seeing if a local
+                // value was passed. Local values are passed only for elements that use the common vocabulary i.e. Type,
+                // Subject, and Place. If the local and common values are different, if the local term is not mapped to
+                // a common term, add the local value to the local elements data section of the shared index so that the
+                // local value will be searchable when doing a shared keyword search (it won't be searchable by Type,
+                // Subject, or Place since those elements will have the common values.)
+                if ($fieldTextsLocal)
                 {
-                    $originalFieldTextValue = $originalFieldTexts[$index]['text'];
-                    if ($originalFieldTextValue != $fieldTextValue)
+                    $fieldTextValueLocal = $fieldTextsLocal[$index]['text'];
+                    if ($fieldTextValueLocal != $fieldTextValueCommon)
                     {
-                        $this->localElementData[$fieldName][] = $originalFieldTextValue;
+                        $this->localElementData[$fieldName][] = $fieldTextValueLocal;
                     }
                 }
             }
             else if (in_array($fieldName, $localFields))
             {
-                $this->localElementData[$fieldName][] = $fieldTextValue;
+                $this->localElementData[$fieldName][] = $fieldTextValueCommon;
             }
             else if (!$excludePrivateFields && in_array($fieldName, $privateFields))
             {
-                $this->privateElementData[$fieldName][] = $fieldTextValue;
+                $this->privateElementData[$fieldName][] = $fieldTextValueCommon;
             }
         }
 
         // Set flags to indicate if this field requires special handling.
-        $this->setSpecialFieldFlags($fieldName, $fieldTexts);
+        $this->setSpecialFieldFlags($fieldName, $fieldTextsCommon);
 
         // Create the various kinds of data associated with this field.
-        $this->createHtmlData($fieldName, $fieldTexts);
-        $this->createIntegerElementSortData($fieldName, $fieldTexts[0]['text']);
-        $this->createAddressElementSortData($fieldName, $fieldTexts);
-        $this->createFacetDataForField($fieldName, $fieldTexts, $originalFieldTexts);
+        $this->createHtmlData($fieldName, $fieldTextsCommon);
+        $this->createIntegerElementSortData($fieldName, $fieldTextsCommon[0]['text']);
+        $this->createAddressElementSortData($fieldName, $fieldTextsCommon);
+        $this->createFacetDataForField($fieldName, $fieldTextsCommon, $fieldTextsLocal);
     }
 
     protected function createHtmlData($elasticsearchFieldName, $fieldTexts)
