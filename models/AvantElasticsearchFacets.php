@@ -349,7 +349,9 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($leafEntries as $index => $leafEntry)
             {
                 if ($leafEntry['action'] == 'hide')
+                {
                     continue;
+                }
 
                 $facetApplied = $leafEntry['action'] == 'remove' ? true : $facetApplied;
                 if ($this->entryHasNoFilteringEffect($leafEntry))
@@ -357,68 +359,24 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $leafEntry['action'] = 'dead';
                 }
 
-                $isGrandchild = false;
+                $parts = array_map('trim', explode(',', $leafEntry['name']));
 
-                $level = 2;
-
-                if ($level == 2)
+                // Create the structure of the hierarchy of terms for this entry starting at the second level
+                // e.g. starting at Object,Clothing where Object is at level 1 and Clothing is at level 2.
+                $level = 1;
+                foreach ($parts as $part)
                 {
-                    $name = $leafEntry['name'];
-                    $pos = strpos($leafEntry['name'], ',');
-                    if ($pos !== false)
+                    $level += 1;
+                    if ($level > 6)
                     {
-                        $level += 1;
-                        $leafEntry['name'] = substr($name, $pos + 1);
-                        $leafEntryListItems[$index]['entry'] = $leafEntry;
-                        $leafEntryListItems[$index]['level'] = $level;
-                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                        // This is an arbitrary, but practical limit. If you make it higher, add additional
+                        // CSS for the facet-entry- class to style levels above .facet-entry-6.
+                        break;
                     }
-                    else
-                    {
-                        $leafEntryListItems[$index]['entry'] = $leafEntry;
-                        $leafEntryListItems[$index]['level'] = $level;
-                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
-                    }
-                }
-
-                if ($level == 3)
-                {
-                    $name = $leafEntry['name'];
-                    $pos = strpos($leafEntry['name'], ',');
-                    if ($pos !== false)
-                    {
-                        $level += 1;
-                        $leafEntry['name'] = substr($name, $pos + 1);
-                        $leafEntryListItems[$index]['entry'] = $leafEntry;
-                        $leafEntryListItems[$index]['level'] = $level;
-                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
-                    }
-                }
-                if ($level == 4)
-                {
-                    $name = $leafEntry['name'];
-                    $pos = strpos($leafEntry['name'], ',');
-                    if ($pos !== false)
-                    {
-                        $level += 1;
-                        $leafEntry['name'] = substr($name, $pos + 1);
-                        $leafEntryListItems[$index]['entry'] = $leafEntry;
-                        $leafEntryListItems[$index]['level'] = $level;
-                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
-                    }
-                }
-                if ($level == 5)
-                {
-                    $name = $leafEntry['name'];
-                    $pos = strpos($leafEntry['name'], ',');
-                    if ($pos !== false)
-                    {
-                        $level += 1;
-                        $leafEntry['name'] = substr($name, $pos + 1);
-                        $leafEntryListItems[$index]['entry'] = $leafEntry;
-                        $leafEntryListItems[$index]['level'] = $level;
-                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
-                    }
+                    $leafEntryListItems[$index]['entry'] = $leafEntry;
+                    $leafEntryListItems[$index]['entry']['name'] = $part;
+                    $leafEntryListItems[$index]['level'] = $level;
+                    $leafEntryListItems[$index]['action'] = $leafEntry['action'];
                 }
             }
 
