@@ -358,19 +358,28 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                 }
 
                 $isGrandchild = false;
-                $name = $leafEntry['name'];
-                $pos = strpos($leafEntry['name'], ',');
-                if ($pos !== false)
-                {
-                    $isGrandchild = true;
-                    $leafEntry['name'] = substr($name, $pos + 1);
-                }
 
-                // Record this leaf's entry, level, and action.
-                $level = $isGrandchild ? 3 : 2;
-                $leafEntryListItems[$index]['entry'] = $leafEntry;
-                $leafEntryListItems[$index]['level'] = $level;
-                $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                $level = 2;
+
+                if ($level == 2)
+                {
+                    $name = $leafEntry['name'];
+                    $pos = strpos($leafEntry['name'], ',');
+                    if ($pos !== false)
+                    {
+                        $level += 1;
+                        $leafEntry['name'] = substr($name, $pos + 1);
+                        $leafEntryListItems[$index]['entry'] = $leafEntry;
+                        $leafEntryListItems[$index]['level'] = $level;
+                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                    }
+                    else
+                    {
+                        $leafEntryListItems[$index]['entry'] = $leafEntry;
+                        $leafEntryListItems[$index]['level'] = $level;
+                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                    }
+                }
 
                 if ($level == 3)
                 {
@@ -378,10 +387,34 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $pos = strpos($leafEntry['name'], ',');
                     if ($pos !== false)
                     {
-                        $isGrandchild = true;
+                        $level += 1;
                         $leafEntry['name'] = substr($name, $pos + 1);
-
-                        $level = 4;
+                        $leafEntryListItems[$index]['entry'] = $leafEntry;
+                        $leafEntryListItems[$index]['level'] = $level;
+                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                    }
+                }
+                if ($level == 4)
+                {
+                    $name = $leafEntry['name'];
+                    $pos = strpos($leafEntry['name'], ',');
+                    if ($pos !== false)
+                    {
+                        $level += 1;
+                        $leafEntry['name'] = substr($name, $pos + 1);
+                        $leafEntryListItems[$index]['entry'] = $leafEntry;
+                        $leafEntryListItems[$index]['level'] = $level;
+                        $leafEntryListItems[$index]['action'] = $leafEntry['action'];
+                    }
+                }
+                if ($level == 5)
+                {
+                    $name = $leafEntry['name'];
+                    $pos = strpos($leafEntry['name'], ',');
+                    if ($pos !== false)
+                    {
+                        $level += 1;
+                        $leafEntry['name'] = substr($name, $pos + 1);
                         $leafEntryListItems[$index]['entry'] = $leafEntry;
                         $leafEntryListItems[$index]['level'] = $level;
                         $leafEntryListItems[$index]['action'] = $leafEntry['action'];
@@ -664,27 +697,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                     $leaf .= ",$part";
                 }
             }
-
-//            if ($partsCount == 2)
-//            {
-//                // Example: 'Image,Photograph' => 'Image,Photograph'
-//                $leaf .= ",$parts[1]";
-//            }
-//            else
-//            {
-//                if ($partsCount >= 3)
-//                {
-//                    // Limit the hierarchy to three levels by truncating. We used to elide the middle terms when there
-//                    // were four or more levels in order to keep the leaf term visible. With that approach,
-//                    // 'Vessels, Boat, Sailboat, Sloop, Friendship' became 'Vessels, Boat, Friendship' but that caused
-//                    // 'Sailboat' and 'Friendship' to appear at the same level in the facets which was wrong and
-//                    // confusing. Now the term becomes 'Vessels, Boat, Sailboat'.
-//
-//                    // Example: 'Image,Photograph,Print' => 'Image,Photograph,Print'
-//                    // Example: 'Image,Photograph,Negative,Glass Plate' => 'Image,Photograph,Negative'
-//                    $leaf .= ",$parts[1],$parts[2]";
-//                }
-//            }
         }
         else
         {
