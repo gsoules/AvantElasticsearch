@@ -45,8 +45,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['public'] = $item->public;
         $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
 
-        $document->setCommonFieldsData($isSharedIndex);
-        $document->setFacetData($isSharedIndex);
+        // Fixup the document to use the appropriate common fields and facet data for a shared or local index.
+        AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $document->body);
 
         $params = [
             'id' => $document->id,
@@ -241,21 +241,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 unset($document['body']['private-fields']);
             }
 
-            // Choose which facet data to use. The 'facet-common-search' data contains facets from the common
-            // vocabularies whereas 'facet-local-search' contains facets for the local vocabularies. Both are
-            // contained in the raw data, but only one or the other goes into the document as 'facet'.
-            $facet = $isSharedIndex ? 'facet-shared-search' : 'facet-local-search';
-            $document['body']['facet'] = $document['body'][$facet];;
-            unset($document['body']['facet-shared-search']);
-            unset($document['body']['facet-local-search']);
-
-            // Choose which facet data to use. The 'common-fields-shared-search' data contains the values of common
-            // vocabularies whereas 'common-fields-local-search' contains values for the local vocabularies. Both are
-            // contained in the raw data, but only one or the other goes into the document as 'common-fields'.
-            $commonFields = $isSharedIndex ? 'common-fields-shared-search' : 'common-fields-local-search';
-            $document['body']['common-fields'] = $document['body'][$facet];;
-            unset($document['body']['common-fields-shared-search']);
-            unset($document['body']['common-fields-local-search']);
+            // Fixup the document to use the appropriate common fields and facet data for a shared or local index.
+            AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $document['body']);
 
             // Convert the array into an object.
             $this->batchDocuments[$index] = (object)$document;

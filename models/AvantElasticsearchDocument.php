@@ -453,6 +453,46 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $pdfText;
     }
 
+    public static function fixupDocumentBody($isSharedIndex, &$documentBody)
+    {
+        // Choose which data to use for the 'common-fields' and 'facet' values depending on whether the index is
+        // shared or local. The document body contains both common and local data, but only one or the other is
+        // kept. This fixup is necessary because the data file for a bulk export contains both kinds of data which
+        // it stores in the keys ending with 'shared-search' and 'local-search', however only one or the other goes
+        // into the index. This method choose which data to use, inserts the correct keys ('common-fields and 'facet'),
+        // and then deletes the original keys.
+
+        $commonFieldsKey = $isSharedIndex ? 'common-fields-shared-search' : 'common-fields-local-search';
+        $documentBody['common-fields'] = $documentBody[$commonFieldsKey];
+        unset($documentBody['common-fields-shared-search']);
+        unset($documentBody['common-fields-local-search']);
+
+        $facetKey = $isSharedIndex ? 'facet-shared-search' : 'facet-local-search';
+        $documentBody['facet'] = $documentBody[$facetKey];
+        unset($documentBody['facet-shared-search']);
+        unset($documentBody['facet-local-search']);
+
+        if (!$isSharedIndex)
+        {
+            // Remove any keys from local-fields that exist in common-fields. This part of the fixup is needed
+            // because fields that use the common vocabulary (Type, Subject, and Place) which have a local value
+            // mapped to a common value, get their mapped local value stored in local-fields and their common values
+            // stored in common-fields. This overloaded use of local fields is done so that those local values are
+            // searchable by a shared search. However, they are not needed for a local search since they exist in
+            // common-fields. The code below removes them from local-fields so they are not duplicated in the index.
+            foreach ($documentBody['local-fields'] as $fieldName => $localFieldValues)
+            {
+                foreach ($documentBody['common-fields'] as $commonFieldName => $commonFieldValues)
+                {
+                    if ($fieldName == $commonFieldName)
+                    {
+                        unset($documentBody['local-fields'][$commonFieldName]);
+                    }
+                }
+            }
+        }
+    }
+
     protected function getCommonTermForLocalTerm($localTerm, $localToCommonMappings)
     {
         if (array_key_exists($localTerm, $localToCommonMappings))
@@ -755,20 +795,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         $this->avantElasticsearchFacets = $avantElasticsearchFacets;
         $this->facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
-    }
-
-    public function setCommonFieldsData($isSharedIndex)
-    {
-        unset($this->body['common-fields-shared-search']);
-        unset($this->body['common-fields-local-search']);
-        return $this->setField('common-fields', $isSharedIndex ? $this->commonFieldDataSharedSearch : $this->commonFieldDataLocalSearch);
-    }
-
-    public function setFacetData($isSharedIndex)
-    {
-        unset($this->body['facet-shared-search']);
-        unset($this->body['facet-local-search']);
-        return $this->setField('facet', $isSharedIndex ? $this->facetDataCommon : $this->facetDataLocal);
     }
 
     public function setField($key, $value)
