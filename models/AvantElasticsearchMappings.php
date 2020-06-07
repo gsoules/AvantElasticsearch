@@ -95,7 +95,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         // element whereas a sort field only contains the first value of a multi-value element.
         foreach ($commonFields as $fieldName)
         {
-            $this->addTextAndKeywordFieldToMappingProperties("common.$fieldName");
+            $this->addTextAndKeywordFieldToMappingProperties("common-fields.$fieldName");
             $this->addKeywordFieldToMappingProperties("sort.$fieldName");
         }
 
@@ -103,13 +103,13 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         {
             foreach ($localFields as $fieldName)
             {
-                $this->addTextAndKeywordFieldToMappingProperties("local.$fieldName");
+                $this->addTextAndKeywordFieldToMappingProperties("local-fields.$fieldName");
                 $this->addKeywordFieldToMappingProperties("sort.$fieldName");
             }
 
             foreach ($privateFields as $fieldName)
             {
-                $this->addTextAndKeywordFieldToMappingProperties("private.$fieldName");
+                $this->addTextAndKeywordFieldToMappingProperties("private-fields.$fieldName");
                 $this->addKeywordFieldToMappingProperties("sort.$fieldName");
             }
         }

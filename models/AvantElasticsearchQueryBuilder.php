@@ -355,8 +355,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'fields' => [
                         'item.title^20',
                         'item.description^10',
-                        'common.*',
-                        'local.*',
+                        'common-fields.*',
+                        'local-fields.*',
                         'tags',
                         'pdf.text-*'
                     ]
@@ -510,9 +510,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
         {
             $fields = [
-                'common.*',
-                'local.*',
-                'private.*',
+                'common-fields.*',
+                'local-fields.*',
+                'private-fields.*',
                 'item.*',
                 'file.*',
                 'tags',
@@ -527,10 +527,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             // Include the Type and Subject for the logic that chooses the proper placeholder image (based on item
             // type and subject) when the item has no image of its own).
             $fields = [
-                'common.title',
-                'common.identifier',
-                'common.type',
-                'common.subject',
+                'common-fields.title',
+                'common-fields.identifier',
+                'common-fields.type',
+                'common-fields.subject',
                 'item.*',
                 'file.*',
                 'url.*'
@@ -539,9 +539,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
         {
             $fields = [
-                'common.' . $indexFieldName,
-                'local.' . $indexFieldName,
-                'private.' . $indexFieldName,
+                'common-fields.' . $indexFieldName,
+                'local-fields.' . $indexFieldName,
+                'private-fields.' . $indexFieldName,
                 'common.identifier',
                 'url.item'
             ];
@@ -690,11 +690,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     protected function getQualifiedFieldNameFor($fieldName)
     {
         if (in_array($fieldName, $this->getFieldNamesOfCommonElements()))
-            return "common.$fieldName";
+            return "common-fields.$fieldName";
         else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
-            return "local.$fieldName";
+            return "local-fields.$fieldName";
         else if (in_array($fieldName, $this->getFieldNamesOfPrivateElements()))
-            return "private.$fieldName";
+            return "private-fields.$fieldName";
         else
             return $fieldName;
     }
