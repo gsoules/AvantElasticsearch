@@ -32,8 +32,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $year = 0;
 
     // Arrays pair that can contain different data for use in a local index than in a shared index.
-    protected $commonFieldDataLocalIndex = [];
-    protected $commonFieldDataSharedIndex = [];
+    protected $coreFieldDataLocalIndex = [];
+    protected $coreFieldDataSharedIndex = [];
     protected $facetDataLocalIndex = [];
     protected $facetDataSharedIndex = [];
     protected $sortDataLocalIndex = [];
@@ -71,8 +71,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $fileCounts = $this->getFileCounts($itemData);
         $this->setField('file', $fileCounts);
 
-        $this->setField('common-fields-shared-index', $this->commonFieldDataSharedIndex);
-        $this->setField('common-fields-local-index', $this->commonFieldDataLocalIndex);
+        $this->setField('core-fields-shared-index', $this->coreFieldDataSharedIndex);
+        $this->setField('core-fields-local-index', $this->coreFieldDataLocalIndex);
         $this->setField('facet-shared-index', $this->facetDataSharedIndex);
         $this->setField('facet-local-index', $this->facetDataLocalIndex);
         $this->setField('sort-local-index', $this->sortDataLocalIndex);
@@ -247,7 +247,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         // Get the various kinds of field names. Common fields are ones that every shared site uses. Local fields are
         // ones that are unique to a specific site. Private fields are both unique and private to a specific site.
-        $commonFieldNames = $this->installation['common_fields'];
+        $coreFieldNames = $this->installation['common_fields'];
         $localFieldNames = $this->installation['local_fields'];
         $privateFieldNames = $this->installation['private_fields'];
 
@@ -268,28 +268,28 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
 
             // Copy the text to its corresponding field:
-            if (in_array($fieldName, $commonFieldNames))
+            if (in_array($fieldName, $coreFieldNames))
             {
-                $this->commonFieldDataLocalIndex[$fieldName][] = $localIndexValue;
-                $this->commonFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
+                $this->coreFieldDataLocalIndex[$fieldName][] = $localIndexValue;
+                $this->coreFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
 
                 if ($localIndexValue != $sharedIndexValue && $sharedIndexValue != UNMAPPED_SHARED_INDEX_VALUE)
                 {
-                    // This is a common field that has different local and shared index values. To allow the local index
+                    // This is a core field that has different local and shared index values. To allow the local index
                     // value to be searchable, copy that value to the local fields data which gets queried by a shared
-                    // search. As further explanation, let's use the Subject field as an example. It is a common field
-                    // which means it is used by (common to) all sites (all sites have a Subject element). In contrast,
-                    // a field like "Address" would be a local field meaning that it is only used by specific sites.
-                    // The Subject field also uses the Common Vocabulary which means it can have a local value like
+                    // search. As further explanation, let's use the Subject field as an example. It is a core field
+                    // which means it is used by all sites (all sites have a Subject element). In contrast, a field like
+                    // "Address" would be a local field meaning that it is only used by specific sites. The Subject
+                    //  field also uses the Common Vocabulary which means it can have a local value like
                     // "Birds, Songbirds" that is mapped to a Common Vocabulary term like "Nature, Animals, Birds".
                     // The local value gets used as the Subject in the local index and the mapped value gets used in
                     // the shared index. However, without the logic below, a shared search on "Songbirds" would come up
                     // empty because that word would not be in the shared index. To allow shared searching of mapped
                     // values, the code below adds the local value to the shared index by putting it in the index's
                     // local field data as though it were a separate local field. As such, the Subject field will appear
-                    // in the common fields data with the value "Nature, Animals, Birds" and the Subject field will also
+                    // in the core fields data with the value "Nature, Animals, Birds" and the Subject field will also
                     // appear in the local fields data with the value "Birds, Songbirds". Since a shared search queries
-                    // both fields, it will get a hit on "Songbirds" in the local field data.
+                    // both the core and local field data, the search will get a hit on "Songbirds" in the local data.
                     $this->localFieldData[$fieldName][] = $localIndexValue;
                 }
             }
@@ -367,8 +367,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // configured in AvantCommon. Get the alias value and use it as the identifier field value.
             $id = $this->installation['alias_id'];
             $aliasText = isset($itemFieldTexts[$id][0]['text']) ? $itemFieldTexts[$id][0]['text'] : BLANK_FIELD_TEXT;
-            $this->commonFieldDataSharedIndex['identifier'][0] = $aliasText;
-            $this->commonFieldDataLocalIndex['identifier'][0] = $aliasText;
+            $this->coreFieldDataSharedIndex['identifier'][0] = $aliasText;
+            $this->coreFieldDataLocalIndex['identifier'][0] = $aliasText;
         }
 
         // Create a field-text to represent an unspecified date, place, subject, or type.
@@ -447,12 +447,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // shared and local data, but only one or the other is kept. This fixup is necessary because the data file for
         // a bulk export contains both kinds of data which it stores in the keys ending with 'shared-index' and
         // 'local-index', however only one or the other goes into the index. This method choose which data to use,
-        // inserts the correct keys (common-fields, facet, or sort), and then deletes the original keys.
+        // inserts the correct keys (core-fields, facet, or sort), and then deletes the original keys.
 
-        $commonFieldsKey = $isSharedIndex ? 'common-fields-shared-index' : 'common-fields-local-search';
-        $documentBody['common-fields'] = $documentBody[$commonFieldsKey];
-        unset($documentBody['common-fields-shared-index']);
-        unset($documentBody['common-fields-local-index']);
+        $coreFieldsKey = $isSharedIndex ? 'core-fields-shared-index' : 'core-fields-local-search';
+        $documentBody['core-fields'] = $documentBody[$coreFieldsKey];
+        unset($documentBody['core-fields-shared-index']);
+        unset($documentBody['core-fields-local-index']);
 
         $facetKey = $isSharedIndex ? 'facet-shared-index' : 'facet-local-index';
         $documentBody['facet'] = $documentBody[$facetKey];
@@ -466,19 +466,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         if (!$isSharedIndex)
         {
-            // Remove any keys from local-fields that exist in common-fields. This part of the fixup is needed
+            // Remove any keys from local-fields that exist in core-fields. This part of the fixup is needed
             // because fields that use the common vocabulary (Type, Subject, and Place) which have a local value
             // mapped to a common value, get their mapped local value stored in local-fields and their common values
-            // stored in common-fields. This overloaded use of local fields is done so that those local values are
+            // stored in core-fields. This overloaded use of local fields is done so that those local values are
             // searchable by a shared search. However, they are not needed for a local search since they exist in
-            // common-fields. The code below removes them from local-fields so they are not duplicated in the index.
+            // core-fields. The code below removes them from local-fields so they are not duplicated in the index.
             foreach ($documentBody['local-fields'] as $fieldName => $localFieldValues)
             {
-                foreach ($documentBody['common-fields'] as $commonFieldName => $commonFieldValues)
+                foreach ($documentBody['core-fields'] as $coreFieldName => $coreFieldValues)
                 {
-                    if ($fieldName == $commonFieldName)
+                    if ($fieldName == $coreFieldName)
                     {
-                        unset($documentBody['local-fields'][$commonFieldName]);
+                        unset($documentBody['local-fields'][$coreFieldName]);
                     }
                 }
             }
@@ -658,7 +658,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             {
                 // This installation does not have its files at the root of the 'original' folder. Check to see if
                 // the files are located in a sub directory having the item identifier as its name.
-                $itemIdentifier = $this->commonFieldDataLocalIndex['identifier'][0];
+                $itemIdentifier = $this->coreFieldDataLocalIndex['identifier'][0];
                 $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $fileName);
                 if (!file_exists($filepath))
                 {

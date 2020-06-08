@@ -312,9 +312,9 @@ class AvantElasticsearch
         if (empty($this->fieldNamesOfLocalElements))
         {
             $allFields = $this->getFieldNamesOfAllElements();
-            $commonFields = $this->getFieldNamesOfCommonElements();
+            $coreFields = $this->getFieldNamesOfCommonElements();
             $privateFields = $this->getFieldNamesOfPrivateElements();
-            $this->fieldNamesOfLocalElements = array_diff($allFields, $commonFields, $privateFields);
+            $this->fieldNamesOfLocalElements = array_diff($allFields, $coreFields, $privateFields);
             asort($this->fieldNamesOfLocalElements);
         }
 

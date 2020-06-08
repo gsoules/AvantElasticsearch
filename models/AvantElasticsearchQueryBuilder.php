@@ -355,7 +355,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'fields' => [
                         'item.title^20',
                         'item.description^10',
-                        'common-fields.*',
+                        'core-fields.*',
                         'local-fields.*',
                         'tags',
                         'pdf.text-*'
@@ -510,7 +510,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
         {
             $fields = [
-                'common-fields.*',
+                'core-fields.*',
                 'local-fields.*',
                 'private-fields.*',
                 'item.*',
@@ -527,10 +527,10 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             // Include the Type and Subject for the logic that chooses the proper placeholder image (based on item
             // type and subject) when the item has no image of its own).
             $fields = [
-                'common-fields.title',
-                'common-fields.identifier',
-                'common-fields.type',
-                'common-fields.subject',
+                'core-fields.title',
+                'core-fields.identifier',
+                'core-fields.type',
+                'core-fields.subject',
                 'item.*',
                 'file.*',
                 'url.*'
@@ -539,7 +539,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         else if ($viewId == SearchResultsViewFactory::INDEX_VIEW_ID)
         {
             $fields = [
-                'common-fields.' . $indexFieldName,
+                'core-fields.' . $indexFieldName,
                 'local-fields.' . $indexFieldName,
                 'private-fields.' . $indexFieldName,
                 'common.identifier',
@@ -690,7 +690,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     protected function getQualifiedFieldNameFor($fieldName)
     {
         if (in_array($fieldName, $this->getFieldNamesOfCommonElements()))
-            return "common-fields.$fieldName";
+            return "core-fields.$fieldName";
         else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
             return "local-fields.$fieldName";
         else if (in_array($fieldName, $this->getFieldNamesOfPrivateElements()))

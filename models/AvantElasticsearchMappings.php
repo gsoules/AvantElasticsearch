@@ -86,16 +86,16 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     public function constructElasticsearchMappings($isSharedIndex)
     {
-        $commonFields = $this->getFieldNamesOfCommonElements();
+        $coreFields = $this->getFieldNamesOfCommonElements();
         $localFields = $this->getFieldNamesOfLocalElements();
         $privateFields = $this->getFieldNamesOfPrivateElements();
 
         // Provide both an element and sort mapping for every field. The element mapping is used for searching and the
         // sort mapping is used exclusively for sorting. Also, an element field contain all the values for a multi-value
         // element whereas a sort field only contains the first value of a multi-value element.
-        foreach ($commonFields as $fieldName)
+        foreach ($coreFields as $fieldName)
         {
-            $this->addTextAndKeywordFieldToMappingProperties("common-fields.$fieldName");
+            $this->addTextAndKeywordFieldToMappingProperties("core-fields.$fieldName");
             $this->addKeywordFieldToMappingProperties("sort.$fieldName");
         }
 
@@ -114,7 +114,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             }
         }
 
-        if (in_array('address', $commonFields) || !$isSharedIndex)
+        if (in_array('address', $coreFields) || !$isSharedIndex)
         {
             // Address is a special field that any installation can use, but unless it is a Common field
             // only emit these special address sorting fields for a local index.

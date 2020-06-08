@@ -201,7 +201,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemData;
     }
 
-    protected function createLocalOrSharedDocument($isSharedIndex, $commonFieldNames)
+    protected function createLocalOrSharedDocument($isSharedIndex, $coreFieldNames)
     {
         // This method changes $this->batchDocuments from an array or arrays into an array of objects
         // each containing Omeka item data appropriate for either the local or shared index.
@@ -231,7 +231,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 // Remove sorting for all but the common fields.
                 foreach ($document['body']['sort'] as $fieldName => $sortValue)
                 {
-                    if (!in_array($fieldName, $commonFieldNames))
+                    if (!in_array($fieldName, $coreFieldNames))
                     {
                         unset($document['body']['sort'][$fieldName]);
                     }
@@ -806,8 +806,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->batchDocuments = json_decode(file_get_contents($dataFileName), true);
 
         // Convert the raw document data into document objects structured for either the local or shared index.
-        $commonFieldNames = $this->getFieldNamesOfCommonElements();
-        $this->createLocalOrSharedDocument($isSharedIndex, $commonFieldNames);
+        $coreFieldNames = $this->getFieldNamesOfCommonElements();
+        $this->createLocalOrSharedDocument($isSharedIndex, $coreFieldNames);
 
         // Build a list of document sizes.
         $this->batchDocumentsCount = count($this->batchDocuments);
