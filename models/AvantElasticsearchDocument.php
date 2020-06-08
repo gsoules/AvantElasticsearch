@@ -76,7 +76,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->setField('facet-shared-index', $this->facetDataSharedIndex);
         $this->setField('facet-local-index', $this->facetDataLocalIndex);
         $this->setField('sort-local-index', $this->sortDataLocalIndex);
-        $this->setField('sort=shared-index', $this->sortDataLocalIndex);
+        $this->setField('sort-shared-index', $this->sortDataLocalIndex);
         $this->setField('local-fields', $this->localFieldData);
 
         if (!$excludePrivateFields)
@@ -273,7 +273,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // Get the element's field name.
         $fieldName = $this->installation['all_contributor_fields'][$elementId];
 
-        // Get the various kinds of field names. Common fields are ones that every shared site uses. Local fields are
+        // Get the various kinds of field names. Core fields are ones that every shared site uses. Local fields are
         // ones that are unique to a specific site. Private fields are both unique and private to a specific site.
         $coreFieldNames = $this->installation['common_fields'];
         $localFieldNames = $this->installation['local_fields'];
@@ -479,7 +479,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // 'local-index', however only one or the other goes into the index. This method choose which data to use,
         // inserts the correct keys (core-fields, facet, or sort), and then deletes the original keys.
 
-        $coreFieldsKey = $isSharedIndex ? 'core-fields-shared-index' : 'core-fields-local-search';
+        $coreFieldsKey = $isSharedIndex ? 'core-fields-shared-index' : 'core-fields-local-index';
         $documentBody['core-fields'] = $documentBody[$coreFieldsKey];
         unset($documentBody['core-fields-shared-index']);
         unset($documentBody['core-fields-local-index']);

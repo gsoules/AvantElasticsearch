@@ -688,7 +688,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Get the value for each of the element's texts.
         foreach ($fieldTexts as $fieldText)
         {
-            $text = $fieldText[$forSharedIndex ? 'text-shared-index' : 'text'];
+            // Determine if these field texts have separate shared index values. If not, use the one value
+            // that's there for both shared and local.
+            $key = $forSharedIndex && isset($fieldText['text-shared-index']) ? 'text-shared-index' : 'text';
+
+            $text = $fieldText[$key];
 
             $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
 

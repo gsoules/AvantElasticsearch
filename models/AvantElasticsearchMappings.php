@@ -116,7 +116,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         if (in_array('address', $coreFields) || !$isSharedIndex)
         {
-            // Address is a special field that any installation can use, but unless it is a Common field
+            // Address is a special field that any installation can use, but unless it is a core field
             // only emit these special address sorting fields for a local index.
             $this->addKeywordFieldToMappingProperties('sort.address-number');
             $this->addKeywordFieldToMappingProperties('sort.address-street');

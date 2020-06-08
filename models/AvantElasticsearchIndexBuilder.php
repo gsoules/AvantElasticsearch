@@ -45,7 +45,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['public'] = $item->public;
         $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
 
-        // Fixup the document to use the appropriate common fields and facet data for a shared or local index.
+        // Fixup the document to use the appropriate data for a shared or local index.
         AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $document->body);
 
         $params = [
@@ -103,6 +103,60 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
             $this->fileStats[$mimeType]['count'] = $count;
             $this->fileStats[$mimeType]['size'] = $size;
+        }
+    }
+
+    protected function convertDocumentForLocalOrSharedIndex($isSharedIndex, $coreFieldNames)
+    {
+        // This method changes $this->batchDocuments from an array or arrays into an array of objects
+        // each containing Omeka item data appropriate for either the local or shared index.
+
+        foreach($this->batchDocuments as $index => $document)
+        {
+            if ($isSharedIndex)
+            {
+                // Remove all non-public items from the batch of documents
+                // Remove private elements from each document
+                //
+                // This filtering is necessary to support the overall indexing approach which is to:
+                // * 1.  Export all items and all fields into a single JSON data file containing 100% of the contributor's data
+                // * 2a. Import only the non-private fields of public items into the shared index (using this method)
+                // * 2b. Import all items and all fields into the local index (no filtering)
+                //
+                // This export once, import twice approach makes it possible to create/update both the local and shared indexes
+                // from the same export file (versus having one export file for the local index and another for the shared index).
+
+                if (!$document['body']['item']['public'])
+                {
+                    // Remove the document for this non-public item.
+                    unset($this->batchDocuments[$index]);
+                    continue;
+                }
+
+                // Remove sorting for all but the core fields.
+                foreach ($document['body']['sort-shared-index'] as $fieldName => $sortValue)
+                {
+                    if (!in_array($fieldName, $coreFieldNames))
+                    {
+                        unset($document['body']['sort-shared-index'][$fieldName]);
+                    }
+                }
+
+                // Remove all the private fields.
+                unset($document['body']['private-fields']);
+            }
+
+            // Fixup the document to use the appropriate data for a shared or local index.
+            AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $document['body']);
+
+            // Convert the array into an object.
+            $this->batchDocuments[$index] = (object)$document;
+        }
+
+        if ($isSharedIndex)
+        {
+            // Reindex the array to remove gaps left from the removal of non-public items.
+            $this->batchDocuments = array_values($this->batchDocuments);
         }
     }
 
@@ -199,60 +253,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['files_data'] = $itemFilesData;
         $itemData['tags_data'] = $itemTagsData;
         return $itemData;
-    }
-
-    protected function createLocalOrSharedDocument($isSharedIndex, $coreFieldNames)
-    {
-        // This method changes $this->batchDocuments from an array or arrays into an array of objects
-        // each containing Omeka item data appropriate for either the local or shared index.
-
-        foreach($this->batchDocuments as $index => $document)
-        {
-            if ($isSharedIndex)
-            {
-                // Remove all non-public items from the batch of documents
-                // Remove private elements from each document
-                //
-                // This filtering is necessary to support the overall indexing approach which is to:
-                // * 1.  Export all items and all fields into a single JSON data file containing 100% of the contributor's data
-                // * 2a. Import only the non-private fields of public items into the shared index (using this method)
-                // * 2b. Import all items and all fields into the local index (no filtering)
-                //
-                // This export once, import twice approach makes it possible to create/update both the local and shared indexes
-                // from the same export file (versus having one export file for the local index and another for the shared index).
-
-                if (!$document['body']['item']['public'])
-                {
-                    // Remove the document for this non-public item.
-                    unset($this->batchDocuments[$index]);
-                    continue;
-                }
-
-                // Remove sorting for all but the common fields.
-                foreach ($document['body']['sort'] as $fieldName => $sortValue)
-                {
-                    if (!in_array($fieldName, $coreFieldNames))
-                    {
-                        unset($document['body']['sort'][$fieldName]);
-                    }
-                }
-
-                // Remove all the private fields.
-                unset($document['body']['private-fields']);
-            }
-
-            // Fixup the document to use the appropriate common fields and facet data for a shared or local index.
-            AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $document['body']);
-
-            // Convert the array into an object.
-            $this->batchDocuments[$index] = (object)$document;
-        }
-
-        if ($isSharedIndex)
-        {
-            // Reindex the array to remove gaps left from the removal of non-public items.
-            $this->batchDocuments = array_values($this->batchDocuments);
-        }
     }
 
     protected function createNewIndex($isSharedIndex)
@@ -807,7 +807,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // Convert the raw document data into document objects structured for either the local or shared index.
         $coreFieldNames = $this->getFieldNamesOfCommonElements();
-        $this->createLocalOrSharedDocument($isSharedIndex, $coreFieldNames);
+        $this->convertDocumentForLocalOrSharedIndex($isSharedIndex, $coreFieldNames);
 
         // Build a list of document sizes.
         $this->batchDocumentsCount = count($this->batchDocuments);
