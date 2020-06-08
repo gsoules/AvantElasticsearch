@@ -49,11 +49,6 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $html = '';
 
-        if ($facetText == UNMAPPED_SHARED_INDEX_VALUE)
-        {
-            return $html;
-        }
-
         if ($action == 'add')
         {
             $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetText, $rootPath, $isRoot);
@@ -693,10 +688,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Get the value for each of the element's texts.
         foreach ($fieldTexts as $fieldText)
         {
-            $key = $forSharedIndex && isset($fieldText['text-shared-index']) ? 'text-shared-index' : 'text';
-            $text = $fieldText[$key];
-            if ($text == UNMAPPED_SHARED_INDEX_VALUE)
-                $text = $fieldText['text'];
+            $text = $fieldText[$forSharedIndex ? 'text-shared-index' : 'text'];
 
             $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
 

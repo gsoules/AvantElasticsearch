@@ -128,16 +128,36 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
             if ($usingCommonVocabulary && array_key_exists($elementId, $vocabularyKinds))
             {
-                // This element uses the common vocabulary. Get the common value, if one exists, for each of the
-                // element's local values. The common value will be used in the shared index, and the original value
-                // will be used in the local index. If the local value is not mapped to a common term, the shared
-                // values gets set to UNMAPPED_SHARED_INDEX_VALUE so that subsequent logic can deal with it correctly.
+                // This element uses the Common Vocabulary. Get the common term for each of the element's local values.
+                // The common value will be used in the shared index, and the local value will be used in the local
+                // index. If the local value is not mapped to a common term, the local values gets used as the shared
+                // index value and the field gets flagged as unmapped for the benefit of subsequent logic.
                 $mappings = $vocabularyMappings[$vocabularyKinds[$elementId]];
                 foreach ($fieldTexts as $index => $fieldText)
                 {
                     $localTerm = $fieldText['text'];
                     $commonTerm = $this->getCommonTermForLocalTerm($localTerm, $mappings);
-                    $fieldTexts[$index]['text-shared-index'] = $commonTerm ? $commonTerm : UNMAPPED_SHARED_INDEX_VALUE;
+                    if (empty($commonTerm))
+                    {
+                        // The local value is not mapped to a common term.
+                        $commonTerm = $localTerm;
+                        $fieldTexts[$index]['mapped'] = false;
+                    }
+                    elseif ($commonTerm != $localTerm)
+                    {
+                        // The local value is mapped to a common term that is different than the local value.
+                        $fieldTexts[$index]['mapped'] = true;
+                    }
+                    $fieldTexts[$index]['text-shared-index'] = $commonTerm;
+                }
+            }
+            else
+            {
+                // This element does not use the Common Vocabulary which means that both the local and shared
+                // index will use the same value. Copy the local value to the shared value.
+                foreach ($fieldTexts as $index => $fieldText)
+                {
+                    $fieldTexts[$index]['text-shared-index'] = $fieldTexts[$index]['text'];
                 }
             }
 
@@ -258,11 +278,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // Get the shared and local index values. If there is no shared value, use the local value. A shared value
             // will only exist if the element uses the Common Vocabulary to map local values to common values.
             $localIndexValue = $fieldText['text'];
-            $sharedIndexValue = isset($fieldText['text-shared-index']) ? $fieldText['text-shared-index'] : $fieldText['text'];
-
-            // Get the value to use for the shared index. If the element uses the Common Vocabulary, but its local value
-            // is not mapped to a common term, the shared index value "defaults" to being the local index value.
-            $defaultSharedIndexValue = $sharedIndexValue == UNMAPPED_SHARED_INDEX_VALUE ? $localIndexValue : $sharedIndexValue;
+            $sharedIndexValue = $fieldText['text-shared-index'];
 
             if ($index == 0)
             {
@@ -270,16 +286,16 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // values, they won't be used for sorting. In a sorted list of Omeka items, the other values will
                 // appear along with the value, but only this value will be in sort order.
                 $this->sortDataLocalIndex[$fieldName] = $this->convertFieldValueToSortText($localIndexValue);
-                $this->sortDataSharedIndex[$fieldName] = $this->convertFieldValueToSortText($defaultSharedIndexValue);
+                $this->sortDataSharedIndex[$fieldName] = $this->convertFieldValueToSortText($sharedIndexValue);
             }
 
             // Copy the text to its corresponding field:
             if (in_array($fieldName, $coreFieldNames))
             {
                 $this->coreFieldDataLocalIndex[$fieldName][] = $localIndexValue;
-                $this->coreFieldDataSharedIndex[$fieldName][] = $defaultSharedIndexValue;
+                $this->coreFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
 
-                if ($localIndexValue != $sharedIndexValue && $sharedIndexValue != UNMAPPED_SHARED_INDEX_VALUE)
+                if (isset($fieldText['mapped']) && $fieldText['mapped'] == true)
                 {
                     // This core field's local value is mapped to a different shared value. To allow the local index
                     // value to be searchable during a shared search, copy the local value to the local fields data.
@@ -495,6 +511,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     {
         if (array_key_exists($localTerm, $localToCommonMappings))
         {
+            // Get the common term. If the common term is empty, the local term is not mapped to a common term.
             $commonTerm = $localToCommonMappings[$localTerm];
         }
         else
@@ -502,14 +519,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // This should never happen under normal circumstances because the mappings table should contain an entry
             // for every local term defined using the Vocabulary Editor. However, if somehow an item uses a term that
             // we are not tracking, e.g. inserted through the Bulk Editor, we'll detect it here and handle gracefully.
-            $commonTerm = 'UNTRACKED';
-        }
-
-        if (empty($commonTerm))
-        {
-            // The local term is not a common term and has not been mapped to a common term using the Vocabulary Editor.
-            // Use a special value for the common term so that subsequent logic knows that the local term is unmapped.
-            $commonTerm = UNMAPPED_SHARED_INDEX_VALUE;
+            $commonTerm = 'UNTRACKED-LOCAL_TERM';
         }
 
         return $commonTerm;
