@@ -301,6 +301,16 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             if (in_array($fieldName, $coreFieldNames))
             {
                 $this->coreFieldDataLocalIndex[$fieldName][] = $localIndexValue;
+
+                if (isset($this->coreFieldDataSharedIndex[$fieldName]) && in_array($sharedIndexValue, $this->coreFieldDataSharedIndex[$fieldName]))
+                {
+                    // This value is already in the shared index data. This can happen when multiple local terms are
+                    // mapped to the same common term. For example if local terms "Birds,Songbirds" and "Birds,Raptors"
+                    // are both mapped to "Nature,Animals,Birds" then "Nature,Animals,Birds" will appear twice in the
+                    // field texts as a shared index value.
+                    continue;
+                }
+
                 $this->coreFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
 
                 if ($fieldText['mapping'] == 'mapped')
