@@ -86,7 +86,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     public function constructElasticsearchMappings($isSharedIndex)
     {
-        $coreFields = $this->getFieldNamesOfCommonElements();
+        $coreFields = $this->getFieldNamesOfCoreElements();
         $localFields = $this->getFieldNamesOfLocalElements();
         $privateFields = $this->getFieldNamesOfPrivateElements();
 

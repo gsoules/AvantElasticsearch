@@ -71,12 +71,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $fileCounts = $this->getFileCounts($itemData);
         $this->setField('file', $fileCounts);
 
-        $this->setField('core-fields-shared-index', $this->coreFieldDataSharedIndex);
         $this->setField('core-fields-local-index', $this->coreFieldDataLocalIndex);
-        $this->setField('facet-shared-index', $this->facetDataSharedIndex);
+        $this->setField('core-fields-shared-index', $this->coreFieldDataSharedIndex);
         $this->setField('facet-local-index', $this->facetDataLocalIndex);
+        $this->setField('facet-shared-index', $this->facetDataSharedIndex);
         $this->setField('sort-local-index', $this->sortDataLocalIndex);
-        $this->setField('sort-shared-index', $this->sortDataLocalIndex);
+        $this->setField('sort-shared-index', $this->sortDataSharedIndex);
         $this->setField('local-fields', $this->localFieldData);
 
         if (!$excludePrivateFields)
@@ -275,7 +275,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
         // Get the various kinds of field names. Core fields are ones that every shared site uses. Local fields are
         // ones that are unique to a specific site. Private fields are both unique and private to a specific site.
-        $coreFieldNames = $this->installation['common_fields'];
+        $coreFieldNames = $this->installation['core_fields'];
         $localFieldNames = $this->installation['local_fields'];
         $privateFieldNames = $this->installation['private_fields'];
 

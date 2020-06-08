@@ -689,7 +689,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     protected function getQualifiedFieldNameFor($fieldName)
     {
-        if (in_array($fieldName, $this->getFieldNamesOfCommonElements()))
+        if (in_array($fieldName, $this->getFieldNamesOfCoreElements()))
             return "core-fields.$fieldName";
         else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
             return "local-fields.$fieldName";

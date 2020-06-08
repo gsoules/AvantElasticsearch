@@ -75,7 +75,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $this->installation['all_contributor_fields'] = $this->getFieldNamesOfAllElements();
         $this->installation['private_fields'] = $this->getFieldNamesOfPrivateElements();
-        $this->installation['common_fields'] = $this->getFieldNamesOfCommonElements();
+        $this->installation['core_fields'] = $this->getFieldNamesOfCoreElements();
         $this->installation['local_fields'] = $this->getFieldNamesOfLocalElements();
         $this->installation['contributor'] = ElasticsearchConfig::getOptionValueForContributor();
         $this->installation['contributor_id'] = ElasticsearchConfig::getOptionValueForContributorId();
@@ -806,7 +806,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->batchDocuments = json_decode(file_get_contents($dataFileName), true);
 
         // Convert the raw document data into document objects structured for either the local or shared index.
-        $coreFieldNames = $this->getFieldNamesOfCommonElements();
+        $coreFieldNames = $this->getFieldNamesOfCoreElements();
         $this->convertDocumentForLocalOrSharedIndex($isSharedIndex, $coreFieldNames);
 
         // Build a list of document sizes.

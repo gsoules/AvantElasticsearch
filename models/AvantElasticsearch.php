@@ -24,7 +24,7 @@ class AvantElasticsearch
     private $fieldNamesOfAllElements = array();
     private $fieldNamesOfLocalElements = array();
     private $fieldNamesOfPrivateElements = array();
-    private $fieldNamesOfCommonElements = array();
+    private $fieldNamesOfCoreElements = array();
 
     public function __construct()
     {
@@ -289,21 +289,21 @@ class AvantElasticsearch
         return $this->fieldNamesOfAllElements;
     }
 
-    public function getFieldNamesOfCommonElements()
+    public function getFieldNamesOfCoreElements()
     {
-        if (empty($this->fieldNamesOfCommonElements))
+        if (empty($this->fieldNamesOfCoreElements))
         {
             $config = AvantElasticsearch::getAvantElasticsearcConfig();
             $elementsList = $config ? $config->common_elements : array();
             $elementNames = array_map('trim', explode(',', $elementsList));
             foreach ($elementNames as $elementName)
             {
-                $this->fieldNamesOfCommonElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+                $this->fieldNamesOfCoreElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
             }
-            asort($this->fieldNamesOfCommonElements);
+            asort($this->fieldNamesOfCoreElements);
         }
 
-        return $this->fieldNamesOfCommonElements;
+        return $this->fieldNamesOfCoreElements;
     }
 
     protected function getFieldNamesOfLocalElements()
@@ -311,7 +311,7 @@ class AvantElasticsearch
         if (empty($this->fieldNamesOfLocalElements))
         {
             $allFields = $this->getFieldNamesOfAllElements();
-            $coreFields = $this->getFieldNamesOfCommonElements();
+            $coreFields = $this->getFieldNamesOfCoreElements();
             $privateFields = $this->getFieldNamesOfPrivateElements();
             $this->fieldNamesOfLocalElements = array_diff($allFields, $coreFields, $privateFields);
             asort($this->fieldNamesOfLocalElements);

@@ -688,6 +688,12 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Get the value for each of the element's texts.
         foreach ($fieldTexts as $fieldText)
         {
+            if ($forSharedIndex && isset($fieldText['mapping']) && $fieldText['mapping'] == 'unmapped')
+            {
+                // Exclude unmapped local values from the facets in a shared index. This filtering is what prevents
+                // a site's local vocabulary terms from appearing in the facets for shared search results.
+                continue;
+            }
             // Determine if these field texts have separate shared index values. If not, use the one value
             // that's there for both shared and local.
             $key = $forSharedIndex && isset($fieldText['text-shared-index']) ? 'text-shared-index' : 'text';
