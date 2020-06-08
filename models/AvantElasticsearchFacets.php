@@ -693,8 +693,11 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Get the value for each of the element's texts.
         foreach ($fieldTexts as $fieldText)
         {
-            $key = $forSharedIndex ? 'text-shared-index' : 'text';
+            $key = $forSharedIndex && isset($fieldText['text-shared-index']) ? 'text-shared-index' : 'text';
             $text = $fieldText[$key];
+            if ($text == UNMAPPED_SHARED_INDEX_VALUE)
+                $text = $fieldText['text'];
+
             $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
 
             if ($facetDefinition['is_hierarchy'])

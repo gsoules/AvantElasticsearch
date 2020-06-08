@@ -255,8 +255,14 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // example, if an Omeka item has more than one Subject, its Subject element will have a separate values for each.
         foreach ($fieldTexts as $index => $fieldText)
         {
-            $sharedIndexValue = $fieldTexts['text-shared-index'];
-            $localIndexValue = $fieldTexts['text'];
+            // Get the shared and local index values. If there is no shared value, use the local value. A shared value
+            // will only exist if the element uses the Common Vocabulary to map local values to common values.
+            $localIndexValue = $fieldText['text'];
+            $sharedIndexValue = isset($fieldText['text-shared-index']) ? $fieldText['text-shared-index'] : $fieldText['text'];
+
+            // Get the value to use for the shared index. If the element uses the Common Vocabulary, but its local value
+            // is not mapped to a common term, the shared index value "defaults" to being the local index value.
+            $defaultSharedIndexValue = $sharedIndexValue == UNMAPPED_SHARED_INDEX_VALUE ? $localIndexValue : $sharedIndexValue;
 
             if ($index == 0)
             {
@@ -264,20 +270,20 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // values, they won't be used for sorting. In a sorted list of Omeka items, the other values will
                 // appear along with the value, but only this value will be in sort order.
                 $this->sortDataLocalIndex[$fieldName] = $this->convertFieldValueToSortText($localIndexValue);
-                $this->sortDataSharedIndex[$fieldName] = $this->convertFieldValueToSortText($sharedIndexValue);
+                $this->sortDataSharedIndex[$fieldName] = $this->convertFieldValueToSortText($defaultSharedIndexValue);
             }
 
             // Copy the text to its corresponding field:
             if (in_array($fieldName, $coreFieldNames))
             {
                 $this->coreFieldDataLocalIndex[$fieldName][] = $localIndexValue;
-                $this->coreFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
+                $this->coreFieldDataSharedIndex[$fieldName][] = $defaultSharedIndexValue;
 
                 if ($localIndexValue != $sharedIndexValue && $sharedIndexValue != UNMAPPED_SHARED_INDEX_VALUE)
                 {
-                    // This is a core field that has different local and shared index values. To allow the local index
-                    // value to be searchable, copy that value to the local fields data which gets queried by a shared
-                    // search. As further explanation, let's use the Subject field as an example. It is a core field
+                    // This core field's local value is mapped to a different shared value. To allow the local index
+                    // value to be searchable during a shared search, copy the local value to the local fields data.
+                    // As further explanation, let's use the Subject field as an example. It is a core field
                     // which means it is used by all sites (all sites have a Subject element). In contrast, a field like
                     // "Address" would be a local field meaning that it is only used by specific sites. The Subject
                     //  field also uses the Common Vocabulary which means it can have a local value like
@@ -295,12 +301,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
             else if (in_array($fieldName, $localFieldNames))
             {
-                // Copy the local value since a local field never uses the common vocabulary.
+                // Copy the local value since a local field never uses the Common Vocabulary.
                 $this->localFieldData[$fieldName][] = $localIndexValue;
             }
             else if (!$excludePrivateFields && in_array($fieldName, $privateFieldNames))
             {
-                // Copy the local value since a private field never uses the common vocabulary.
+                // Copy the local value since a private field never uses the Common Vocabulary.
                 $this->privateFieldData[$fieldName][] = $localIndexValue;
             }
         }
