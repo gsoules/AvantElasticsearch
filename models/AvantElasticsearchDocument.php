@@ -615,6 +615,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'title' => $titleString,
             'description' => $descriptionString,
             'public' => (bool)$itemData['public'],
+            'modified' => $itemData['modified'],
             'contributor' => $this->installation['contributor'],
             'contributor-id' => $this->installation['contributor_id']
         );

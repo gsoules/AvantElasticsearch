@@ -122,6 +122,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
             $this->addKeywordFieldToMappingProperties('sort.address-street');
         }
 
+        // The item's modification timestamp.
+        $this->addKeywordFieldToMappingProperties('item.modified');
+
         // Specify special fields that will be used to influence document scores by boosting.
         $this->addBoostFields();
 

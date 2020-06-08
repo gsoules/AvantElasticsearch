@@ -43,6 +43,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['files_data'] = $itemFilesData;
         $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $item->public;
+        $itemData['modified'] = $item->modified;
         $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
 
         // Fixup the document to use the appropriate data for a shared or local index.
@@ -448,7 +449,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $sql = "
                 SELECT
                   id,
-                  public
+                  public,
+                  modified
                 FROM
                   $table
             ";
