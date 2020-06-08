@@ -31,15 +31,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
     protected $titleFieldTexts = null;
     protected $year = 0;
 
-    // Arrays for collecting multiple values.
-    protected $commonFieldDataLocalSearch = [];
-    protected $commonFieldDataSharedSearch = [];
+    // Arrays pair that can contain different data for use in a local index than in a shared index.
+    protected $commonFieldDataLocalIndex = [];
+    protected $commonFieldDataSharedIndex = [];
+    protected $facetDataLocalIndex = [];
+    protected $facetDataSharedIndex = [];
+    protected $sortDataLocalIndex = [];
+    protected $sortDataSharedIndex = [];
+
+    protected $htmlFields = [];
     protected $localFieldData = [];
     protected $privateFieldData = [];
-    protected $sortData = [];
-    protected $facetDataCommon = [];
-    protected $facetDataLocal = [];
-    protected $htmlFields = [];
 
     public function __construct($indexName, $documentId)
     {
@@ -69,12 +71,13 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $fileCounts = $this->getFileCounts($itemData);
         $this->setField('file', $fileCounts);
 
-        $this->setField('common-fields-shared-search', $this->commonFieldDataSharedSearch);
-        $this->setField('common-fields-local-search', $this->commonFieldDataLocalSearch);
+        $this->setField('common-fields-shared-index', $this->commonFieldDataSharedIndex);
+        $this->setField('common-fields-local-index', $this->commonFieldDataLocalIndex);
+        $this->setField('facet-shared-index', $this->facetDataSharedIndex);
+        $this->setField('facet-local-index', $this->facetDataLocalIndex);
+        $this->setField('sort-local-index', $this->sortDataLocalIndex);
+        $this->setField('sort=shared-index', $this->sortDataLocalIndex);
         $this->setField('local-fields', $this->localFieldData);
-        $this->setField('sort', $this->sortData);
-        $this->setField('facet-shared-search', $this->facetDataCommon);
-        $this->setField('facet-local-search', $this->facetDataLocal);
 
         if (!$excludePrivateFields)
             $this->setField('private-fields', $this->privateFieldData);
@@ -118,37 +121,27 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $vocabularyKinds = $this->installation['vocabularies']['kinds'];
         $vocabularyMappings = $this->installation['vocabularies']['mappings'];
 
-        $localAndCommonFieldTexts = array();
-
         foreach ($itemFieldTexts as $elementId => $fieldTexts)
         {
             // Strip any HTML tags from the field's text value(s).
             $this->removeHtmlTagsFromFieldText($fieldTexts);
 
-            // Initially set common, local, and, default field texts value to be the same.
-            $localAndCommonFieldTexts['common'] = $fieldTexts;
-            $localAndCommonFieldTexts['local'] = $fieldTexts;
-            $localAndCommonFieldTexts['default'] = $fieldTexts;
-
             if ($usingCommonVocabulary && array_key_exists($elementId, $vocabularyKinds))
             {
-                // This element uses the common vocabulary and the shared index is being built. Get the common value,
-                // if one exists, for each of the element's local values. If the local value is not mapped to a
-                // common term, the common term gets set to UNMAPPED_LOCAL_TERM. In that case, the local term is used
-                // as the default term. The default term is the one used when creating a shared index. It's the common
-                // term is there is one, but "defaults" to the local term otherwise.
+                // This element uses the common vocabulary. Get the common value, if one exists, for each of the
+                // element's local values. The common value will be used in the shared index, and the original value
+                // will be used in the local index. If the local value is not mapped to a common term, the shared
+                // values gets set to UNMAPPED_SHARED_INDEX_VALUE so that subsequent logic can deal with it correctly.
                 $mappings = $vocabularyMappings[$vocabularyKinds[$elementId]];
                 foreach ($fieldTexts as $index => $fieldText)
                 {
                     $localTerm = $fieldText['text'];
                     $commonTerm = $this->getCommonTermForLocalTerm($localTerm, $mappings);
-                    $localAndCommonFieldTexts['common'][$index]['text'] = $commonTerm;
-                    if ($commonTerm != UNMAPPED_LOCAL_TERM)
-                        $localAndCommonFieldTexts['default'][$index]['text'] = $commonTerm;
+                    $fieldTexts[$index]['text-shared-index'] = $commonTerm ? $commonTerm : UNMAPPED_SHARED_INDEX_VALUE;
                 }
             }
 
-            $this->createFieldDataForElement($elementId, $localAndCommonFieldTexts, $excludePrivateFields);
+            $this->createFieldDataForElement($elementId, $fieldTexts, $excludePrivateFields);
         }
 
         $this->createFacetDataForContributor();
@@ -172,9 +165,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $number = intval($numberMatch);
 
                 // Pad the beginning of the number with leading zeros so that it can be sorted correctly as text.
-                $this->sortData[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
+                $this->sortDataLocalIndex[$elasticsearchFieldName . '-number'] = sprintf('%010d', $number);
 
-                $this->sortData[$elasticsearchFieldName . '-street'] = $matches[2];
+                $this->sortDataLocalIndex[$elasticsearchFieldName . '-street'] = $matches[2];
             }
         }
     }
@@ -224,7 +217,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         return $facetData;
     }
 
-    protected function createFacetDataForField($elasticsearchFieldName, $commonFieldTexts, $localFieldTexts = null)
+    protected function createFacetDataForField($elasticsearchFieldName, $fieldTexts)
     {
         if (!isset($this->facetDefinitions[$elasticsearchFieldName]))
         {
@@ -232,25 +225,22 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             return;
         }
 
-        if (!$localFieldTexts)
-            $localFieldTexts = $commonFieldTexts;
-
         // Create the common facets.
-        $facetValuesForElementCommon = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $commonFieldTexts);
+        $facetValuesForElementCommon = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts, true);
         foreach ($facetValuesForElementCommon as $facetValue)
         {
-            $this->facetDataCommon = $this->createFacetData($facetValue, $elasticsearchFieldName, $this->facetDataCommon);
+            $this->facetDataSharedIndex = $this->createFacetData($facetValue, $elasticsearchFieldName, $this->facetDataSharedIndex);
         }
 
         // Create the local facets.
-        $facetValuesForElementLocal = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $localFieldTexts);
+        $facetValuesForElementLocal = $this->avantElasticsearchFacets->getFacetValuesForElement($elasticsearchFieldName, $fieldTexts, false);
         foreach ($facetValuesForElementLocal as $facetValue)
         {
-            $this->facetDataLocal = $this->createFacetData($facetValue, $elasticsearchFieldName, $this->facetDataLocal);
+            $this->facetDataLocalIndex = $this->createFacetData($facetValue, $elasticsearchFieldName, $this->facetDataLocalIndex);
         }
     }
 
-    protected function createFieldDataForElement($elementId, $localAndCommonFieldTexts, $excludePrivateFields)
+    protected function createFieldDataForElement($elementId, $fieldTexts, $excludePrivateFields)
     {
         // Get the element's field name.
         $fieldName = $this->installation['all_contributor_fields'][$elementId];
@@ -261,60 +251,58 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $localFieldNames = $this->installation['local_fields'];
         $privateFieldNames = $this->installation['private_fields'];
 
-        $fieldTexts = array();
-
         // Loop over the values for this element. It's values plural since some elements can have multiple values. For
         // example, if an Omeka item has more than one Subject, its Subject element will have a separate values for each.
-        foreach ($localAndCommonFieldTexts['default'] as $index => $fieldTextsDefault)
+        foreach ($fieldTexts as $index => $fieldText)
         {
-            $fieldTextsCommon = $localAndCommonFieldTexts['common'][$index];
-            $fieldTextsLocal = $localAndCommonFieldTexts['local'][$index];
-
-            $fieldTextsDefaultValue = $fieldTextsDefault['text'];
-            $fieldTextsCommonValue = $fieldTextsCommon['text'];
-            $fieldTextsLocalValue = $fieldTextsLocal['text'];
+            $sharedIndexValue = $fieldTexts['text-shared-index'];
+            $localIndexValue = $fieldTexts['text'];
 
             if ($index == 0)
             {
                 // This is the element's first value. Use it value for sorting purposes. If the element has additional
                 // values, they won't be used for sorting. In a sorted list of Omeka items, the other values will
-                // appear along with the value, but only this value will be in sort order. Use the default value which
-                // will be the local value for a local index. For a shared index it will be the common term if one
-                // exists, otherwise it "defaults" to the local term.
-                $sortText = $this->convertFieldValueToSortText($fieldTextsDefaultValue);
-                $this->sortData[$fieldName] = $sortText;
+                // appear along with the value, but only this value will be in sort order.
+                $this->sortDataLocalIndex[$fieldName] = $this->convertFieldValueToSortText($localIndexValue);
+                $this->sortDataSharedIndex[$fieldName] = $this->convertFieldValueToSortText($sharedIndexValue);
             }
 
             // Copy the text to its corresponding field:
             if (in_array($fieldName, $commonFieldNames))
             {
-                $this->commonFieldDataSharedSearch[$fieldName][] = $fieldTextsDefaultValue;
-                $this->commonFieldDataLocalSearch[$fieldName][] = $fieldTextsLocalValue;
+                $this->commonFieldDataLocalIndex[$fieldName][] = $localIndexValue;
+                $this->commonFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
 
-                if ($fieldTextsLocalValue != $fieldTextsCommonValue && $fieldTextsCommonValue != UNMAPPED_LOCAL_TERM)
+                if ($localIndexValue != $sharedIndexValue && $sharedIndexValue != UNMAPPED_SHARED_INDEX_VALUE)
                 {
-                    // This is a common field, and because it has different local and common values, we know that it
-                    // uses the common vocabulary. We just copied its common vocabulary term to the common fields data,
-                    // but if that's all we did, a shared keyword search of the local term would come up empty. To allow
-                    // shared keyword searches to find local terms that are mapped to common terms, also copy the local
-                    // value to the local fields data which makes it searchable. In the resulting shared index, a field
-                    // like Subject, which is a common field, will exist in both the common-fields and local-fields
-                    // sections of the index.
-                    $this->localFieldData[$fieldName][] = $fieldTextsLocalValue;
+                    // This is a common field that has different local and shared index values. To allow the local index
+                    // value to be searchable, copy that value to the local fields data which gets queried by a shared
+                    // search. As further explanation, let's use the Subject field as an example. It is a common field
+                    // which means it is used by (common to) all sites (all sites have a Subject element). In contrast,
+                    // a field like "Address" would be a local field meaning that it is only used by specific sites.
+                    // The Subject field also uses the Common Vocabulary which means it can have a local value like
+                    // "Birds, Songbirds" that is mapped to a Common Vocabulary term like "Nature, Animals, Birds".
+                    // The local value gets used as the Subject in the local index and the mapped value gets used in
+                    // the shared index. However, without the logic below, a shared search on "Songbirds" would come up
+                    // empty because that word would not be in the shared index. To allow shared searching of mapped
+                    // values, the code below adds the local value to the shared index by putting it in the index's
+                    // local field data as though it were a separate local field. As such, the Subject field will appear
+                    // in the common fields data with the value "Nature, Animals, Birds" and the Subject field will also
+                    // appear in the local fields data with the value "Birds, Songbirds". Since a shared search queries
+                    // both fields, it will get a hit on "Songbirds" in the local field data.
+                    $this->localFieldData[$fieldName][] = $localIndexValue;
                 }
             }
             else if (in_array($fieldName, $localFieldNames))
             {
                 // Copy the local value since a local field never uses the common vocabulary.
-                $this->localFieldData[$fieldName][] = $fieldTextsLocalValue;
+                $this->localFieldData[$fieldName][] = $localIndexValue;
             }
             else if (!$excludePrivateFields && in_array($fieldName, $privateFieldNames))
             {
                 // Copy the local value since a private field never uses the common vocabulary.
-                $this->privateFieldData[$fieldName][] = $fieldTextsLocalValue;
+                $this->privateFieldData[$fieldName][] = $localIndexValue;
             }
-
-            $fieldTexts[] = $fieldTextsDefault;
         }
 
         // Set flags to indicate if this field requires special handling.
@@ -324,7 +312,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $this->createHtmlData($fieldName, $fieldTexts);
         $this->createIntegerElementSortData($fieldName, $fieldTexts[0]['text']);
         $this->createAddressElementSortData($fieldName, $fieldTexts);
-        $this->createFacetDataForField($fieldName, $localAndCommonFieldTexts['default'], $localAndCommonFieldTexts['local']);
+        $this->createFacetDataForField($fieldName, $fieldTexts);
     }
 
     protected function createHtmlData($elasticsearchFieldName, $fieldTexts)
@@ -366,7 +354,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             if (is_numeric($textString))
             {
                 // Pad the beginning of the value with leading zeros so that integers can be sorted correctly as text.
-                $this->sortData[$elasticsearchFieldName] = sprintf('%010d', $textString);
+                $this->sortDataLocalIndex[$elasticsearchFieldName] = sprintf('%010d', $textString);
             }
         }
     }
@@ -379,8 +367,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // configured in AvantCommon. Get the alias value and use it as the identifier field value.
             $id = $this->installation['alias_id'];
             $aliasText = isset($itemFieldTexts[$id][0]['text']) ? $itemFieldTexts[$id][0]['text'] : BLANK_FIELD_TEXT;
-            $this->commonFieldDataSharedSearch['identifier'][0] = $aliasText;
-            $this->commonFieldDataLocalSearch['identifier'][0] = $aliasText;
+            $this->commonFieldDataSharedIndex['identifier'][0] = $aliasText;
+            $this->commonFieldDataLocalIndex['identifier'][0] = $aliasText;
         }
 
         // Create a field-text to represent an unspecified date, place, subject, or type.
@@ -435,7 +423,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $tagsData = $itemData['tags_data'];
         if (!empty($tagsData))
         {
-            $this->facetDataLocal['tag'] = $tagsData;
+            $this->facetDataLocalIndex['tag'] = $tagsData;
             $this->setField('tags', $tagsData);
         }
     }
@@ -455,22 +443,26 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
     public static function fixupDocumentBody($isSharedIndex, &$documentBody)
     {
-        // Choose which data to use for the 'common-fields' and 'facet' values depending on whether the index is
-        // shared or local. The document body contains both common and local data, but only one or the other is
-        // kept. This fixup is necessary because the data file for a bulk export contains both kinds of data which
-        // it stores in the keys ending with 'shared-search' and 'local-search', however only one or the other goes
-        // into the index. This method choose which data to use, inserts the correct keys ('common-fields and 'facet'),
-        // and then deletes the original keys.
+        // Choose which data to use depending on whether the index is shared or local. The document body contains both
+        // shared and local data, but only one or the other is kept. This fixup is necessary because the data file for
+        // a bulk export contains both kinds of data which it stores in the keys ending with 'shared-index' and
+        // 'local-index', however only one or the other goes into the index. This method choose which data to use,
+        // inserts the correct keys (common-fields, facet, or sort), and then deletes the original keys.
 
-        $commonFieldsKey = $isSharedIndex ? 'common-fields-shared-search' : 'common-fields-local-search';
+        $commonFieldsKey = $isSharedIndex ? 'common-fields-shared-index' : 'common-fields-local-search';
         $documentBody['common-fields'] = $documentBody[$commonFieldsKey];
-        unset($documentBody['common-fields-shared-search']);
-        unset($documentBody['common-fields-local-search']);
+        unset($documentBody['common-fields-shared-index']);
+        unset($documentBody['common-fields-local-index']);
 
-        $facetKey = $isSharedIndex ? 'facet-shared-search' : 'facet-local-search';
+        $facetKey = $isSharedIndex ? 'facet-shared-index' : 'facet-local-index';
         $documentBody['facet'] = $documentBody[$facetKey];
-        unset($documentBody['facet-shared-search']);
-        unset($documentBody['facet-local-search']);
+        unset($documentBody['facet-shared-index']);
+        unset($documentBody['facet-local-index']);
+
+        $sortKey = $isSharedIndex ? 'sort-shared-index' : 'sort-local-index';
+        $documentBody['sort'] = $documentBody[$sortKey];
+        unset($documentBody['sort-shared-index']);
+        unset($documentBody['sort-local-index']);
 
         if (!$isSharedIndex)
         {
@@ -511,7 +503,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         {
             // The local term is not a common term and has not been mapped to a common term using the Vocabulary Editor.
             // Use a special value for the common term so that subsequent logic knows that the local term is unmapped.
-            $commonTerm = UNMAPPED_LOCAL_TERM;
+            $commonTerm = UNMAPPED_SHARED_INDEX_VALUE;
         }
 
         return $commonTerm;
@@ -666,7 +658,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             {
                 // This installation does not have its files at the root of the 'original' folder. Check to see if
                 // the files are located in a sub directory having the item identifier as its name.
-                $itemIdentifier = $this->commonFieldDataLocalSearch['identifier'][0];
+                $itemIdentifier = $this->commonFieldDataLocalIndex['identifier'][0];
                 $filepath = $this->getItemPdfFilepath('original' . DIRECTORY_SEPARATOR . $itemIdentifier, $fileName);
                 if (!file_exists($filepath))
                 {

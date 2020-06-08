@@ -49,7 +49,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $html = '';
 
-        if ($facetText == UNMAPPED_LOCAL_TERM)
+        if ($facetText == UNMAPPED_SHARED_INDEX_VALUE)
         {
             return $html;
         }
@@ -680,7 +680,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         return $value;
     }
 
-    public function getFacetValuesForElement($elasticsearchFieldName, $fieldTexts)
+    public function getFacetValuesForElement($elasticsearchFieldName, $fieldTexts, $forSharedIndex)
     {
         if (!array_key_exists($elasticsearchFieldName, $this->facetDefinitions))
         {
@@ -693,7 +693,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Get the value for each of the element's texts.
         foreach ($fieldTexts as $fieldText)
         {
-            $text = $fieldText['text'];
+            $key = $forSharedIndex ? 'text-shared-index' : 'text';
+            $text = $fieldText[$key];
             $facetDefinition = $this->facetDefinitions[$elasticsearchFieldName];
 
             if ($facetDefinition['is_hierarchy'])
