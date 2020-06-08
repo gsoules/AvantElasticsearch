@@ -131,7 +131,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 // This element uses the Common Vocabulary. Get the common term for each of the element's local values.
                 // The common value will be used in the shared index, and the local value will be used in the local
                 // index. If the local value is not mapped to a common term, the local values gets used as the shared
-                // index value and the field gets flagged as unmapped for the benefit of subsequent logic.
+                // index value. The 'mapped' flag is for the benefit of subsequent logic. The other 'mapping' flags are
+                // are to make clear what's going on during development and debugging.
                 $mappings = $vocabularyMappings[$vocabularyKinds[$elementId]];
                 foreach ($fieldTexts as $index => $fieldText)
                 {
@@ -141,13 +142,19 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                     {
                         // The local value is not mapped to a common term.
                         $commonTerm = $localTerm;
-                        $fieldTexts[$index]['mapped'] = false;
+                        $fieldTexts[$index]['mapping'] = 'unmapped';
                     }
                     elseif ($commonTerm != $localTerm)
                     {
                         // The local value is mapped to a common term that is different than the local value.
-                        $fieldTexts[$index]['mapped'] = true;
+                        $fieldTexts[$index]['mapping'] = 'mapped';
                     }
+                    else
+                    {
+                        // The local value is the same as a common term.
+                        $fieldTexts[$index]['mapping'] = 'same';
+                    }
+
                     $fieldTexts[$index]['text-shared-index'] = $commonTerm;
                 }
             }
@@ -158,6 +165,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 foreach ($fieldTexts as $index => $fieldText)
                 {
                     $fieldTexts[$index]['text-shared-index'] = $fieldTexts[$index]['text'];
+                    $fieldTexts[$index]['mapping'] = 'none';
                 }
             }
 
@@ -295,7 +303,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $this->coreFieldDataLocalIndex[$fieldName][] = $localIndexValue;
                 $this->coreFieldDataSharedIndex[$fieldName][] = $sharedIndexValue;
 
-                if (isset($fieldText['mapped']) && $fieldText['mapped'] == true)
+                if ($fieldText['mapping'] == 'mapped')
                 {
                     // This core field's local value is mapped to a different shared value. To allow the local index
                     // value to be searchable during a shared search, copy the local value to the local fields data.
