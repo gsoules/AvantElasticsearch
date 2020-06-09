@@ -354,6 +354,13 @@ class AvantElasticsearch
         return $configuration->shared_index_name;
     }
 
+    public static function getNewSharedIndexAllowed()
+    {
+        $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
+        $configuration = new Zend_Config_Ini($configFile, 'config');
+        return $configuration->new_shared_index_allowed == true;
+    }
+
     public function getYearFromDate($dateText)
     {
         $year = '';

@@ -15,13 +15,22 @@ if (AvantCommon::isAjaxRequest())
 $pageTitle = __('Elasticsearch Indexing');
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 
+$contributorId = ElasticsearchConfig::getOptionValueForContributorId();
+$sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
+
 // Initialize the action options.
 $options = array(
-    'export-all' => 'Export all items from Omeka',
-    'export-some' => 'Export 100 items from Omeka',
-    'import-existing' =>'Import into existing index',
-    'import-new' => 'Import into new index'
+    'export-some' => ' Export 100 items from Omeka',
+    'export-all' => ' Export all items from Omeka',
+    'import-local-existing' =>" Import into existing local index ($contributorId)",
+    'import-local-new' =>" Import into new local index ($contributorId)",
+    'import-shared-existing' =>" Import into existing shared index ($sharedIndexName)"
     );
+
+if (AvantElasticsearch::getNewSharedIndexAllowed())
+{
+    $options['import-shared-new'] = " Import into new shared index ($sharedIndexName)";
+}
 
 // Warn if this session is running in the debugger because simultaneous Ajax requests won't work while debugging.
 if (isset($_COOKIE['XDEBUG_SESSION']))
@@ -55,13 +64,11 @@ if (!$esDirectoryExists)
 // Display the action radio buttons and the Start button.
 if ($esDirectoryExists && $avantElasticsearchClient->ready())
 {
-    $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
     $indexingId =  date('md') . '-' . $contributorId;
     $indexName =  $contributorId;
     echo "<hr/>";
     echo '<div class="indexing-radio-buttons">' . $this->formRadio('action', null, null, $options) . '</div>';
     echo '<div><span style="display:inline-block;width:80px;">Indexing ID: </span><span>' . $this->formText(null, $indexingId, array('size' => '12', 'id' => 'indexing-id')) . '</span></div>';
-    echo '<div id="index-name-fields"><span style="display:inline-block;width:80px;">Index Name: </span><span>' . $this->formText(null, $indexName, array('size' => '12', 'id' => 'index-name')) . '</span></div>';
     echo "<button id='start-button'>Start</button>";
     echo '<div id="status-area"></div>';
 }
@@ -75,7 +82,6 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
     jQuery(document).ready(function ()
     {
         var actionButtons = jQuery("input[name='action']");
-        var indexNameFields = jQuery("#index-name-fields");
         var startButton = jQuery("#start-button").button();
         var statusArea = jQuery("#status-area");
 
@@ -98,7 +104,6 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
         function initialize()
         {
             enableStartButton(false);
-            indexNameFields.hide();
 
             // Set up the handlers that respond to radio button and Start button clicks.
             actionButtons.change(function (e)
@@ -110,11 +115,9 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                 if (selectedAction.startsWith('export'))
                 {
                     indexingOperation = 'export';
-                    indexNameFields.hide();
                 }
                 else
                 {
-                    indexNameFields.show();
                     indexingOperation = 'import';
                 }
                 enableStartButton(true);
@@ -122,7 +125,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
 
             startButton.on("click", function()
             {
-                if (selectedAction === 'import-new')
+                if (selectedAction === 'import-local-new' || selectedAction === 'import-shared-new')
                 {
                     if (!confirm('Are you sure you want to create a new index?\n\nThe current index will be DELETED.'))
                         return;
@@ -177,7 +180,6 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
             actionInProgress = true;
             statusArea.html('');
             indexingId = jQuery("#indexing-id").val();
-            indexingName = jQuery("#index-name").val();
 
             enableStartButton(false);
 
@@ -194,7 +196,6 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     dataType: 'json',
                     data: {
                         action: selectedAction,
-                        index_name: indexingName,
                         indexing_id: indexingId,
                         operation: indexingOperation
                     },

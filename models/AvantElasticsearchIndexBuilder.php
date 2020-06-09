@@ -655,8 +655,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // benefit of providing a persistent log file which can be used later to view import and export statistics.
 
         $action = isset($_POST['action']) ? $_POST['action'] : 'NO ACTION PROVIDED';
+        $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
         $indexingId = isset($_POST['indexing_id']) ? $_POST['indexing_id'] : '';
-        $indexName = isset($_POST['index_name']) ? $_POST['index_name'] : '';
         $indexingOperation = isset($_POST['operation']) ? $_POST['operation'] : '';
         $indexingAction = false;
         $response = '';
@@ -672,13 +672,20 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     $indexingAction = true;
                     // The limit is used only during development to reduce the number of items exported when debugging.
                     $limit = $action == 'export-all' ? 0 : 100;
-                    $this->performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit);
+                    $this->performBulkIndexExport($contributorId, $indexingId, $indexingOperation, $limit);
                     break;
 
-                case 'import-new':
-                case 'import-existing':
+                case 'import-local-new':
+                case 'import-local-existing':
+                case 'import-shared-new':
+                case 'import-shared-existing':
                     $indexingAction = true;
-                    $deleteExistingIndex = $action == 'import-new';
+                    $deleteExistingIndex = $action == 'import-local-new' || $action == 'import-shared-new';
+                    if ($action == 'import-local-new' || $action == 'import-local-existing')
+                        $indexName = ElasticsearchConfig::getOptionValueForContributorId();
+                    else
+                        $indexName = AvantElasticsearch::getNameOfSharedIndex();
+
                     $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
                     break;
 

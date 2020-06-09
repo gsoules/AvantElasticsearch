@@ -21,9 +21,9 @@
 }
 
 .indexing-radio-buttons {
-    line-height: 24px;
-    margin: 0 0 8px 0;
-    padding: 8px 0;
+    line-height: 28px;
+    font-size: 110%;
+    margin-bottom: 16px;
 }
 
 .health-report-ok,
