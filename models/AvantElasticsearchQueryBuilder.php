@@ -492,12 +492,18 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         if ($viewId == SearchResultsViewFactory::TABLE_VIEW_ID)
             $body['track_scores'] = true;
 
+        $indexName = $this->getNameOfActiveIndex();
+
         $params = [
-            'index' => $this->getNameOfActiveIndex(),
+            'index' => $indexName,
             'from' => $offset,
             'size' => $limit,
             'body' => $body
         ];
+
+        // For debugging. Copy/paste the value of $kibana into the Kibana Dev Tools and use Auto Indent to format it.
+        $bodyJson = json_encode($body);
+        $kibana = "GET $indexName/_search\n$bodyJson";
 
         return $params;
     }
