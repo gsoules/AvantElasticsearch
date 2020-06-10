@@ -185,7 +185,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
         if ($fieldName == 'tags')
         {
-            $field = 'tags';
+            $fields = ['tags'];
             if ($condition == 'is exactly')
             {
                 // The 'is exactly' condition won't work with tags because its value is an array, not a string.
@@ -194,19 +194,19 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
         else if ($fieldName == 'contributor')
         {
-            $field = 'item.contributor-id';
+            $fields = ['item.contributor-id'];
         }
         else if ($fieldName == 'public')
         {
-            $field = 'item.public';
+            $fields = ['item.public'];
             $terms = strtolower(trim($terms));
             if ($terms != 'true' && $terms != 'false')
                 $terms = 'false';
         }
         else
-            $field = $this->getQualifiedFieldNameFor($fieldName);
+            $fields = $this->getQualifiedFieldNamesFor($fieldName);
 
-        $fieldLowerCase = "$field.lowercase";
+        $fieldLowerCase = "$fields[0].lowercase";
 
         switch ($condition)
         {
@@ -219,7 +219,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 break;
 
             case 'is not empty':
-                $query = array('exists' => ['field' => $field]);
+                $query = array('exists' => ['field' => $fields[0]]);
                 break;
 
             case 'starts with':
@@ -240,9 +240,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'simple_query_string' => [
                         'query' => $terms,
                         'default_operator' => 'and',
-                        'fields' => [
-                            $field
-                        ]
+                        'fields' => $fields
                     ]
                 );
         }
@@ -393,7 +391,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             else if ($fieldName == 'contributor')
                 $field = 'item.contributor-id';
             else
-                $field = $this->getQualifiedFieldNameFor($fieldName);
+                $field = $this->getQualifiedFieldNamesFor($fieldName);
 
             $mustNot[] = [
                 "exists" => [
@@ -693,16 +691,53 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return '';
     }
 
-    protected function getQualifiedFieldNameFor($fieldName)
+    protected function getQualifiedFieldNamesFor($fieldName)
     {
+        $fields = array();
+
         if (in_array($fieldName, $this->getFieldNamesOfCoreElements()))
-            return "core-fields.$fieldName";
+        {
+            $fields[] = "core-fields.$fieldName";
+
+            // Determine if local-fields should also be searched. This is the case for fields that use the
+            // Common Vocabulary and thus can have two different values: a local value for local searching
+            // that is mapped to a common value for shared searching. For an explanation, see the comments
+            // regarding 'mapped' fields in AvantElasticsearch::createFieldDataForElement().
+            if ($this->isSharedIndexVocabularyField($fieldName))
+                $fields[] = "local-fields.$fieldName";
+        }
         else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
-            return "local-fields.$fieldName";
+        {
+            $fields[] = "local-fields.$fieldName";
+        }
         else if (in_array($fieldName, $this->getFieldNamesOfPrivateElements()))
-            return "private-fields.$fieldName";
+        {
+            $fields[] = "private-fields.$fieldName";
+        }
         else
-            return $fieldName;
+        {
+            $fields[] = $fieldName;
+        }
+
+        return $fields;
+    }
+
+    protected function isSharedIndexVocabularyField($fieldName)
+    {
+        if (!plugin_is_active('AvantVocabulary'))
+            return false;
+
+        if (!$this->isUsingSharedIndex())
+            return false;
+
+        // Determine if the field uses the Common Vocabulary.
+        $vocabularyFields = AvantVocabulary::getVocabularyFields();
+        foreach ($vocabularyFields as $vocabularyFieldName => $kind)
+        {
+            if ($fieldName == $this->convertElementNameToElasticsearchFieldName($vocabularyFieldName))
+                return true;
+        }
+        return false;
     }
 
     public function isUsingSharedIndex()
