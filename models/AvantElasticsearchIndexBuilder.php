@@ -296,21 +296,32 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $kindTable = AvantVocabulary::getVocabularyKinds();
 
         // Query the database to get an array of local_term / common_term pairs for each kind.
-        foreach ($kindTable as $kind)
+        try
         {
-            $pairs[$kind] = get_db()->getTable('VocabularyLocalTerms')->getLocalToCommonTermMap($kind);
-        }
-
-        // Convert the pairs into an array for each kind where the index is the local term and the value is the common term.
-        // If there is no local term, the common term is used for the local term.
-        foreach ($pairs as $kind => $mappingsForKind)
-        {
-            foreach ($mappingsForKind as $mapping)
+            foreach ($kindTable as $kind)
             {
-                $commonTerm = $mapping['common_term'];
-                $localTerm = $mapping['local_term'] ? $mapping['local_term'] : $commonTerm;
-                $mappings[$kind][$localTerm] = $commonTerm;
+                $pairs[$kind] = get_db()->getTable('VocabularyLocalTerms')->getLocalToCommonTermMap($kind);
             }
+
+            // Convert the pairs into an array for each kind where the index is the local term and the value is the common term.
+            // If there is no local term, the common term is used for the local term.
+            foreach ($pairs as $kind => $mappingsForKind)
+            {
+                foreach ($mappingsForKind as $mapping)
+                {
+                    $commonTerm = $mapping['common_term'];
+                    $localTerm = $mapping['local_term'] ? $mapping['local_term'] : $commonTerm;
+                    $mappings[$kind][$localTerm] = $commonTerm;
+                }
+            }
+        }
+        catch (Exception $e)
+        {
+            // This should never happen under normal circumstances. However, when first setting up a Digital Archive
+            // site, it could occur if an attempt is made to export Elasticsearch data before having built the
+            // vocabulary tables.
+            $kindTable = array();
+            $mappings = array();
         }
 
         $vocabularies = [
