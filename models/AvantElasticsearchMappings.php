@@ -90,7 +90,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $localFields = $this->getFieldNamesOfLocalElements();
         $privateFields = $this->getFieldNamesOfPrivateElements();
 
-        // Provide both an element and sort mapping for every field. The element mapping is used for searching and the
+        // Provide both an element and sort mapping for core fields. The element mapping is used for searching and the
         // sort mapping is used exclusively for sorting. Also, an element field contain all the values for a multi-value
         // element whereas a sort field only contains the first value of a multi-value element.
         foreach ($coreFields as $fieldName)
@@ -101,6 +101,9 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
         if (!$isSharedIndex)
         {
+            // Provide both an element and sort mapping for this site's local fields. The element mapping is used for searching and the
+            // sort mapping is used exclusively for sorting. Also, an element field contain all the values for a multi-value
+            // element whereas a sort field only contains the first value of a multi-value element.
             foreach ($localFields as $fieldName)
             {
                 $this->addTextAndKeywordFieldToMappingProperties("local-fields.$fieldName");
@@ -166,11 +169,13 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addKeywordFieldToMappingProperties('url.item');
         $this->addKeywordFieldToMappingProperties('url.thumb');
 
+        $dynamicTemplates = array();
+
         // Dynamically map fields pdf.text-0, pdf-text-1, and so on. How many of these fields there are is determined
         // by the item with the most PDF file attachments (only PDFs that are searchable). For example, most items
         // will have zero or one PDF attachment, but if there's an item with 10 PDFs, fields up to pdf-text-9 will
         // created and mapped when that item is indexed.
-        $templatePdf = (object) array(
+        $dynamicTemplates[] = (object) array(
             'pdf_text' => [
                 'path_match' => 'pdf.text-*',
                     'mapping' => [
@@ -180,22 +185,31 @@ class AvantElasticsearchMappings extends AvantElasticsearch
                 ]
             );
 
-        $templateLocal = (object) array(
-            'local_text' => [
-                'path_match' => 'local.*',
+        // Dynamically map local fields into the shared index so that every local field from every site gets into the
+        // shared index. This has to be done dynamically since the shared index is only created once and at creation
+        // time there's no way of knowing what local fields exist for which sites or which local fields will get
+        // added to sites in the future. By using a dynamic template, every time a local site updates the shared index,
+        // any of its local fields that are not already in the shared index, will get added. The ultimate goal is to
+        // allow the local content for all sites to be searchable when doing a shared search just as it would be
+        // searchable if searching just the local site.
+        if ($isSharedIndex)
+        {
+            $dynamicTemplates[] = (object) array(
+                'local_text' => [
+                    'path_match' => 'local-fields.*',
                     'mapping' => [
                         'type' => 'text',
                         'analyzer' => 'english'
                     ]
                 ]
             );
+        }
 
         $mappingType = $this->getDocumentMappingType();
-
         $mappings = [
             $mappingType => [
                 'properties' => $this->properties,
-                'dynamic_templates' => [$templatePdf, $templateLocal]
+                'dynamic_templates' => $dynamicTemplates
             ]
         ];
 
