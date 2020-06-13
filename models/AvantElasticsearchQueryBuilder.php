@@ -51,7 +51,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     ]
                 ];
 
-                // Sorting is currently required for hierarchical data because the logic for presenting hierarchical
+                // Sorting is required for hierarchical data because the logic for presenting hierarchical
                 // facets indented as root > first-child > leaf is dependent on the values being sorted.
                 $terms[$group]['terms']['order'] = array('_key' => 'asc');
                 $terms[$group]['aggregations']['leafs']['terms']['order'] = array('_key' => 'asc');
