@@ -97,6 +97,14 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         {
             $this->addTextAndKeywordFieldToMappingProperties("core-fields.$fieldName");
             $this->addKeywordFieldToMappingProperties("sort.$fieldName");
+
+            if ($this->isSharedIndexVocabularyField($fieldName))
+            {
+                // This core field uses the Common Vocabulary and thus can have two values if the local value is mapped
+                // to a common term. Add it to the list of shadow fields so that its common value can shadow its local
+                // value during a local search, and its local value can shadow its common value during a shared search.
+                $this->addTextAndKeywordFieldToMappingProperties("shadow-fields.$fieldName");
+            }
         }
 
         if (!$isSharedIndex)

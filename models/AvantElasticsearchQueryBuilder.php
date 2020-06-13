@@ -204,7 +204,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 $terms = 'false';
         }
         else
-            $fields = $this->getQualifiedFieldNamesFor($fieldName);
+            $fields = $this->getFieldNamesToQuery($fieldName);
 
         $fieldLowerCase = "$fields[0].lowercase";
 
@@ -270,7 +270,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             if (empty($condition) || $condition == 'is empty')
                 continue;
 
-            $fieldName = $this->getAdvancedFieldName($advancedArg);
+            $fieldName = $this->getFieldNameFromAdvancedSearchFilter($advancedArg);
             $terms = $this->getAdvancedTerms($advancedArg);
 
             $conditionFilter = $this->constructQueryCondition($fieldName, $condition, $terms);
@@ -355,6 +355,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                         'item.description^10',
                         'core-fields.*',
                         'local-fields.*',
+                        'shadow-fields.*',
                         'tags',
                         'pdf.text-*'
                     ]
@@ -385,13 +386,13 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             if ($this->getAdvancedCondition($advanced) != 'is empty')
                 continue;
 
-            $fieldName = $this->getAdvancedFieldName($advanced);
+            $fieldName = $this->getFieldNameFromAdvancedSearchFilter($advanced);
             if ($fieldName == 'tags')
                 $field = 'tags';
             else if ($fieldName == 'contributor')
                 $field = 'item.contributor-id';
             else
-                $field = $this->getQualifiedFieldNamesFor($fieldName);
+                $field = $this->getFieldNamesToQuery($fieldName);
 
             $mustNot[] = [
                 "exists" => [
@@ -517,6 +518,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'core-fields.*',
                 'local-fields.*',
                 'private-fields.*',
+                'shadow-fields.*',
                 'item.*',
                 'file.*',
                 'tags',
@@ -546,6 +548,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'core-fields.' . $indexFieldName,
                 'local-fields.' . $indexFieldName,
                 'private-fields.' . $indexFieldName,
+                'shadow-fields.' . $indexFieldName,
                 'common.identifier',
                 'url.item'
             ];
@@ -633,9 +636,19 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return isset($advanced['type']) ? $advanced['type'] : '';
     }
 
-    protected function getAdvancedFieldName($advanced)
+    protected function getAdvancedTerms($advanced)
     {
-        $elementId = isset($advanced['element_id']) ? $advanced['element_id'] : '';
+        return isset($advanced['terms']) ? trim($advanced['terms']) : '';
+    }
+
+    public function getFacetDefinitions()
+    {
+        return $this->avantElasticsearchFacets->getFacetDefinitions();
+    }
+
+    protected function getFieldNameFromAdvancedSearchFilter($filter)
+    {
+        $elementId = isset($filter['element_id']) ? $filter['element_id'] : '';
         if (ctype_digit($elementId))
         {
             // The value is an Omeka element Id. Attempt to get the element's name. This should only happen if the query
@@ -654,14 +667,37 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $this->convertElementNameToElasticsearchFieldName($elementName);
     }
 
-    protected function getAdvancedTerms($advanced)
+    protected function getFieldNamesToQuery($fieldName)
     {
-        return isset($advanced['terms']) ? trim($advanced['terms']) : '';
-    }
+        $fields = array();
 
-    public function getFacetDefinitions()
-    {
-        return $this->avantElasticsearchFacets->getFacetDefinitions();
+        if (in_array($fieldName, $this->getFieldNamesOfCoreElements()))
+        {
+            $fields[] = "core-fields.$fieldName";
+
+            if ($this->isSharedIndexVocabularyField($fieldName))
+            {
+                // This core field uses the Common Vocabulary and therefore it could have two different values: a Common
+                // Vocabulary value and a local value that is mapped to the common value. During a shared search, the
+                // local value "shadows" the common value. This code adds the shadow value to the query. For further
+                // explanation, see comments regarding 'mapped' fields in AvantElasticsearch::createFieldDataForElement().
+                $fields[] = "shadow-fields.$fieldName";
+            }
+        }
+        else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
+        {
+            $fields[] = "local-fields.$fieldName";
+        }
+        else if (in_array($fieldName, $this->getFieldNamesOfPrivateElements()))
+        {
+            $fields[] = "private-fields.$fieldName";
+        }
+        else
+        {
+            $fields[] = $fieldName;
+        }
+
+        return $fields;
     }
 
     protected function getFuzzySynonym($word)
@@ -689,55 +725,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         }
 
         return '';
-    }
-
-    protected function getQualifiedFieldNamesFor($fieldName)
-    {
-        $fields = array();
-
-        if (in_array($fieldName, $this->getFieldNamesOfCoreElements()))
-        {
-            $fields[] = "core-fields.$fieldName";
-
-            // Determine if local-fields should also be searched. This is the case for fields that use the
-            // Common Vocabulary and thus can have two different values: a local value for local searching
-            // that is mapped to a common value for shared searching. For an explanation, see the comments
-            // regarding 'mapped' fields in AvantElasticsearch::createFieldDataForElement().
-            if ($this->isSharedIndexVocabularyField($fieldName))
-                $fields[] = "local-fields.$fieldName";
-        }
-        else if (in_array($fieldName, $this->getFieldNamesOfLocalElements()))
-        {
-            $fields[] = "local-fields.$fieldName";
-        }
-        else if (in_array($fieldName, $this->getFieldNamesOfPrivateElements()))
-        {
-            $fields[] = "private-fields.$fieldName";
-        }
-        else
-        {
-            $fields[] = $fieldName;
-        }
-
-        return $fields;
-    }
-
-    protected function isSharedIndexVocabularyField($fieldName)
-    {
-        if (!plugin_is_active('AvantVocabulary'))
-            return false;
-
-        if (!$this->isUsingSharedIndex())
-            return false;
-
-        // Determine if the field uses the Common Vocabulary.
-        $vocabularyFields = AvantVocabulary::getVocabularyFields();
-        foreach ($vocabularyFields as $vocabularyFieldName => $kind)
-        {
-            if ($fieldName == $this->convertElementNameToElasticsearchFieldName($vocabularyFieldName))
-                return true;
-        }
-        return false;
     }
 
     public function isUsingSharedIndex()

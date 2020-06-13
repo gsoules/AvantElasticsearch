@@ -22,9 +22,10 @@ class AvantElasticsearch
 
     // Used for caching and therefore should not be accessed directly by subclasses.
     private $fieldNamesOfAllElements = array();
+    private $fieldNamesOfCoreElements = array();
     private $fieldNamesOfLocalElements = array();
     private $fieldNamesOfPrivateElements = array();
-    private $fieldNamesOfCoreElements = array();
+    private $fieldNamesOfShadowElements = array();
 
     public function __construct()
     {
@@ -375,6 +376,21 @@ class AvantElasticsearch
     {
         json_decode($string);
         return (json_last_error() == JSON_ERROR_NONE);
+    }
+
+    protected function isSharedIndexVocabularyField($fieldName)
+    {
+        if (!plugin_is_active('AvantVocabulary'))
+            return false;
+
+        // Determine if the field uses the Common Vocabulary.
+        $vocabularyFields = AvantVocabulary::getVocabularyFields();
+        foreach ($vocabularyFields as $vocabularyFieldName => $kind)
+        {
+            if ($fieldName == $this->convertElementNameToElasticsearchFieldName($vocabularyFieldName))
+                return true;
+        }
+        return false;
     }
 
     public function setIndexName($name)
