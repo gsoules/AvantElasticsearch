@@ -355,9 +355,20 @@ class AvantElasticsearch
         return $configuration->shared_index_name;
     }
 
+    public static function getNewLocalIndexAllowed()
+    {
+        $configFile = BASE_DIR . '/es.ini';
+        if (!file_exists($configFile))
+            return false;
+        $configuration = new Zend_Config_Ini($configFile, 'config');
+        return $configuration->new_local_index_allowed == true;
+    }
+
     public static function getNewSharedIndexAllowed()
     {
-        $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
+        $configFile = BASE_DIR . '/es.ini';
+        if (!file_exists($configFile))
+            return false;
         $configuration = new Zend_Config_Ini($configFile, 'config');
         return $configuration->new_shared_index_allowed == true;
     }

@@ -23,9 +23,13 @@ $options = array(
     'export-some' => ' Export 100 items from Omeka',
     'export-all' => ' Export all items from Omeka',
     'import-local-existing' =>" Import into existing local index ($contributorId)",
-    'import-local-new' =>" Import into new local index ($contributorId)",
     'import-shared-existing' =>" Import into existing shared index ($sharedIndexName)"
     );
+
+if (AvantElasticsearch::getNewLocalIndexAllowed())
+{
+    $options['import-local-new'] = " Import into new local index ($contributorId)";
+}
 
 if (AvantElasticsearch::getNewSharedIndexAllowed())
 {
