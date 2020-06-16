@@ -20,7 +20,6 @@ $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
 
 // Initialize the action options.
 $options = array(
-    'export-some' => ' Export 100 items from Omeka',
     'export-all' => ' Export all items from Omeka',
     'import-local-existing' =>" Import into existing local index ($contributorId)",
     'import-shared-existing' =>" Import into existing shared index ($sharedIndexName)"
@@ -28,12 +27,13 @@ $options = array(
 
 if (AvantElasticsearch::getNewLocalIndexAllowed())
 {
-    $options['import-local-new'] = " Import into new local index ($contributorId)";
+    $options['export-some'] = " *Export 100 items from Omeka";
+    $options['import-local-new'] = " *Import into new local index ($contributorId)";
 }
 
 if (AvantElasticsearch::getNewSharedIndexAllowed())
 {
-    $options['import-shared-new'] = " Import into new shared index ($sharedIndexName)";
+    $options['import-shared-new'] = " *Import into new shared index ($sharedIndexName)";
 }
 
 // Warn if this session is running in the debugger because simultaneous Ajax requests won't work while debugging.
