@@ -191,7 +191,7 @@ class AvantElasticsearch
     {
         try
         {
-            $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
+            $configFile = BASE_DIR . DIRECTORY_SEPARATOR . 'es.ini';
             return new Zend_Config_Ini($configFile, 'config');
         }
         catch (Exception $e)
@@ -350,26 +350,19 @@ class AvantElasticsearch
 
     public static function getNameOfSharedIndex()
     {
-        $configFile = AVANTELASTICSEARCH_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'config.ini';
-        $configuration = new Zend_Config_Ini($configFile, 'config');
+        $configuration = self::getAvantElasticsearcConfig();
         return $configuration->shared_index_name;
     }
 
     public static function getNewLocalIndexAllowed()
     {
-        $configFile = BASE_DIR . '/es.ini';
-        if (!file_exists($configFile))
-            return false;
-        $configuration = new Zend_Config_Ini($configFile, 'config');
+        $configuration = self::getAvantElasticsearcConfig();
         return $configuration->new_local_index_allowed == true;
     }
 
     public static function getNewSharedIndexAllowed()
     {
-        $configFile = BASE_DIR . '/es.ini';
-        if (!file_exists($configFile))
-            return false;
-        $configuration = new Zend_Config_Ini($configFile, 'config');
+        $configuration = self::getAvantElasticsearcConfig();
         return $configuration->new_shared_index_allowed == true;
     }
 
