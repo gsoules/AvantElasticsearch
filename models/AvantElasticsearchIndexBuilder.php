@@ -44,6 +44,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $item->public;
         $itemData['modified'] = $item->modified;
+
         $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
 
         // Fixup the document to use the appropriate data for a shared or local index.
@@ -690,6 +691,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'import-local-existing':
                 case 'import-shared-new':
                 case 'import-shared-existing':
+                case 'remove-shared':
                     $indexingAction = true;
                     $deleteExistingIndex = $action == 'import-local-new' || $action == 'import-shared-new';
                     if ($action == 'import-local-new' || $action == 'import-local-existing')
@@ -697,7 +699,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     else
                         $indexName = AvantElasticsearch::getNameOfSharedIndex();
 
-                    $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
+                    if ($action == 'remove-shared')
+                    {
+                        $this->removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation);
+                    }
+                    else
+                    {
+                        $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
+                    }
                     break;
 
                 case 'progress':
@@ -912,6 +921,29 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // don't need the indexing Id parameter.
         $logFileName = $this->getIndexingLogFileName($indexingId, $indexingOperation);
         return file_get_contents($logFileName);
+    }
+
+    protected function removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation)
+    {
+        // This method will remove all of a contributor's items from the shared index
+        // without affecting items from other contributors.
+        $this->initializeIndexingOperation($indexName, $indexingId, $indexingOperation);
+        $this->logEvent(__('Begin removing items from shared index'));
+        $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
+
+        $params = [
+            'index' => $indexName,
+            'type' => $this->getDocumentMappingType(),
+            'body' => [
+                'query' => [
+                    'match' => [
+                        'item.contributor-id' => $contributorId
+                    ]
+                ]
+            ]
+        ];
+
+        return $this->avantElasticsearchClient->deleteDocumentsByContributor($params);
     }
 
     protected function reportExportStatistics($itemsCount)

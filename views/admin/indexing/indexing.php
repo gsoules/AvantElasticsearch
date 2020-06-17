@@ -21,8 +21,9 @@ $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
 // Initialize the action options.
 $options = array(
     'export-all' => ' Export all items from Omeka',
-    'import-local-existing' =>" Import into existing local index ($contributorId)",
-    'import-shared-existing' =>" Import into existing shared index ($sharedIndexName)"
+    'remove-shared' => " Remove all items from shared index ($sharedIndexName)",
+    'import-local-existing' => " Import into existing local index ($contributorId)",
+    'import-shared-existing' => " Import into existing shared index ($sharedIndexName)"
     );
 
 if (AvantElasticsearch::getNewLocalIndexAllowed())
@@ -167,7 +168,11 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     },
                     error: function (request, status, error)
                     {
-                        alert('AJAX ERROR on reportProgress' + ' >>> ' + JSON.stringify(request));
+                        // Remove the HTML tags from the message and separate the lines with actual newline characters.
+                        let message = JSON.stringify(request);
+                        message = message.replace(/(<([^>]+)>)/ig,"");
+                        message = message.replace(/\\n/g, '\n');
+                        alert('AJAX ERROR on reportProgress' + ' >>> ' + message);
                     }
                 }
             );

@@ -82,6 +82,36 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
     }
 
+    public function deleteDocumentsByContributor($params, $failedAttemptOk = false)
+    {
+        try
+        {
+            if ($this->client)
+            {
+                $this->client->deleteByQuery($params);
+                return true;
+            }
+            else
+            {
+                $this->lastError = 'Failed to remove contributor from index: Client is null';
+                return false;
+            }
+        }
+        catch (Exception $e)
+        {
+            $className = get_class($e);
+            if ($failedAttemptOk && $className == 'Elasticsearch\Common\Exceptions\Missing404Exception')
+            {
+                return true;
+            }
+            else
+            {
+                $this->recordException($e);
+                return false;
+            }
+        }
+    }
+
     public function deleteDocument($params, $failedAttemptOk = false)
     {
         try
@@ -259,7 +289,6 @@ class AvantElasticsearchClient extends AvantElasticsearch
         try
         {
             $this->client->index($params);
-            return true;
         }
         catch (Exception $e)
         {
