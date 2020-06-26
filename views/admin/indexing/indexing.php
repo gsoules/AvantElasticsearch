@@ -21,9 +21,9 @@ $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
 // Initialize the action options.
 $options = array(
     'export-all' => ' Export all items from Omeka',
+    'import-local-existing' => " Import into existing local index ($contributorId)",
     'remove-shared' => " Remove all items from shared index ($sharedIndexName)",
-    'import-shared-existing' => " Import into existing shared index ($sharedIndexName)",
-    'import-local-existing' => " Import into existing local index ($contributorId)"
+    'import-shared-existing' => " Import into existing shared index ($sharedIndexName)"
     );
 
 if (AvantElasticsearch::getNewLocalIndexAllowed())
