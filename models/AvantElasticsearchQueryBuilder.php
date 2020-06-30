@@ -154,7 +154,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             $highlight =
                 ['fields' =>
                     [
-                        'common.description' =>
+                        'core-fields.description' =>
                             (object)[
                                 'number_of_fragments' => 4,
                                 'fragment_size' => 150,
@@ -353,11 +353,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'fields' => [
                         'item.title^20',
                         'item.description^10',
+                        'pdf.text-*^10',
                         'core-fields.*',
                         'local-fields.*',
                         'shadow-fields.*',
-                        'tags',
-                        'pdf.text-*'
+                        'tags'
                     ]
                 ]
             ];
@@ -408,7 +408,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         $shouldQuery = [
             "match" => [
-                "common.type" => [
+                "core-fields.type" => [
                     "query" => "reference",
                     "boost" => 5
                 ]
