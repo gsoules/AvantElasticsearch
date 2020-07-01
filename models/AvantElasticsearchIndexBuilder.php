@@ -296,22 +296,20 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Get a table that associates vocabulary kinds with element Ids.
         $kindTable = AvantVocabulary::getVocabularyKinds();
 
-        // Query the database to get an array of local_term / common_term pairs for each kind.
         try
         {
+            // Query the database to get an array of local term items for each kind.
             foreach ($kindTable as $kind)
-            {
-                $pairs[$kind] = get_db()->getTable('VocabularyLocalTerms')->getLocalToCommonTermMap($kind);
-            }
+               $localTermItemsForKind[$kind] = get_db()->getTable('VocabularyLocalTerms')->getLocalTermItems($kind);
 
-            // Convert the pairs into an array for each kind where the index is the local term and the value is the common term.
-            // If there is no local term, the common term is used for the local term.
-            foreach ($pairs as $kind => $mappingsForKind)
+            // Convert the items into an array for each kind where the index is the local term and the value
+            // is the common term. If there is no local term, the common term is used for the local term.
+            foreach ($localTermItemsForKind as $kind => $localTermItems)
             {
-                foreach ($mappingsForKind as $mapping)
+                foreach ($localTermItems as $localTermItem)
                 {
-                    $commonTerm = $mapping['common_term'];
-                    $localTerm = $mapping['local_term'] ? $mapping['local_term'] : $commonTerm;
+                    $commonTerm = $localTermItem['common_term'];
+                    $localTerm = $localTermItem['default_term'];
                     $mappings[$kind][$localTerm] = $commonTerm;
                 }
             }
