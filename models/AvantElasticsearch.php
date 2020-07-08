@@ -376,6 +376,65 @@ class AvantElasticsearch
         return $year;
     }
 
+    public static function handleHealthCheck()
+    {
+        $db = get_db();
+        $table = "{$db->prefix}items";
+        $sql = "SELECT COUNT(*) FROM $table";
+        $sqlItemsCount = $db->fetchOne($sql);
+
+        $indexItemsCount = 0;
+        $avantElasticsearchClient = new AvantElasticsearchClient();
+
+        if ($avantElasticsearchClient->ready())
+        {
+            $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+
+            // Explicitly specify that the shared index should be queried.
+            $indexName = AvantElasticsearch::getNameOfLocalIndex();
+            $avantElasticsearchQueryBuilder->setIndexName($indexName);
+
+            $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
+            $response = $avantElasticsearchClient->search($params);
+            if ($response)
+                $indexItemsCount = $response["hits"]["total"];
+        }
+
+        if ($sqlItemsCount == $indexItemsCount)
+        {
+            $status = "OK : $indexItemsCount items";
+        }
+        else
+        {
+            $status = "WARNING : SQL:$sqlItemsCount INDEX:$indexItemsCount";
+        }
+
+        return $status;
+    }
+
+    public static function handleRemoteRequest($action, $siteId, $password)
+    {
+        if (AvantElasticsearch::remoteRequestIsValid($siteId, $password))
+        {
+            switch ($action)
+            {
+                case 'es-health-check':
+                    $response = AvantElasticsearch::handleHealthCheck();
+                    break;
+
+                default:
+                    $response = 'Unsupported AvantElasticsearch action: ' . $action;
+                    break;
+            }
+        }
+        else
+        {
+            $response = '';
+        }
+
+        return $response;
+    }
+
     public function isJson($string)
     {
         json_decode($string);
@@ -395,6 +454,16 @@ class AvantElasticsearch
                 return true;
         }
         return false;
+    }
+
+    public static function remoteRequestIsValid($siteId, $password)
+    {
+        // Use the last six characters of the Elasticsearch key as the password for remote access to AvantVocabulary.
+        // This is simpler/safer than the remote caller having to know an Omeka user name and password. Though the
+        // key is public anyway, using just the tail end of it means the caller does not know the entire key.
+        $key = ElasticsearchConfig::getOptionValueForKey();
+        $keySuffix = substr($key, strlen($key) - 6);
+        return $password == $keySuffix && $siteId == ElasticsearchConfig::getOptionValueForContributorId();
     }
 
     public function setIndexName($name)
