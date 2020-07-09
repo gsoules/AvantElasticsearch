@@ -139,6 +139,15 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
             });
         }
 
+        function reportAjaxError(request, action)
+        {
+            // Strip away HMTL tags.
+            let message = JSON.stringify(request);
+            message = message.replace(/(<([^>]+)>)/ig,"");
+            message = message.replace(/\\n/g, '\n');
+            alert('AJAX ERROR on ' + action + ' >>> ' + message);
+        }
+
         function reportProgress()
         {
             if (!actionInProgress)
@@ -169,10 +178,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     error: function (request, status, error)
                     {
                         // Remove the HTML tags from the message and separate the lines with actual newline characters.
-                        let message = JSON.stringify(request);
-                        message = message.replace(/(<([^>]+)>)/ig,"");
-                        message = message.replace(/\\n/g, '\n');
-                        alert('AJAX ERROR on reportProgress' + ' >>> ' + message);
+                        reportAjaxError(request, 'reportProgress');
                     }
                 }
             );
@@ -217,7 +223,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     error: function (request, status, error)
                     {
                         clearTimeout(progressTimer);
-                        alert('AJAX ERROR on ' + selectedAction + ' >>> ' +  JSON.stringify(request));
+                        reportAjaxError(request, selectedAction);
                     }
                 }
             );

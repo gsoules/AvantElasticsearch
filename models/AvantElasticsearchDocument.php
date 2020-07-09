@@ -164,6 +164,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
             else
             {
+                // WARNING: If AvantVocabulary is not active, all values will go into the shared index.
+                // To correct this if it happens by mistake, a) Activate AvantVocabulary, b) Use the
+                // Elasticsearch Indexing page to remove all items from the shared index, c) Export all
+                // Omeka items and import them into the existing shared index.
+
                 // This element does not use the Common Vocabulary which means that both the local and shared
                 // index will use the same value. Copy the local value to the shared value.
                 foreach ($fieldTexts as $index => $fieldText)
