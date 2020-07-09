@@ -376,7 +376,7 @@ class AvantElasticsearch
         return $year;
     }
 
-    public static function handleHealthCheck()
+    public static function handleHealthCheck($siteId)
     {
         $db = get_db();
         $table = "{$db->prefix}items";
@@ -384,29 +384,37 @@ class AvantElasticsearch
         $sqlItemsCount = $db->fetchOne($sql);
 
         $indexItemsCount = 0;
-        $avantElasticsearchClient = new AvantElasticsearchClient();
 
-        if ($avantElasticsearchClient->ready())
+        $localIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_LOCAL) == true;
+        if ($localIndexIsEnabled)
         {
-            $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+            $avantElasticsearchClient = new AvantElasticsearchClient();
+            if ($avantElasticsearchClient->ready())
+            {
+                $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
 
-            // Explicitly specify that the shared index should be queried.
-            $indexName = AvantElasticsearch::getNameOfLocalIndex();
-            $avantElasticsearchQueryBuilder->setIndexName($indexName);
+                // Explicitly specify that the shared index should be queried.
+                $indexName = AvantElasticsearch::getNameOfLocalIndex();
+                $avantElasticsearchQueryBuilder->setIndexName($indexName);
 
-            $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
-            $response = $avantElasticsearchClient->search($params);
-            if ($response)
-                $indexItemsCount = $response["hits"]["total"];
+                $params = $avantElasticsearchQueryBuilder->constructFileStatisticsAggregationParams($indexName);
+                $response = $avantElasticsearchClient->search($params);
+                if ($response)
+                    $indexItemsCount = $response["hits"]["total"];
+            }
         }
 
         if ($sqlItemsCount == $indexItemsCount)
         {
-            $status = "OK : $indexItemsCount items";
+            $subject = "Health Check PASSED for $siteId";
+            $status = "PASS: SQL and Index both contain $indexItemsCount items";
+            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
         }
         else
         {
-            $status = "WARNING : SQL:$sqlItemsCount INDEX:$indexItemsCount";
+            $subject = "Health Check FAILED for $siteId";
+            $status = "FAIL: SQL:$sqlItemsCount Index:$indexItemsCount";
+            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
         }
 
         return $status;
@@ -419,7 +427,7 @@ class AvantElasticsearch
             switch ($action)
             {
                 case 'es-health-check':
-                    $response = AvantElasticsearch::handleHealthCheck();
+                    $response = AvantElasticsearch::handleHealthCheck($siteId);
                     break;
 
                 default:
