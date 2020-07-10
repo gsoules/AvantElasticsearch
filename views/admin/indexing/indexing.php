@@ -15,6 +15,24 @@ if (AvantCommon::isAjaxRequest())
 $pageTitle = __('Elasticsearch Indexing');
 echo head(array('title' => $pageTitle, 'bodyclass' => 'indexing'));
 
+$errorMessage = '';
+if (!plugin_is_active('AvantVocabulary'))
+{
+    $errorMessage = '<div class="error">Elasticsearch indexing cannot be performed because the AvantVocabulary plugin is not active.</div>';
+}
+elseif (!$avantElasticsearchIndexBuilder->hasVocabularies())
+{
+    $errorMessage = '<div class="error">Elasticsearch indexing cannot be performed because the AvantVocabulary vocabulary tables are empty.</div>';
+    $errorMessage .=  '<div class="error">Rebuild the Common Terms and Local Terms tables before attempting to index.</div>';
+}
+
+if ($errorMessage)
+{
+    echo $errorMessage;
+    echo foot();
+    return;
+}
+
 $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
 $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
 
@@ -41,7 +59,7 @@ if (AvantElasticsearch::getNewSharedIndexAllowed())
 if (isset($_COOKIE['XDEBUG_SESSION']))
 {
     echo '<div class="health-report-error">XDEBUG_SESSION in progress. Indexing status will not be reported in real-time.<br/>';
-    echo '<a href="http://localhost/omeka-2.6/?XDEBUG_SESSION_STOP" target="_blank">Click here to stop debugging</a>';
+    echo '<a href="http://localhost/omeka/?XDEBUG_SESSION_STOP" target="_blank">Click here to stop debugging</a>';
     echo '</div>';
 }
 

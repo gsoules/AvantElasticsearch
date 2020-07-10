@@ -295,6 +295,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         // Get a table that associates vocabulary kinds with element Ids.
         $kindTable = AvantVocabulary::getVocabularyKinds();
+        $mappings = array();
 
         try
         {
@@ -316,11 +317,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-            // This should never happen under normal circumstances. However, when first setting up a Digital Archive
-            // site, it could occur if an attempt is made to export Elasticsearch data before having built the
-            // vocabulary tables.
+            // This should never happen under normal circumstances.
             $kindTable = array();
-            $mappings = array();
         }
 
         $vocabularies = [
@@ -740,6 +738,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $response = json_encode($response);
         echo $response;
+    }
+
+    public function hasVocabularies()
+    {
+        $has = false;
+        if ($this->vocabularies)
+        {
+            $has = !empty($this->vocabularies['mappings']);
+        }
+        return $has;
     }
 
     protected function initializeIndexingOperation($indexName, $indexingId, $indexingOperation)
