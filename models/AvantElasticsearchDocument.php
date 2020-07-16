@@ -140,15 +140,15 @@ class AvantElasticsearchDocument extends AvantElasticsearch
                 $mappings = $vocabularyMappings[$vocabularyKinds[$elementId]];
                 foreach ($fieldTexts as $index => $fieldText)
                 {
-                    $localTerm = $fieldText['text'];
-                    $commonTerm = $this->getCommonTermForLocalTerm($localTerm, $mappings);
+                    $siteTerm = $fieldText['text'];
+                    $commonTerm = $this->getCommonTermForSiteTerm($siteTerm, $mappings);
                     if (empty($commonTerm))
                     {
                         // The local value is not mapped to a common term.
-                        $commonTerm = $localTerm;
+                        $commonTerm = $siteTerm;
                         $fieldTexts[$index]['mapping'] = 'unmapped';
                     }
-                    elseif ($commonTerm != $localTerm)
+                    elseif ($commonTerm != $siteTerm)
                     {
                         // The local value is mapped to a common term that is different than the local value.
                         $fieldTexts[$index]['mapping'] = 'mapped';
@@ -313,8 +313,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
 
                 if (isset($this->coreFieldDataSharedIndex[$fieldName]) && in_array($sharedIndexValue, $this->coreFieldDataSharedIndex[$fieldName]))
                 {
-                    // This value is already in the shared index data. This can happen when multiple local terms are
-                    // mapped to the same common term. For example if local terms "Birds,Songbirds" and "Birds,Raptors"
+                    // This value is already in the shared index data. This can happen when multiple site terms are
+                    // mapped to the same common term. For example if site terms "Birds,Songbirds" and "Birds,Raptors"
                     // are both mapped to "Nature,Animals,Birds" then "Nature,Animals,Birds" will appear twice in the
                     // field texts as a shared index value.
                     continue;
@@ -521,17 +521,17 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         unset($documentBody['sort-local-index']);
     }
 
-    protected function getCommonTermForLocalTerm($localTerm, $localToCommonMappings)
+    protected function getCommonTermForSiteTerm($siteTerm, $localToCommonMappings)
     {
-        if (array_key_exists($localTerm, $localToCommonMappings))
+        if (array_key_exists($siteTerm, $localToCommonMappings))
         {
-            // Get the common term. If the common term is empty, the local term is not mapped to a common term.
-            $commonTerm = $localToCommonMappings[$localTerm];
+            // Get the common term. If the common term is empty, the site term is not mapped to a common term.
+            $commonTerm = $localToCommonMappings[$siteTerm];
         }
         else
         {
             // This should never happen under normal circumstances because the mappings table should contain an entry
-            // for every local term defined using the Vocabulary Editor. However, if somehow an item uses a term that
+            // for every site term defined using the Vocabulary Editor. However, if somehow an item uses a term that
             // we are not tracking, e.g. inserted through the Bulk Editor, we'll detect it here and handle gracefully.
             $commonTerm = 'UNTRACKED';
         }

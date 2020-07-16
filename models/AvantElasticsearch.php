@@ -25,7 +25,6 @@ class AvantElasticsearch
     private $fieldNamesOfCoreElements = array();
     private $fieldNamesOfLocalElements = array();
     private $fieldNamesOfPrivateElements = array();
-    private $fieldNamesOfShadowElements = array();
 
     public function __construct()
     {
@@ -196,7 +195,7 @@ class AvantElasticsearch
         }
         catch (Exception $e)
         {
-            return null;
+            throw new Exception("Could not read AvantElasticsearch config file: $configFile");
         }
     }
 
@@ -295,13 +294,20 @@ class AvantElasticsearch
         if (empty($this->fieldNamesOfCoreElements))
         {
             $config = AvantElasticsearch::getAvantElasticsearcConfig();
-            $elementsList = $config ? $config->common_elements : array();
-            $elementNames = array_map('trim', explode(',', $elementsList));
-            foreach ($elementNames as $elementName)
+            if ($config)
             {
-                $this->fieldNamesOfCoreElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+                $elementsList = $config ? $config->common_elements : array();
+                $elementNames = array_map('trim', explode(',', $elementsList));
+                foreach ($elementNames as $elementName)
+                {
+                    $this->fieldNamesOfCoreElements[] = $this->convertElementNameToElasticsearchFieldName($elementName);
+                }
+                asort($this->fieldNamesOfCoreElements);
             }
-            asort($this->fieldNamesOfCoreElements);
+            else
+            {
+                throw new Exception('No core element names are configured');
+            }
         }
 
         return $this->fieldNamesOfCoreElements;

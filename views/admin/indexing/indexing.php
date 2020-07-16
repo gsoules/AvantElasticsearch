@@ -23,7 +23,7 @@ if (!plugin_is_active('AvantVocabulary'))
 elseif (!$avantElasticsearchIndexBuilder->hasVocabularies())
 {
     $errorMessage = '<div class="error">Elasticsearch indexing cannot be performed because the AvantVocabulary vocabulary tables are empty.</div>';
-    $errorMessage .=  '<div class="error">Rebuild the Common Terms and Local Terms tables before attempting to index.</div>';
+    $errorMessage .=  '<div class="error">Rebuild the Common Terms and Site Terms tables before attempting to index.</div>';
 }
 
 if ($errorMessage)
@@ -171,8 +171,6 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
             if (!actionInProgress)
                 return;
 
-            console.log('reportProgress ' + ++progressCount);
-
             // Call back to the server (this page) to get the status of the indexing action.
             // The server returns the complete status since the action began, not just what has since transpired.
             jQuery.ajax(
@@ -187,7 +185,10 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     },
                     success: function (data)
                     {
-                        showStatus(data);
+                        if (data.success)
+                            showStatus(data.message);
+                        else
+                            alert(data.message);
                         if (actionInProgress)
                         {
                             progressTimer = setTimeout(reportProgress, 2000);
@@ -235,13 +236,16 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     success: function (data)
                     {
                         actionInProgress = false;
-                        showStatus(data);
+                        if (data.success)
+                            showStatus(data.message);
+                        else
+                            alert(data.message);
                         enableStartButton(true);
                     },
                     error: function (request, status, error)
                     {
                         clearTimeout(progressTimer);
-                        reportAjaxError(request, selectedAction);
+                        reportAjaxError(data.statusText, selectedAction);
                     }
                 }
             );

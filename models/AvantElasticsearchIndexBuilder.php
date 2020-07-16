@@ -299,19 +299,19 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         try
         {
-            // Query the database to get an array of local term items for each kind.
+            // Query the database to get an array of site term items for each kind.
             foreach ($kindTable as $kind)
-               $localTermItemsForKind[$kind] = get_db()->getTable('VocabularyLocalTerms')->getLocalTermItems($kind);
+               $siteTermItemsForKind[$kind] = get_db()->getTable('VocabularySiteTerms')->getSiteTermItems($kind);
 
-            // Convert the items into an array for each kind where the index is the local term and the value
-            // is the common term. If there is no local term, the common term is used for the local term.
-            foreach ($localTermItemsForKind as $kind => $localTermItems)
+            // Convert the items into an array for each kind where the index is the site term and the value
+            // is the common term. If there is no site term, the common term is used for the site term.
+            foreach ($siteTermItemsForKind as $kind => $siteTermItems)
             {
-                foreach ($localTermItems as $localTermItem)
+                foreach ($siteTermItems as $siteTermItem)
                 {
-                    $commonTerm = $localTermItem['common_term'];
-                    $localTerm = $localTermItem['default_term'];
-                    $mappings[$kind][$localTerm] = $commonTerm;
+                    $commonTerm = $siteTermItem['common_term'];
+                    $siteTerm = $siteTermItem['default_term'];
+                    $mappings[$kind][$siteTerm] = $commonTerm;
                 }
             }
         }
@@ -668,6 +668,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $indexingOperation = isset($_POST['operation']) ? $_POST['operation'] : '';
         $indexingAction = false;
         $response = '';
+        $success = true;
 
         $memoryStart = memory_get_usage() / MB_BYTES;
 
@@ -711,12 +712,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
                 default:
                     $response = 'Unexpected action: ' . $action;
+                    $success = false;
             }
         }
         catch (Exception $e)
         {
             $indexingAction = false;
             $response = $e->getMessage();
+            $success = false;
         }
 
         if ($indexingAction)
@@ -736,7 +739,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $response = $this->readLog($indexingId, $indexingOperation);
         }
 
-        $response = json_encode($response);
+        $response = json_encode(array('success'=>$success, 'message'=>$response));
         echo $response;
     }
 
