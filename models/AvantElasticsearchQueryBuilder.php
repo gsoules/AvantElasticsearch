@@ -544,6 +544,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'core-fields.subject',
                 'item.*',
                 'file.*',
+                'pdf.file-url',
                 'url.*'
             ];
         }
