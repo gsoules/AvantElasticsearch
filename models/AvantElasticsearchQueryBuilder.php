@@ -100,6 +100,9 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
 
     public function constructFileStatisticsAggregationParams($indexName)
     {
+        // The default number of buckets returned is 10. The max possible is 10,000.
+        $maxBuckets = 1000;
+
         $params = [
             'index' => $indexName,
             'body' => [
@@ -107,7 +110,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 'aggregations' => [
                     'contributors' => [
                         'terms' => [
-                            'field' => 'item.contributor'
+                            'field' => 'item.contributor',
+                            'size' => $maxBuckets
                         ],
                         'aggregations' => [
                             'audio' => [
@@ -134,7 +138,8 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     ],
                     'contributor-ids' => [
                         'terms' => [
-                            'field' => 'item.contributor-id'
+                            'field' => 'item.contributor-id',
+                            'size' => $maxBuckets
                         ]
                     ]
                 ]
