@@ -67,6 +67,7 @@ class AvantElasticsearch
 
     public static function generateContributorStatistics($indexName)
     {
+        $contributorCount = 0;
         $stats = '';
         $avantElasticsearchClient = new AvantElasticsearchClient();
 
@@ -93,6 +94,7 @@ class AvantElasticsearch
 
                 $rows = '';
                 $buckets = $response['aggregations']['contributors']['buckets'];
+                $contributorCount = count($buckets);
 
                 // Get all the totals so that we'll know which columns to generate.
                 foreach ($buckets as $index => $bucket)
@@ -117,7 +119,7 @@ class AvantElasticsearch
                 $header = "<table id='search-stats-table'>";
                 $header .= '<tr>';
                 $header .= '<td class="contributor-table-organization"><strong>Contributor</strong></td>';
-                $header .= '<td><strong>Id</strong></td>';
+                $header .= '<td><strong>ID</strong></td>';
                 $header .= '<td><strong>Items</strong></td>';
                 $header .= '<td><strong>Images</strong></td>';
                 $header .= '<td><strong>Docs</strong></td>';
@@ -183,7 +185,7 @@ class AvantElasticsearch
                 $stats = $header . $rows . $totals;
             }
         }
-        return $stats;
+        return array($contributorCount, $stats);
     }
 
     public static function getAvantElasticsearcConfig()
@@ -414,7 +416,7 @@ class AvantElasticsearch
         {
             $subject = "Health Check PASSED for $siteId";
             $status = "PASS: SQL and Index both contain $indexItemsCount items";
-            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
+//            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
         }
         else
         {
