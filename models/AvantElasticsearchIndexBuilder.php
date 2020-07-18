@@ -12,7 +12,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $batchDocumentsTotalSize;
     protected $document;
     protected $fileStats;
-    protected $json;
     protected $indexingId;
     protected $indexingOperation;
     protected $sqlFieldTextsData;
@@ -108,58 +107,48 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
     }
 
-    protected function convertDocumentForLocalOrSharedIndex($isSharedIndex, $coreFieldNames)
+    protected function convertDocumentForLocalOrSharedIndex($documentJson, $isSharedIndex, $coreFieldNames)
     {
-        // This method changes $this->batchDocuments from an array or arrays into an array of objects
-        // each containing Omeka item data appropriate for either the local or shared index.
-
-        foreach($this->batchDocuments as $index => $document)
-        {
-            if ($isSharedIndex)
-            {
-                // Remove all non-public items from the batch of documents
-                // Remove private elements from each document
-                //
-                // This filtering is necessary to support the overall indexing approach which is to:
-                // * 1.  Export all items and all fields into a single JSON data file containing 100% of the contributor's data
-                // * 2a. Import only the non-private fields of public items into the shared index (using this method)
-                // * 2b. Import all items and all fields into the local index (no filtering)
-                //
-                // This export once, import twice approach makes it possible to create/update both the local and shared indexes
-                // from the same export file (versus having one export file for the local index and another for the shared index).
-
-                if (!$document['body']['item']['public'])
-                {
-                    // Remove the document for this non-public item.
-                    unset($this->batchDocuments[$index]);
-                    continue;
-                }
-
-                // Remove sorting for all but the core fields.
-                foreach ($document['body']['sort-shared-index'] as $fieldName => $sortValue)
-                {
-                    if (!in_array($fieldName, $coreFieldNames))
-                    {
-                        unset($document['body']['sort-shared-index'][$fieldName]);
-                    }
-                }
-
-                // Remove all the private fields.
-                unset($document['body']['private-fields']);
-            }
-
-            // Fixup the document to use the appropriate data for a shared or local index.
-            AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $document['body']);
-
-            // Convert the array into an object.
-            $this->batchDocuments[$index] = (object)$document;
-        }
+        // This method changes the Json for a document into a document object that is
+        // appropriate for either the local or shared index.
 
         if ($isSharedIndex)
         {
-            // Reindex the array to remove gaps left from the removal of non-public items.
-            $this->batchDocuments = array_values($this->batchDocuments);
+            // Exclude non-public items from the the shared index.
+            // Remove private elements from documents in the shared index.
+            //
+            // This filtering is necessary to support the overall indexing approach which is to:
+            // * 1.  Export all items and all fields into a single JSON data file containing 100% of the contributor's data
+            // * 2a. Import only the non-private fields of public items into the shared index (using this method)
+            // * 2b. Import all items and all fields into the local index (no filtering)
+            //
+            // This export once, import twice approach makes it possible to create/update both the local and shared indexes
+            // from the same export file (versus having one export file for the local index and another for the shared index).
+
+            if (!$documentJson['body']['item']['public'])
+            {
+                // Don't return a document for this non-public item.
+                return null;
+            }
+
+            // Remove sorting for all but the core fields.
+            foreach ($documentJson['body']['sort-shared-index'] as $fieldName => $sortValue)
+            {
+                if (!in_array($fieldName, $coreFieldNames))
+                {
+                    unset($documentJson['body']['sort-shared-index'][$fieldName]);
+                }
+            }
+
+            // Remove all the private fields.
+            unset($documentJson['body']['private-fields']);
         }
+
+        // Fixup the document to use the appropriate data for a shared or local index.
+        AvantElasticsearchDocument::fixupDocumentBody($isSharedIndex, $documentJson['body']);
+
+        // Convert the array into an object.
+        return (object)$documentJson;
     }
 
     public function createDocumentBatchParams($start, $end)
@@ -795,9 +784,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $maxCount = count($this->sqlItemsData);
         $itemsCount = $limit == 0 ? $maxCount : min($limit, $maxCount);
 
-        $this->json = '';
         $this->fileStats = array();
         $identifierElementId = ItemMetadata::getIdentifierElementId();
+
+        // Derive the data file name and delete it if it already exists.
+        $dataFileName = $this->getIndexingDataFileName($this->indexingId);
+        unlink($dataFileName);
 
         $this->logEvent(__('Begin exporting %s items', $itemsCount));
         for ($index = 0; $index < $itemsCount; $index++)
@@ -809,25 +801,25 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemData = $this->createItemData($index, $identifierElementId);
             $excludePrivateFields = false;
             $this->document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
-            $this->writeDocumentToJsonData($index);
+            $this->writeDocumentToJsonData($dataFileName);
             $this->freeSqlData($itemData['id'], $index);
         }
 
         $this->reportExportStatistics($itemsCount);
-        $this->writeJsonDataToFile();
+        $this->writeJsonDataMessage($dataFileName);
     }
 
     public function performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex)
     {
         $this->initializeIndexingOperation($indexName, $indexingId, $indexingOperation);
         $dataFileName = $this->getIndexingDataFileName($indexingId);
-
+        $coreFieldNames = $this->getFieldNamesOfCoreElements();
         $isSharedIndex = $indexName == self::getNameOfSharedIndex();
 
         // Verify that the import file exists.
         if (!file_exists($dataFileName))
         {
-            $this->logError(__("File %s was not found", $dataFileName));
+                  $this->logError(__("File %s was not found", $dataFileName));
             return;
         }
 
@@ -840,12 +832,26 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
         }
 
-        // Read the index file into an of raw document data which contains local and shared information.
-        $this->batchDocuments = json_decode(file_get_contents($dataFileName), true);
+        // Read the index file into an array of raw document data which contains local and shared information.
+        $handle = fopen($dataFileName, "r");
+        if ($handle)
+        {
+            while (($line = fgets($handle)) !== false)
+            {
+                $documentJson = json_decode($line, true);
 
-        // Convert the raw document data into document objects structured for either the local or shared index.
-        $coreFieldNames = $this->getFieldNamesOfCoreElements();
-        $this->convertDocumentForLocalOrSharedIndex($isSharedIndex, $coreFieldNames);
+                // Convert the data into a document object structured for either the local or shared index.
+                $documentObject = $this->convertDocumentForLocalOrSharedIndex($documentJson, $isSharedIndex, $coreFieldNames);
+                if ($documentObject)
+                    $this->batchDocuments[] = $documentObject;
+            }
+
+            fclose($handle);
+        }
+        else
+        {
+            throw new Exception("Unable to open $dataFileName.");
+        }
 
         // Build a list of document sizes.
         $this->batchDocumentsCount = count($this->batchDocuments);
@@ -965,21 +971,19 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
     }
 
-    protected function writeDocumentToJsonData($index)
+    protected function writeDocumentToJsonData($fileName)
     {
         // Write the document as an object to the JSON array, separating each object by a comma.
         $documentJson = json_encode($this->document);
-        $separator = $index > 0 ? ',' : '';
-        $this->json .= $separator . $documentJson;
+        $json = $documentJson . "\n";
+        file_put_contents($fileName, $json, FILE_APPEND);
     }
 
-    protected function writeJsonDataToFile()
+    protected function writeJsonDataMessage($fileName)
     {
-        $fileSize = number_format(strlen($this->json) / MB_BYTES, 2);
-        $dataFileName = $this->getIndexingDataFileName($this->indexingId);
+        $fileSize = number_format(filesize($fileName) / MB_BYTES, 2);
         $logFileName = $this->getIndexingLogFileName($this->indexingId, $this->indexingOperation);
-        $this->logEvent(__('Write data to %s (%s MB)', $dataFileName, $fileSize));
-        $this->logEvent(__('Write this log to %s', $logFileName));
-        file_put_contents($dataFileName, "[$this->json]");
+        $this->logEvent(__('%s MB written to %s', $fileSize, $fileName));
+        $this->logEvent(__('Log file: %s', $logFileName));
     }
 }
