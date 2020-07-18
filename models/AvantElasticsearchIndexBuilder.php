@@ -805,8 +805,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $this->freeSqlData($itemData['id'], $index);
         }
 
-        $this->reportExportStatistics($itemsCount);
-        $this->writeJsonDataMessage($dataFileName);
+        $this->reportExportStatistics($itemsCount, $dataFileName);
     }
 
     public function performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex)
@@ -961,7 +960,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $this->avantElasticsearchClient->deleteDocumentsByContributor($params);
     }
 
-    protected function reportExportStatistics($itemsCount)
+    protected function reportExportStatistics($itemsCount, $fileName)
     {
         $this->logEvent(__('Export complete. %s items', $itemsCount));
         $this->logEvent(__('File Attachments:'));
@@ -969,6 +968,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         {
             $this->logEvent(__('%s - %s (%s MB)', $fileStat['count'], $key, number_format($fileStat['size'] / MB_BYTES, 2)));
         }
+
+        $fileSize = number_format(filesize($fileName) / MB_BYTES, 2);
+        $logFileName = $this->getIndexingLogFileName($this->indexingId, $this->indexingOperation);
+        $this->logEvent(__('%s MB written to %s', $fileSize, $fileName));
+        $this->logEvent(__('Log file: %s', $logFileName));
     }
 
     protected function writeDocumentToJsonData($fileName)
@@ -977,13 +981,5 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $documentJson = json_encode($this->document);
         $json = $documentJson . "\n";
         file_put_contents($fileName, $json, FILE_APPEND);
-    }
-
-    protected function writeJsonDataMessage($fileName)
-    {
-        $fileSize = number_format(filesize($fileName) / MB_BYTES, 2);
-        $logFileName = $this->getIndexingLogFileName($this->indexingId, $this->indexingOperation);
-        $this->logEvent(__('%s MB written to %s', $fileSize, $fileName));
-        $this->logEvent(__('Log file: %s', $logFileName));
     }
 }
