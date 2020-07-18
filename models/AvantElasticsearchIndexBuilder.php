@@ -373,12 +373,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function fetchFieldTextsDataFromSqlDatabase($index, $itemsCount)
     {
         // Get field texts for a chunk of items. Chunking uses a fraction of the memory necessary to get all texts.
-        $chunkSize = 500;
+        $chunkSize = 100;
         if ($index % $chunkSize == 0)
         {
             $firstItemId = $index;
             $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
-            $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId + 1));
+            $percentDone = round(($index / $itemsCount) * 100) . '%';
+            $this->logEventLast(__('%s - Exporting items %s - %s of %s',
+                $percentDone, $firstItemId + 1, $lastItemId + 1, $itemsCount));
 
             $this->sqlFieldTextsData = $this->fetchFieldTextsForRangeOfItems($this->sqlItemsData[$firstItemId]['id'], $this->sqlItemsData[$lastItemId]['id']);
             if (empty($this->sqlFieldTextsData))
@@ -769,6 +771,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), $event, FILE_APPEND);
     }
 
+    protected function logEventLast($eventMessage)
+    {
+        // This method overwrites the last line of the log file. Use it when reporting progress on a repeated action.
+        $event =  $eventMessage;
+        $logFileName = $this->getIndexingLogFileName($this->indexingId, $this->indexingOperation);
+        $contents = file_get_contents($logFileName);
+        $lines = explode("\r\n", $contents);
+        $lines[count($lines) - 1] = $event;
+        $contents = implode("\r\n", $lines);
+        file_put_contents($logFileName, $contents);
+    }
+
     public function performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit = 0)
     {
         $this->initializeIndexingOperation($indexName, $indexingId, $indexingOperation);
@@ -838,6 +852,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         $fileLineCount = count(file($dataFileName));
         $documentCount = 0;
+        $skipCount = 0;
         $batchLimit = MB_BYTES * 1;
         $documentBatchParams = array();
         $batchSize = 0;
@@ -873,13 +888,18 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $documentBatchParams['body'][] = $actionsAndMetadata;
                 $documentBatchParams['body'][] = $document->body;
             }
+            else
+            {
+                $skipCount += 1;
+            }
 
             if ($batchSize >= $batchLimit || $documentCount == $fileLineCount)
             {
                 $batchEnd = $documentCount;
                 $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
-                $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)',
-                    $batchEnd - $batchStart + 1, $batchStart, $batchEnd, $batchSizeMb));
+                $percentDone = round(($batchEnd / $fileLineCount) * 100) . '%';
+                $this->logEventLast(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
+                    $percentDone, $batchEnd - $batchStart + 1, $batchStart, $batchEnd, $fileLineCount, $batchSizeMb));
 
                 if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
                 {
@@ -894,7 +914,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         fclose($handle);
 
         $totalSizeMb = number_format($totalSize / MB_BYTES, 2);
-        $this->logEvent(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
+        $this->logEventLast(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
+        $this->logEvent(__("%s non-public documents skipped", $skipCount));
     }
 
     protected function readLog($indexingId, $indexingOperation)
@@ -934,7 +955,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function reportExportStatistics($itemsCount, $fileName)
     {
-        $this->logEvent(__('Export complete. %s items', $itemsCount));
+        $this->logEventLast(__('Export complete. %s items', $itemsCount));
         $this->logEvent(__('File Attachments:'));
         foreach ($this->fileStats as $key => $fileStat)
         {
