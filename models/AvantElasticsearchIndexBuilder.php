@@ -6,10 +6,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     /* @var $avantElasticsearchClient AvantElasticsearchClient  */
     protected $avantElasticsearchClient;
-    protected $batchDocuments = array();
-    protected $batchDocumentsCount;
-    protected $batchDocumentsSizes = array();
-    protected $batchDocumentsTotalSize;
     protected $document;
     protected $fileStats;
     protected $indexingId;
@@ -377,12 +373,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function fetchFieldTextsDataFromSqlDatabase($index, $itemsCount)
     {
         // Get field texts for a chunk of items. Chunking uses a fraction of the memory necessary to get all texts.
-        $chunkSize = 1000;
+        $chunkSize = 500;
         if ($index % $chunkSize == 0)
         {
             $firstItemId = $index;
             $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
-            $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId));
+            $this->logEvent(__('Exporting items %s - %s', $firstItemId + 1, $lastItemId + 1));
 
             $this->sqlFieldTextsData = $this->fetchFieldTextsForRangeOfItems($this->sqlItemsData[$firstItemId]['id'], $this->sqlItemsData[$lastItemId]['id']);
             if (empty($this->sqlFieldTextsData))
@@ -787,7 +783,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->fileStats = array();
         $identifierElementId = ItemMetadata::getIdentifierElementId();
 
-        // Derive the data file name and delete it if it already exists.
+        // Derive the data file name and delete the file if it already exists.
         $dataFileName = $this->getIndexingDataFileName($this->indexingId);
         unlink($dataFileName);
 
@@ -818,7 +814,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // Verify that the import file exists.
         if (!file_exists($dataFileName))
         {
-                  $this->logError(__("File %s was not found", $dataFileName));
+            $this->logError(__("File %s was not found", $dataFileName));
             return;
         }
 
@@ -831,98 +827,74 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             }
         }
 
+        $this->logEvent(__('Begin indexing documents'));
+
+        $this->avantElasticsearchClient = new AvantElasticsearchClient();
+
         // Read the index file into an array of raw document data which contains local and shared information.
         $handle = fopen($dataFileName, "r");
-        if ($handle)
-        {
-            while (($line = fgets($handle)) !== false)
-            {
-                $documentJson = json_decode($line, true);
-
-                // Convert the data into a document object structured for either the local or shared index.
-                $documentObject = $this->convertDocumentForLocalOrSharedIndex($documentJson, $isSharedIndex, $coreFieldNames);
-                if ($documentObject)
-                    $this->batchDocuments[] = $documentObject;
-            }
-
-            fclose($handle);
-        }
-        else
-        {
+        if (!$handle)
             throw new Exception("Unable to open $dataFileName.");
-        }
 
-        // Build a list of document sizes.
-        $this->batchDocumentsCount = count($this->batchDocuments);
-        foreach ($this->batchDocuments as $document)
+        $fileLineCount = count(file($dataFileName));
+        $documentCount = 0;
+        $batchLimit = MB_BYTES * 1;
+        $documentBatchParams = array();
+        $batchSize = 0;
+        $batchStart = 0;
+        $totalSize = 0;
+
+        while (($line = fgets($handle)) !== false)
         {
-            $this->batchDocumentsSizes[] = strlen(json_encode($document));
-        }
+            $documentCount += 1;
 
-        // Perform the actual indexing.
-        $this->logEvent(__('Begin indexing %s documents', $this->batchDocumentsCount));
-        $this->performBulkIndexImportBatches();
-    }
-
-    protected function performBulkIndexImportBatches()
-    {
-        $limit = MB_BYTES * 1;
-        $start = 0;
-        $end = 0;
-        $last = $this->batchDocumentsCount - 1;
-
-        while ($start <= $last)
-        {
-            $batchSize = 0;
-            $limitReached = false;
-
-            // Determine which subset of the document will fit in the next batch. When this loop ends, we know the
-            // index of the first and last document to be indexed.
-            while (!$limitReached && $end <= $last)
+            if ($batchSize == 0)
             {
-                $documentSize = $this->batchDocumentsSizes[$end];
-
-                if ($batchSize + $documentSize <= $limit || $batchSize == 0)
-                {
-                    // This document will fit within in the batch, or it's the first document in the batch in which case
-                    // it's allowed even if its size exceeds the limit. Note that this logic does not handle the case
-                    // where a single document exceeds the upload limit of 10 MB. In that case, an error will be
-                    // reported and either that document's size will have to be reduced or this logic will have to
-                    // somehow handle splitting a document across multiple uploads. 10 MB of text would be unusual.
-                    $batchSize += $documentSize;
-                    $end++;
-                }
-                else
-                {
-                    $limitReached = true;
-                }
+                $documentBatchParams = ['body' => []];
+                $batchStart = $documentCount;
             }
 
-            $end--;
+            $batchSize += strlen($line);
+            $totalSize += $batchSize;
+            $json = json_decode($line, true);
 
-            $this->batchDocumentsTotalSize += $batchSize;
-            $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
-            $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)', $end - $start + 1, $start + 1, $end + 1, $batchSizeMb));
-
-            $documentBatchParams = $this->createDocumentBatchParams($start, $end);
-
-            // Create a new client. While this should not be necessary, it's done to see if this will
-            // prevent the No Alive Nodes exception from occurring due to a suspected bug in the client code.
-            $this->avantElasticsearchClient = new AvantElasticsearchClient();
-
-            // Perform the actual indexing on this batch of documents.
-            if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
+            // Convert the json into a document object structured for either the local or shared index.
+            $document = $this->convertDocumentForLocalOrSharedIndex($json, $isSharedIndex, $coreFieldNames);
+            if ($document)
             {
-                $this->logClientError();
-                return;
+                $actionsAndMetadata = [
+                    'index' => [
+                        '_index' => $this->getNameOfActiveIndex(),
+                        '_type'  => $document->type,
+                    ]
+                ];
+
+                $actionsAndMetadata['index']['_id'] = $document->id;
+                $documentBatchParams['body'][] = $actionsAndMetadata;
+                $documentBatchParams['body'][] = $document->body;
             }
 
-            $end++;
-            $start = $end;
+            if ($batchSize >= $batchLimit || $documentCount == $fileLineCount)
+            {
+                $batchEnd = $documentCount;
+                $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
+                $this->logEvent(__('Indexing %s documents: %s - %s (%s MB)',
+                    $batchEnd - $batchStart + 1, $batchStart, $batchEnd, $batchSizeMb));
+
+                if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
+                {
+                    $this->logClientError();
+                    return;
+                }
+
+                $batchSize = 0;
+            }
         }
 
-        $totalSizeMb = number_format($this->batchDocumentsTotalSize / MB_BYTES, 2);
-        $this->logEvent(__("%s documents indexed (%s MB)", $this->batchDocumentsCount, $totalSizeMb));
+        fclose($handle);
+
+        $totalSizeMb = number_format($totalSize / MB_BYTES, 2);
+        $this->logEvent(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
     }
 
     protected function readLog($indexingId, $indexingOperation)
