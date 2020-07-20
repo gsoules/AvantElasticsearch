@@ -46,12 +46,12 @@ $options = array(
 
 if (AvantElasticsearch::getNewLocalIndexAllowed())
 {
-    $options['export-some'] = " *Export 100 items from Omeka";
     $options['import-local-new'] = " *Import into new local index ($contributorId)";
 }
 
 if (AvantElasticsearch::getNewSharedIndexAllowed())
 {
+    $options['export-some'] = " *Export 100 items from Omeka";
     $options['import-shared-new'] = " *Import into new shared index ($sharedIndexName)";
 }
 
