@@ -91,8 +91,8 @@ class AvantElasticsearch
                 $imageTotal = 0;
                 $itemTotal = 0;
                 $videoTotal = 0;
+                $weightTotal = 0;
 
-                $rows = '';
                 $buckets = $response['aggregations']['contributors']['buckets'];
                 $contributorCount = count($buckets);
 
@@ -113,76 +113,101 @@ class AvantElasticsearch
 
                     $videoCount = intval($bucket['video']['value']);
                     $videoTotal += $videoCount;
+
+                    $weightTotal += $itemCount + $imageCount + $documentCount + $audioCount + $videoCount;
                 }
 
-                // Generate the headers
-                $header = "<table id='search-stats-table'>";
-                $header .= '<tr>';
-                $header .= '<td class="contributor-table-organization"><strong>Contributor</strong></td>';
-                $header .= '<td><strong>ID</strong></td>';
-                $header .= '<td><strong>Items</strong></td>';
-                $header .= '<td><strong>Images</strong></td>';
-                $header .= '<td><strong>Docs</strong></td>';
+                // Generate the header row.
+                $headerHtml = "<table id='search-stats-table'>";
+                $headerHtml .= '<tr>';
+                $headerHtml .= '<td class="contributor-table-organization"><strong>Contributor</strong></td>';
+                $headerHtml .= '<td><strong>ID</strong></td>';
+                $headerHtml .= '<td><strong>Items</strong></td>';
+                $headerHtml .= '<td><strong>Images</strong></td>';
+                $headerHtml .= '<td><strong>Docs</strong></td>';
                 if ($audioTotal > 0)
-                {
-                    $header .= '<td><strong>Audio</strong></td>';
-                }
+                    $headerHtml .= '<td><strong>Audio</strong></td>';
                 if ($videoTotal > 0)
-                {
-                    $header .= '<td><strong>Video</strong></td>';
-                }
-                $header .= '</tr>';
+                    $headerHtml .= '<td><strong>Video</strong></td>';
+                $headerHtml .= '<td><strong>Total</strong></td>';
+                $headerHtml .= '</tr>';
 
-                // Generate the rows.
+                $rows = array();
+
+                // Generate an array of rows of HTML.
                 foreach ($buckets as $index => $bucket)
                 {
+                    $row = '';
                     $contributorId = $response['aggregations']['contributor-ids']['buckets'][$index]['key'];
 
+                    // Get the row's column values from the bucket.
                     $itemCount = $bucket['doc_count'];
                     $imageCount = intval($bucket['image']['value']);
                     $documentCount = intval($bucket['document']['value']);
                     $audioCount = intval($bucket['audio']['value']);
                     $videoCount = intval($bucket['video']['value']);
+                    $weightCount = $itemCount + $imageCount + $documentCount + $audioCount + $videoCount;
+                    $weight = $weightCount;
 
-                    $rows .= '<tr>';
+                    // Format the totals to include a comma thousands separator.
+                    $itemCount = number_format($itemCount);
+                    $imageCount = number_format($imageCount);
+                    $documentCount = number_format($documentCount);
+                    $audioCount = number_format($audioCount);
+                    $videoCount = number_format($videoCount);
+                    $weightCount = number_format($weightCount);
+
+                    // Generate the row.
+                    $row .= '<tr>';
                     $contributor = $bucket['key'];
-                    $rows .= "<td class=\"contributor-table-organization\">$contributor</td>";
-                    $rows .= "<td>$contributorId</td>";
-                    $rows .= "<td>$itemCount</td>";
-                    $rows .= "<td>$imageCount</td>";
-                    $rows .= "<td>$documentCount</td>";
+                    $row .= "<td class=\"contributor-table-organization\">$contributor</td>";
+                    $row .= "<td>$contributorId</td>";
+                    $row .= "<td>$itemCount</td>";
+                    $row .= "<td>$imageCount</td>";
+                    $row .= "<td>$documentCount</td>";
                     if ($audioTotal > 0)
-                    {
-                        $rows .= "<td>$audioCount</td>";
-                    }
-                    $rows .= '</tr>';
+                        $row .= "<td>$audioCount</td>";
                     if ($videoTotal > 0)
-                    {
-                        $rows .= "<td>$videoCount</td>";
-                    }
-                    $rows .= '</tr>';
+                        $row .= "<td>$videoCount</td>";
+                    $row .= "<td>$weightCount</td>";
+                    $row .= '</tr>';
+
+                    // Add the row's weight and HTML to an array.
+                    $rows[] = array($weight, $row);
                 }
+
+                // Sort the array descending based on its weight.
+                usort($rows, function($a, $b){ return $a[0] < $b[0]; });
+
+                // Combine the row HTML into a single string.
+                $rowsHtml = '';
+                foreach ($rows as $row)
+                    $rowsHtml .= $row[1];
+
+                // Format the totals to include a comma thousands separator.
+                $itemTotal = number_format($itemTotal);
+                $imageTotal = number_format($imageTotal);
+                $documentTotal = number_format($documentTotal);
+                $audioTotal = number_format($audioTotal);
+                $videoTotal = number_format($videoTotal);
+                $weightTotal = number_format($weightTotal);
 
                 // Generate the Totals row.
-                $itemTotal = number_format($itemTotal);
-                $totals = '<tr>';
-                $totals .= '<td><strong></strong>';
-                $totals .= '<td><strong>Totals</strong>';
-                $totals .= "<td><strong>$itemTotal</strong></td>";
-                $totals .= "<td><strong>$imageTotal</strong></td>";
-                $totals .= "<td><strong>$documentTotal</strong></td>";
+                $totalsHtml = '<tr>';
+                $totalsHtml .= '<td><strong></strong>';
+                $totalsHtml .= '<td><strong>Totals</strong>';
+                $totalsHtml .= "<td><strong>$itemTotal</strong></td>";
+                $totalsHtml .= "<td><strong>$imageTotal</strong></td>";
+                $totalsHtml .= "<td><strong>$documentTotal</strong></td>";
                 if ($audioTotal > 0)
-                {
-                    $totals .= "<td><strong>$audioTotal</strong></td>";
-                }
+                    $totalsHtml .= "<td><strong>$audioTotal</strong></td>";
                 if ($videoTotal > 0)
-                {
-                    $totals .= "<td><strong>$videoTotal</strong></td>";
-                }
-                $totals .= "</tr>";
-                $totals .= '</table>';
+                    $totalsHtml .= "<td><strong>$videoTotal</strong></td>";
+                $totalsHtml .= "<td><strong>$weightTotal</strong></td>";
+                $totalsHtml .= "</tr>";
+                $totalsHtml .= '</table>';
 
-                $stats = $header . $rows . $totals;
+                $stats = $headerHtml . $rowsHtml . $totalsHtml;
             }
         }
         return array($contributorCount, $stats);

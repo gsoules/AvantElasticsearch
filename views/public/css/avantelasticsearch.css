@@ -31,7 +31,7 @@
 #search-facets {
     border-radius: 5px;
     border: 1px solid #a4a4a4;
-    margin-bottom: 8px;
+    margin-bottom: 0;
 }
 
 #search-facet-sections > ul {
