@@ -710,9 +710,11 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             if (!is_string($text))
             {
                 // This can happen in these two cases and possibly others:
-                // 1. The string is null because the PDF has no content, probably because it has not been OCR'd.
+                // 1. The PDF has no content, probably because it has not been OCR'd or it has not text.
                 // 2. pdftotext is not installed on the host system and so the shell exec returned null.
-                continue;
+                //
+                // In either case, continue as normal with an empty text string.
+                $text = '';
             }
 
             // Strip non ASCII characters from the text.
