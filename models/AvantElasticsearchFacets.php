@@ -52,7 +52,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         if ($action == 'add')
         {
             $html = $this->emitHtmlLinkForAddFilter($facetTableEntry['group'], $facetText, $rootPath, $isRoot);
-            $html .= " ({$facetTableEntry['count']})";
+            $count = number_format($facetTableEntry['count']);
+            $html .= " ($count)";
         }
         else
         {
