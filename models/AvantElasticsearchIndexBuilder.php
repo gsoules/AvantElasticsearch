@@ -361,7 +361,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $firstItemId = $index;
             $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
             $percentDone = round(($index / $itemsCount) * 100) . '%';
-            $this->log->reportProgress(__('%s - Exporting items %s - %s of %s',
+            $this->log->logProgress(__('%s - Exporting items %s - %s of %s',
                 $percentDone, $firstItemId + 1, $lastItemId + 1, $itemsCount));
 
             $this->sqlFieldTextsData = $this->fetchFieldTextsForRangeOfItems($this->sqlItemsData[$firstItemId]['id'], $this->sqlItemsData[$lastItemId]['id']);
@@ -678,7 +678,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'progress':
                     $response = AvantElasticsearchLog::readLog();
                     $response .= PHP_EOL;
-                    $response .= AvantElasticsearchLog::readLogProgress();
+                    $response .= AvantElasticsearchLog::readProgress();
                     break;
 
                 default:
@@ -855,7 +855,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $batchEnd = $documentCount;
                 $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
                 $percentDone = round(($batchEnd / $fileLineCount) * 100) . '%';
-                $this->log->reportProgress(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
+                $this->log->logProgress(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
                     $percentDone, $batchEnd - $batchStart + 1, $batchStart, $batchEnd, $fileLineCount, $batchSizeMb));
 
                 if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
