@@ -16,6 +16,7 @@ class ElasticsearchConfig extends ConfigOptions
     const OPTION_ES_HOST = 'avantelasticsearch_es_host';
     const OPTION_ES_KEY = 'avantelasticsearch_es_key';
     const OPTION_ES_LOCAL = 'avantelasticsearch_es_local';
+    const OPTION_ES_LOG = 'avantelasticsearch_es_log';
     const OPTION_ES_REGION = 'avantelasticsearch_es_region';
     const OPTION_ES_SECRET = 'avantelasticsearch_es_secret';
     const OPTION_ES_SHARE = 'avantelasticsearch_es_share';

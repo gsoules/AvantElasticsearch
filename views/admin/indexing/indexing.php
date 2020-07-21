@@ -185,13 +185,13 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     },
                     success: function (data)
                     {
-                        if (data.success)
-                            showStatus(data.message);
-                        else
-                            alert(data.message);
                         if (actionInProgress)
                         {
-                            progressTimer = setTimeout(reportProgress, 2000);
+                            if (data.success)
+                                showStatus(data.message);
+                            else
+                                alert(data.message);
+                            progressTimer = setTimeout(reportProgress, 1000);
                         }
                     },
                     error: function (request, status, error)
@@ -236,6 +236,7 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     success: function (data)
                     {
                         actionInProgress = false;
+                        clearTimeout(progressTimer);
                         if (data.success)
                             showStatus(data.message);
                         else
@@ -245,7 +246,8 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
                     error: function (request, status, error)
                     {
                         clearTimeout(progressTimer);
-                        reportAjaxError(data.statusText, selectedAction);
+                        reportAjaxError(request, 'startIndexing');
+
                     }
                 }
             );
