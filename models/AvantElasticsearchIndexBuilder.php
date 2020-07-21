@@ -694,7 +694,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     break;
 
                 case 'progress':
-                    $response = $this->readLog($indexingId, $indexingOperation);
+                    $response = $this->logFileRead($indexingId, $indexingOperation);
                     break;
 
                 default:
@@ -723,7 +723,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $this->logEvent(__('Execution time: %s', $time));
             $this->logEvent(__('DONE'));
 
-            $response = $this->readLog($indexingId, $indexingOperation);
+            $response = $this->logFileRead($indexingId, $indexingOperation);
         }
 
         $response = json_encode(array('success'=>$success, 'message'=>$response));
@@ -752,7 +752,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function logCreateNew()
     {
         // Create a new log file (overwrite an existing log file with the same name).
-        file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), date("Y-m-d H:i:s"));
+        $this->logFileWrite($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), date("Y-m-d H:i:s"));
     }
 
     protected function logClientError()
@@ -768,7 +768,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected function logEvent($eventMessage)
     {
         $event =  PHP_EOL . $eventMessage;
-        file_put_contents($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), $event, FILE_APPEND);
+        $this->logFileWrite($this->getIndexingLogFileName($this->indexingId, $this->indexingOperation), $event, FILE_APPEND);
     }
 
     protected function logEventLast($eventMessage)
@@ -780,7 +780,29 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $lines = explode("\r\n", $contents);
         $lines[count($lines) - 1] = $event;
         $contents = implode("\r\n", $lines);
-        file_put_contents($logFileName, $contents);
+        $this->logFileWrite($logFileName, $contents);
+    }
+
+    protected function logFileRead($indexingId, $indexingOperation)
+    {
+        // The indexing Id gets passed because this method is called in response to an Ajax request for progress.
+        // Because the caller is running in a different instance of AvantElasticsearchIndexBuilder than the instance
+        // which is performing indexing, the caller's $this->indexingId class variable is not set for this method to
+        // use. All of the other log methods are for writing, and all are called only by the instance doing the
+        // indexing and that instance sets $this->indexingId when indexing first begins. Thus, the log write methods
+        // don't need the indexing Id parameter.
+        $logFileName = $this->getIndexingLogFileName($indexingId, $indexingOperation);
+        return file_get_contents($logFileName);
+    }
+
+
+    protected function logFileWrite($fileName, $text, $flags = 0)
+    {
+        $mode = $flags == FILE_APPEND ? 'a' : 'w';
+        $handle =  fopen($fileName, $mode);
+        fwrite($handle, $text);
+        fflush($handle);
+        fclose($handle);
     }
 
     public function performBulkIndexExport($indexName, $indexingId, $indexingOperation, $limit = 0)
@@ -797,9 +819,10 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->fileStats = array();
         $identifierElementId = ItemMetadata::getIdentifierElementId();
 
-        // Derive the data file name and delete the file if it already exists.
-        $dataFileName = $this->getIndexingDataFileName($this->indexingId);
-        unlink($dataFileName);
+        // Derive the export file's name and delete the file if it already exists.
+        $exportFileName = $this->getIndexingDataFileName($this->indexingId);
+        if (file_exists($exportFileName))
+            unlink($exportFileName);
 
         $this->logEvent(__('Begin exporting %s items', $itemsCount));
         for ($index = 0; $index < $itemsCount; $index++)
@@ -811,11 +834,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $itemData = $this->createItemData($index, $identifierElementId);
             $excludePrivateFields = false;
             $this->document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
-            $this->writeDocumentToJsonData($dataFileName);
+            $this->writeDocumentToJsonData($exportFileName);
             $this->freeSqlData($itemData['id'], $index);
         }
 
-        $this->reportExportStatistics($itemsCount, $dataFileName);
+        $this->reportExportStatistics($itemsCount, $exportFileName);
     }
 
     public function performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex)
@@ -917,19 +940,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->logEventLast(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
         $this->logEvent(__("%s non-public documents skipped", $skipCount));
     }
-
-    protected function readLog($indexingId, $indexingOperation)
-    {
-        // The indexing Id gets passed because this method is called in response to an Ajax request for progress.
-        // Because the caller is running in a different instance of AvantElasticsearchIndexBuilder than the instance
-        // which is performing indexing, the caller's $this->indexingId class variable is not set for this method to
-        // use. All of the other log methods are for writing, and all are called only by the instance doing the
-        // indexing and that instance sets $this->indexingId when indexing first begins. Thus, the log write methods
-        // don't need the indexing Id parameter.
-        $logFileName = $this->getIndexingLogFileName($indexingId, $indexingOperation);
-        return file_get_contents($logFileName);
-    }
-
     protected function removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation)
     {
         // This method will remove all of a contributor's items from the shared index
