@@ -212,8 +212,8 @@ $url = WEB_ROOT . '/admin/elasticsearch/indexing';
         function startIndexing()
         {
             actionInProgress = true;
-            statusArea.html('');
             indexingId = jQuery("#indexing-id").val();
+            showStatus('Initializing...');
 
             enableStartButton(false);
 

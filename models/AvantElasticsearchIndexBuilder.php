@@ -5,13 +5,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     private $installation;
 
     /* @var $avantElasticsearchClient AvantElasticsearchClient  */
-    /* @var $log AvantElasticsearchLog  */
     protected $avantElasticsearchClient;
+
     protected $document;
     protected $fileStats;
     protected $indexingId;
     protected $indexingOperation;
+
+    /* @var $log AvantElasticsearchLog  */
     protected $log;
+
     protected $sqlFieldTextsData;
     protected $sqlFilesData;
     protected $sqlItemsData;
@@ -358,7 +361,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $firstItemId = $index;
             $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
             $percentDone = round(($index / $itemsCount) * 100) . '%';
-            $this->log->replaceLastLineInLog(__('%s - Exporting items %s - %s of %s',
+            $this->log->reportProgress(__('%s - Exporting items %s - %s of %s',
                 $percentDone, $firstItemId + 1, $lastItemId + 1, $itemsCount));
 
             $this->sqlFieldTextsData = $this->fetchFieldTextsForRangeOfItems($this->sqlItemsData[$firstItemId]['id'], $this->sqlItemsData[$lastItemId]['id']);
@@ -673,7 +676,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     break;
 
                 case 'progress':
-                    $response = AvantElasticsearchLog::readLogProgress();
+                    $response = AvantElasticsearchLog::readLog();
+                    $response .= PHP_EOL;
+                    $response .= AvantElasticsearchLog::readLogProgress();
                     break;
 
                 default:
@@ -701,7 +706,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $time = $executionSeconds == 0 ? '< 1 second' : "$executionSeconds seconds";
             $this->log->logEvent(__('Execution time: %s', $time));
             $this->log->logEvent(__('DONE'));
-            $response = $this->log->readLog($indexingId, $indexingOperation);
+            $response = AvantElasticsearchLog::readLog();
             $this->log->writeLogToFile();
         }
 
@@ -850,7 +855,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $batchEnd = $documentCount;
                 $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
                 $percentDone = round(($batchEnd / $fileLineCount) * 100) . '%';
-                $this->log->replaceLastLineInLog(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
+                $this->log->reportProgress(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
                     $percentDone, $batchEnd - $batchStart + 1, $batchStart, $batchEnd, $fileLineCount, $batchSizeMb));
 
                 if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
@@ -866,7 +871,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         fclose($importFileHandle);
 
         $totalSizeMb = number_format($totalSize / MB_BYTES, 2);
-        $this->log->replaceLastLineInLog(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
+        $this->log->logEvent(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
         $this->log->logEvent(__("%s non-public documents skipped", $skipCount));
     }
     protected function removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation)
@@ -894,7 +899,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     protected function reportExportStatistics($itemsCount, $fileName)
     {
-        $this->log->replaceLastLineInLog(__('Export complete. %s items', $itemsCount));
+        $this->log->logEvent(__('Export complete. %s items', $itemsCount));
         $this->log->logEvent(__('File Attachments:'));
         foreach ($this->fileStats as $key => $fileStat)
         {

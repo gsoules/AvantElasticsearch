@@ -2,6 +2,9 @@
 
 class AvantElasticsearchLog
 {
+    const OPTION_ES_LOG = 'avantelasticsearch_es_log';
+    const OPTION_ES_PROGRESS = 'avantelasticsearch_es_progress';
+
     protected $logFileName;
 
     public function __construct($logFileName)
@@ -11,7 +14,7 @@ class AvantElasticsearchLog
 
     protected function appendToLog($text)
     {
-        $logText = get_option(ElasticsearchConfig::OPTION_ES_LOG);
+        $logText = get_option(self::OPTION_ES_LOG);
         $this->replaceLogContents($logText . $text);
     }
 
@@ -31,9 +34,9 @@ class AvantElasticsearchLog
         $this->appendToLog($event);
     }
 
-    public function readLog()
+    public static function readLog()
     {
-        return get_option(ElasticsearchConfig::OPTION_ES_LOG);
+        return get_option(self::OPTION_ES_LOG);
     }
 
     public static function readLogProgress()
@@ -43,23 +46,19 @@ class AvantElasticsearchLog
         // the indexing. As such, the caller's $this->log variable's is not the same as the one in the
         // instance of AvantElasticsearchIndexBuilder that is performing the indexing. To keep things simple,
         // this method is static so that the caller can retrieve the log content directly from the database.
-        return get_option(ElasticsearchConfig::OPTION_ES_LOG);
-    }
-
-    public function replaceLastLineInLog($eventMessage)
-    {
-        // This method overwrites the last line of the log file. Use it when reporting progress on a repeated action.
-        $event =  $eventMessage;
-        $contents = $this->readLog();
-        $lines = explode("\r\n", $contents);
-        $lines[count($lines) - 1] = $event;
-        $contents = implode("\r\n", $lines);
-        $this->replaceLogContents($contents);
+        $progress = get_option(self::OPTION_ES_PROGRESS);
+        return $progress;
     }
 
     protected function replaceLogContents($text)
     {
-        set_option(ElasticsearchConfig::OPTION_ES_LOG, $text);
+        set_option(self::OPTION_ES_LOG, $text);
+    }
+
+    public function reportProgress($eventMessage)
+    {
+        // This method overwrites the last line of the log file. Use it when reporting progress on a repeated action.
+        set_option(self::OPTION_ES_PROGRESS, $eventMessage);
     }
 
     public function startNewLog()
@@ -70,10 +69,11 @@ class AvantElasticsearchLog
 
     public function writeLogToFile()
     {
-        $contents = get_option(ElasticsearchConfig::OPTION_ES_LOG);
+        $contents = get_option(self::OPTION_ES_LOG);
         file_put_contents($this->logFileName, $contents);
 
-        // Erase the log in the database to prevent a mistimed progress reporting event from reading a ghost log.
-        $this->replaceLogContents('');
+        // Erase the log info in the database to prevent a mistimed progress reporting event from reading a ghost log.
+        set_option(self::OPTION_ES_LOG, '');
+        set_option(self::OPTION_ES_PROGRESS, '');
     }
 }
