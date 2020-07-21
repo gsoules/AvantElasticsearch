@@ -533,7 +533,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             // This should never happen under normal circumstances because the mappings table should contain an entry
             // for every site term defined using the Vocabulary Editor. However, if somehow an item uses a term that
             // we are not tracking, e.g. inserted through the Bulk Editor, we'll detect it here and handle gracefully.
-            $commonTerm = 'UNTRACKED';
+            $commonTerm = "UNTRACKED '$siteTerm'";
         }
 
         return $commonTerm;
