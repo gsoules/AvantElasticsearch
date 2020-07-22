@@ -399,11 +399,23 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             else
                 $field = $this->getFieldNamesToQuery($fieldName);
 
-            $mustNot[] = [
-                "exists" => [
-                    "field" => $field
-                ]
-            ];
+            if (is_array($field))
+            {
+                $exists = array();
+                foreach ($field as $fieldName)
+                {
+                    $exists[] = array("exists" => ["field" => $fieldName]);
+                }
+                $mustNot[] = $exists;
+            }
+            else
+            {
+                $mustNot = [
+                    "exists" => [
+                        "field" => $field
+                    ]
+                ];
+            }
         }
 
         return $mustNot;
