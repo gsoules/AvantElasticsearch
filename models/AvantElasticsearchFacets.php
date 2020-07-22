@@ -269,7 +269,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         $this->createFacet('subject', 'Subject', true, true);
         $this->createFacet('type', 'Type', true, true);
-        $this->createFacet('place', 'Place', true);
+        $this->createFacet('place', 'Place', true, false);
 
         $this->createFacet('date', 'Date');
         $this->facetDefinitions['date']['is_date'] = true;
