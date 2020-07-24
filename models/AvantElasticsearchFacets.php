@@ -490,7 +490,7 @@ class AvantElasticsearchFacets extends AvantElasticsearch
         // Indicate how each facet should appear in the sidebar: add-link, remove-X, disabled, hidden.
         $this->setFacetsTableActions();
 
-        $title = __('Refine your search');
+        $title = __('Refine Your Search');
         $html = "<div id='search-facet-title'>$title</div>";
         $html .= "<div id='search-facet-button' class='search-facet-closed'>$title</div>";
 
@@ -751,6 +751,15 @@ class AvantElasticsearchFacets extends AvantElasticsearch
             foreach ($rootFacetNames as $rootFacetName)
             {
                 $groupName = $this->facetDefinitions[$rootFacetGroup]['name'];
+                $hideRootFacet = false;
+                if ($hideRootFacet && isset($appliedLeafFacets[$rootFacetGroup]))
+                {
+                    // Don't show a root facet if one of its leafs is applied. This is one of those things that doesn't
+                    // really work well whether you show it or not. If you show the root and the user removes it, all
+                    // the leaves get removed too. If you don't show the root and the user removes the leaf, the root
+                    // facet returns which is unexpected.
+                    continue;
+                }
                 $resetUrl = $this->getUrlForRemoveFilter($rootFacetGroup, $rootFacetName, true);
                 $filterBarFacets[$groupName]['reset-url'][] = $resetUrl;
                 $filterBarFacets[$groupName]['reset-text'][] = "$groupName: $rootFacetName";
@@ -775,7 +784,8 @@ class AvantElasticsearchFacets extends AvantElasticsearch
 
         ksort($filterBarFacets);
 
-        if (count($filterBarFacets) >= 2)
+        $showClearAllButton = false;
+        if ($showClearAllButton && count($filterBarFacets) >= 2)
         {
             $resetLink = $this->getUrlForResetLink($query);
             $filterBarFacets[__('Clear all')] = ['reset-url' => [$resetLink], 'reset-text' => [__('Clear all')]];
