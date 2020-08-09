@@ -358,7 +358,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                     'fields' => [
                         'item.title^20',
                         'item.description^10',
-                        'pdf.text-*^10',
+                        'pdf.text-*^5',
                         'core-fields.*',
                         'local-fields.*',
                         'shadow-fields.*',
