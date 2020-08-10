@@ -387,12 +387,6 @@ class AvantElasticsearch
         return $configuration->shared_index_name;
     }
 
-    public static function getNewLocalIndexAllowed()
-    {
-        $configuration = self::getAvantElasticsearcConfig();
-        return $configuration->new_local_index_allowed == true;
-    }
-
     public static function getNewSharedIndexAllowed()
     {
         $configuration = self::getAvantElasticsearcConfig();
