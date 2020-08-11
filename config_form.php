@@ -35,7 +35,7 @@ $healthReportClass = ' class="health-report-' . ($healthOk ? 'ok' : 'error') . '
 </style>
 
 <div class="plugin-help learn-more">
-    <a href="https://github.com/gsoules/AvantElasticsearch" target="_blank">Learn about this plugin</a>
+    <a href="https://digitalarchive.us/plugins/avantelasticsearch/" target="_blank">Learn about this plugin</a>
 </div>
 
 <?php echo "<div$healthReportClass>$healthReport<br/><br/></div>"; ?>
