@@ -91,6 +91,7 @@ class AvantElasticsearch
                 $imageTotal = 0;
                 $itemTotal = 0;
                 $videoTotal = 0;
+                $relationshipTotal = 0;
                 $weightTotal = 0;
 
                 $buckets = $response['aggregations']['contributors']['buckets'];
@@ -114,21 +115,27 @@ class AvantElasticsearch
                     $videoCount = intval($bucket['video']['value']);
                     $videoTotal += $videoCount;
 
-                    $weightTotal += $itemCount + $imageCount + $documentCount + $audioCount + $videoCount;
+                    // Divide the relationship count by two to reflect that item has 1/2 of the relationship with another item.
+                    $relationshipCount = intval($bucket['relationship']['value']);
+                    $relationshipCount = intval($relationshipCount / 2);
+                    $relationshipTotal += $relationshipCount;
+
+                    $weightTotal += $itemCount + $imageCount + $documentCount + $relationshipCount + $audioCount + $videoCount;
                 }
 
                 // Generate the header row.
                 $headerHtml = "<table id='search-stats-table'>";
-                $headerHtml .= '<tr>';
+                $headerHtml .= "<tr id='search-stats-table-header'>";
                 $headerHtml .= '<td class="contributor-table-organization"><strong>Contributor</strong></td>';
                 $headerHtml .= '<td><strong>ID</strong></td>';
                 $headerHtml .= '<td><strong>Items</strong></td>';
-                $headerHtml .= '<td><strong>Images</strong></td>';
-                $headerHtml .= '<td><strong>Docs</strong></td>';
+                $headerHtml .= '<td>Attached<br/><strong>Images</strong></td>';
+                $headerHtml .= '<td>Attached<br/><strong>Documents</strong></td>';
                 if ($audioTotal > 0)
-                    $headerHtml .= '<td><strong>Audio</strong></td>';
+                    $headerHtml .= '<td>Attached<br/><strong>Audio</strong></td>';
                 if ($videoTotal > 0)
-                    $headerHtml .= '<td><strong>Video</strong></td>';
+                    $headerHtml .= '<td>Attached<br/><strong>Video</strong></td>';
+                $headerHtml .= '<td><strong>Relationships</strong></td>';
                 $headerHtml .= '<td><strong>Total</strong></td>';
                 $headerHtml .= '</tr>';
 
@@ -146,13 +153,19 @@ class AvantElasticsearch
                     $documentCount = intval($bucket['document']['value']);
                     $audioCount = intval($bucket['audio']['value']);
                     $videoCount = intval($bucket['video']['value']);
-                    $weightCount = $itemCount + $imageCount + $documentCount + $audioCount + $videoCount;
+
+                    // Divide the relationship count by two to reflect that item has 1/2 of the relationship with another item.
+                    $relationshipCount = intval($bucket['relationship']['value']);
+                    $relationshipCount = intval($relationshipCount / 2);
+
+                    $weightCount = $itemCount + $imageCount + $documentCount + $audioCount + $videoCount + $relationshipCount;
                     $weight = $weightCount;
 
                     // Format the totals to include a comma thousands separator.
                     $itemCount = number_format($itemCount);
                     $imageCount = number_format($imageCount);
                     $documentCount = number_format($documentCount);
+                    $relationshipCount = number_format($relationshipCount);
                     $audioCount = number_format($audioCount);
                     $videoCount = number_format($videoCount);
                     $weightCount = number_format($weightCount);
@@ -169,6 +182,7 @@ class AvantElasticsearch
                         $row .= "<td>$audioCount</td>";
                     if ($videoTotal > 0)
                         $row .= "<td>$videoCount</td>";
+                    $row .= "<td>$relationshipCount</td>";
                     $row .= "<td>$weightCount</td>";
                     $row .= '</tr>';
 
@@ -188,6 +202,7 @@ class AvantElasticsearch
                 $itemTotal = number_format($itemTotal);
                 $imageTotal = number_format($imageTotal);
                 $documentTotal = number_format($documentTotal);
+                $relationshipTotal = number_format($relationshipTotal);
                 $audioTotal = number_format($audioTotal);
                 $videoTotal = number_format($videoTotal);
                 $weightTotal = number_format($weightTotal);
@@ -203,6 +218,7 @@ class AvantElasticsearch
                     $totalsHtml .= "<td><strong>$audioTotal</strong></td>";
                 if ($videoTotal > 0)
                     $totalsHtml .= "<td><strong>$videoTotal</strong></td>";
+                $totalsHtml .= "<td><strong>$relationshipTotal</strong></td>";
                 $totalsHtml .= "<td><strong>$weightTotal</strong></td>";
                 $totalsHtml .= "</tr>";
                 $totalsHtml .= '</table>';

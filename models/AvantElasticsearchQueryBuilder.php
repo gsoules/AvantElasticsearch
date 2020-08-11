@@ -129,6 +129,11 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                                     'field' => 'file.image'
                                 ]
                             ],
+                            'relationship' => [
+                                'sum' => [
+                                    'field' => 'item.relationships'
+                                ]
+                            ],
                             'video' => [
                                 'sum' => [
                                     'field' => 'file.video'

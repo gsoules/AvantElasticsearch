@@ -157,6 +157,7 @@ class AvantElasticsearchMappings extends AvantElasticsearch
         $this->addNumericFieldToMappingProperties('file.video');
         $this->addNumericFieldToMappingProperties('item.id');
         $this->addNumericFieldToMappingProperties('item.year');
+        $this->addNumericFieldToMappingProperties('item.relationships');
 
         // Keyword fields. None of these require full-text search.
         // To learn about keyword fields see: www.elastic.co/guide/en/elasticsearch/reference/master/keyword.html

@@ -18,6 +18,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
     protected $sqlFieldTextsData;
     protected $sqlFilesData;
     protected $sqlItemsData;
+    protected $sqlRelationshipsData;
     protected $sqlTagsData;
     protected $vocabularies;
 
@@ -44,6 +45,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['tags_data'] = $itemTagsData;
         $itemData['public'] = $item->public;
         $itemData['modified'] = $item->modified;
+        $itemData['relationships'] = $this->getItemRelationshipsCount($item);
 
         $document = $this->createDocumentFromItemMetadata($itemData, $excludePrivateFields);
 
@@ -221,6 +223,8 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $itemData['field_texts'] = $itemFieldTexts;
         $itemData['files_data'] = $itemFilesData;
         $itemData['tags_data'] = $itemTagsData;
+        $itemData['relationships'] = array_key_exists($itemId, $this->sqlRelationshipsData) ? $this->sqlRelationshipsData[$itemId] : 0;
+
         return $itemData;
     }
 
@@ -347,6 +351,14 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         if (empty($this->sqlTagsData))
         {
             $this->log->logEvent('No tags fetched from SQL database');
+        }
+
+        // Get the relationship counts for all items so that each document won't do a SQL query to get them.
+        $this->log->logEvent(__('Fetch relationship count data from SQL database'));
+        $this->sqlRelationshipsData = $this->fetchRelationshipsData();
+        if (empty($this->sqlRelationshipsData))
+        {
+            $this->log->logEvent('No relationship counts fetched from SQL database');
         }
 
         return true;
@@ -502,6 +514,71 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $itemFieldTexts;
     }
 
+    protected function fetchRelationshipsData()
+    {
+        $db = get_db();
+        $table = "{$db->prefix}relationships";
+
+        try
+        {
+            $sql = "
+                SELECT
+                  source_item_id as `id`,
+                  count(source_item_id) as `count`
+                FROM
+                  $table
+            ";
+
+            $sql .=  " GROUP BY source_item_id";
+            $sql .=  " ORDER BY source_item_id";
+
+            $sourceItems = $db->query($sql)->fetchAll();
+        }
+        catch (Exception $e)
+        {
+            $sourceItems = array();
+        }
+
+        try
+        {
+            $sql = "
+                SELECT
+                  target_item_id as `id`,
+                  count(target_item_id) as `count`
+                FROM
+                  $table
+            ";
+
+            $sql .=  " GROUP BY target_item_id";
+            $sql .=  " ORDER BY target_item_id";
+
+            $targetItems = $db->query($sql)->fetchAll();
+        }
+        catch (Exception $e)
+        {
+            $targetItems = array();
+        }
+
+        $items = array();
+        foreach ($sourceItems as $sourceItem)
+            $items[$sourceItem['id']] = $sourceItem['count'];
+
+        foreach ($targetItems as $targetItem)
+        {
+            $id = $targetItem['id'];
+            if (array_key_exists($id, $items))
+            {
+                $items[$id] = $items[$id] + $targetItem['count'];
+            }
+            else
+            {
+                $items[$id] = $targetItem['count'];
+            }
+        }
+
+        return $items;
+    }
+
     protected function fetchTagsData()
     {
         try
@@ -608,6 +685,13 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         }
 
         return $itemFilesData;
+    }
+
+    protected function getItemRelationshipsCount($item)
+    {
+        $relatedItemsModel = new RelatedItemsModel($item);
+        $relatedItems = $relatedItemsModel->getRelatedItems();
+        return count($relatedItems);
     }
 
     protected function getItemTagsData($item)

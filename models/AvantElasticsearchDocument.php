@@ -613,7 +613,8 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             'public' => (bool)$itemData['public'],
             'modified' => $itemData['modified'],
             'contributor' => $this->installation['contributor'],
-            'contributor-id' => $this->installation['contributor_id']
+            'contributor-id' => $this->installation['contributor_id'],
+            'relationships' => $itemData['relationships']
         );
 
         if ($year > 0)
