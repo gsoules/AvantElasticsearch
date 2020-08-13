@@ -288,11 +288,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 $queryFilters[] = $conditionFilter;
         }
 
-        // Create year range filter.
-        $yearFilter = $this->constructYearFilter();
-        if (!empty($yearFilter))
-            $queryFilters[] = $yearFilter;
-
         // Create tags filter.
         $tagsFilter = $this->constructTagsFilter();
         if (!empty($tagsFilter))
@@ -626,30 +621,6 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 ]
             ]
         );
-
-        return $query;
-    }
-
-    protected function constructYearFilter()
-    {
-        $yearStart = AvantCommon::queryStringArg('year_start', 0);
-        $yearEnd = AvantCommon::queryStringArg('year_end', 0);
-
-        if (empty($yearStart) && empty($yearEnd))
-            return '';
-
-        $query = array(
-            'range' => [
-                'item.year' => [
-                ]
-            ]
-        );
-
-        if ($yearStart >= 0)
-            $query['range']['item.year']['gte'] = $yearStart;
-
-        if ($yearEnd >= 0 && $yearEnd >= $yearStart)
-            $query['range']['item.year']['lte'] = $yearEnd;
 
         return $query;
     }
