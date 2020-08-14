@@ -741,7 +741,6 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 case 'import-local-existing':
                 case 'import-shared-new':
                 case 'import-shared-existing':
-                case 'remove-shared':
                     $indexingAction = true;
                     $deleteExistingIndex = $action == 'import-local-new' || $action == 'import-shared-new';
                     if ($action == 'import-local-new' || $action == 'import-local-existing')
@@ -749,14 +748,16 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                     else
                         $indexName = AvantElasticsearch::getNameOfSharedIndex();
 
-                    if ($action == 'remove-shared')
+                    if ($action == 'import-shared-existing')
                     {
+                        // Removes all of this site's items from the shared index so that any items that may have
+                        // gotten deleted from MySQL via a backdoor method, will get removed from the shared index.
+                        // If this step is not performed, those deleted items will persist as ghosts that will appear
+                        // in search results, but if you click on one, you'll get a 404 error because the item
+                        // is not in the database.
                         $this->removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation);
                     }
-                    else
-                    {
-                        $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
-                    }
+                    $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
                     break;
 
                 case 'progress':
