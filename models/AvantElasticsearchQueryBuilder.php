@@ -20,6 +20,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
     {
         // Create the aggregations portion of the query to indicate which facet values to return.
         // All requested facet values are returned for the entire set of results.
+        $size = 512;
 
         $facetDefinitions = $this->avantElasticsearchFacets->getFacetDefinitions();
         foreach ($facetDefinitions as $group => $definition)
@@ -39,13 +40,13 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 $terms[$group] = [
                     'terms' => [
                         'field' => "facet.$group.root",
-                        'size' => 128
+                        'size' => $size
                     ],
                     'aggregations' => [
                         'leafs' => [
                             'terms' => [
                                 'field' => "facet.$group.leaf",
-                                'size' => 128
+                                'size' => $size
                             ]
                         ]
                     ]
@@ -62,7 +63,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
                 $terms[$group] = [
                     'terms' => [
                         'field' => "facet.$group",
-                        'size' => 128
+                        'size' => $size
                     ]
                 ];
 
