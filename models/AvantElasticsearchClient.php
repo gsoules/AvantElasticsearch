@@ -112,7 +112,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
     }
 
-    public function deleteDocument($params, $failedAttemptOk = false)
+    public function deleteDocument($params, $missingDocumentExceptionOk, $attempt)
     {
         try
         {
@@ -122,13 +122,14 @@ class AvantElasticsearchClient extends AvantElasticsearch
         catch (Exception $e)
         {
             $className = get_class($e);
-            if ($failedAttemptOk && $className == 'Elasticsearch\Common\Exceptions\Missing404Exception')
+            if ($missingDocumentExceptionOk && $className == 'Elasticsearch\Common\Exceptions\Missing404Exception')
             {
                 return true;
             }
             else
             {
-                $this->recordException($e);
+                if ($attempt >= 3)
+                    $this->recordException($e);
                 return false;
             }
         }
@@ -284,15 +285,17 @@ class AvantElasticsearchClient extends AvantElasticsearch
         return true;
     }
 
-    public function indexDocument($params)
+    public function indexDocument($params, $attempt)
     {
         try
         {
             $this->client->index($params);
+            return true;
         }
         catch (Exception $e)
         {
-            $this->recordException($e);
+            if ($attempt >= 3)
+                $this->recordException($e);
             return false;
         }
     }
@@ -333,7 +336,7 @@ class AvantElasticsearchClient extends AvantElasticsearch
         AvantCommon::sendEmailToAdministrator('ES Error', $subject, $body);
     }
 
-    public function search($params)
+    public function search($params, $attempt = 0)
     {
         try
         {
@@ -342,7 +345,11 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (\Elasticsearch\Common\Exceptions\NoNodesAvailableException $e)
         {
-            $this->recordException($e);
+            // Don't report the 'No alive nodes found in your cluster' error if the caller says this is the
+            // first attempt. Occasionally this error happens normally, perhaps due to a slow network collection,
+            // but the caller will try again.
+            if ($attempt == 0 || $attempt >= 3)
+                $this->recordException($e);
             return null;
         }
         catch (Exception $e)
@@ -358,6 +365,8 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
     }
 
+    // This method is not being used, but is here in case needed in the future. This logic is performed
+    // much more quickly client-side by constructSuggestions() in avantelasticsearch.js
     public function suggest($params)
     {
         try
