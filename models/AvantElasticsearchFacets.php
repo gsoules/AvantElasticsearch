@@ -887,11 +887,36 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         }
                         else
                         {
-                            // Make the leaf visible unless it has the same name as the root.
                             if ($leaf['root'] == $leaf['name'])
+                            {
+                                // Don't expand this facet because the leaf is also the root. An example is the
+                                // top-level Subject facet `People` which has no child facets. To expand it would show
+                                // a leaf 'People' beneath the root 'People',
                                 $actionKind = 'hide';
+                            }
                             else
-                                $actionKind = 'add';
+                            {
+                                // This logic implements the behavior whereby the first time you click on any root facet,
+                                // e.g. Subject `Structures`, that facet expands, but only shows its immediate children
+                                // (else part below). If you click on one of those children (apply that leaf facet),
+                                // all facets for all roots show (if case below). But if instead you click on another
+                                // root facet (such that no leaf facets are applied), only the immediate children of that
+                                // root show (else case below). This approach limits facet expansion until a leaf facet has
+                                // been applied so that a user does not see too many facets too soon. Once a leaf has been
+                                // applied, the number of matching items, and thus the number of facets, becomes greatly
+                                // reduced and so the showing of of all facets is not overwhelming.
+                                if ($appliedLeafFacets)
+                                {
+                                    $actionKind = 'add';
+                                }
+                                else
+                                {
+                                    // Expand this facet only if it is an immediate child of an applied root facet.
+                                    $parts = explode(',', $leaf["root_path"]);
+                                    $depth = count($parts);
+                                    $actionKind = $depth == 2 ? 'add' : 'hide';
+                                }
+                            }
                         }
                         $this->facetsTable[$rootFacetGroup][$facetIndex]['leafs'][$index]['action'] = $actionKind;
                     }
