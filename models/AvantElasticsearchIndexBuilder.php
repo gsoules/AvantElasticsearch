@@ -60,7 +60,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         ];
 
         // Add the document to the index.
-        $this->avantElasticsearchClient->indexDocument($params);
+        for ($attempt = 1; $attempt <= 3; $attempt++)
+        {
+            $success = $this->avantElasticsearchClient->indexDocument($params, $attempt);
+            if ($success)
+                break;
+        }
     }
 
     protected function cacheInstallationParameters()
@@ -300,7 +305,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         return $vocabularies;
     }
 
-    public function deleteItemFromIndex($item, $failedAttemptOk = false)
+    public function deleteItemFromIndex($item, $missingDocumentExceptionOk = false)
     {
         $identifier = ItemMetadata::getItemIdentifier($item);
 
@@ -319,7 +324,12 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             'type' => $document->type
         ];
 
-        $this->avantElasticsearchClient->deleteDocument($params, $failedAttemptOk);
+        for ($attempt = 1; $attempt <= 3; $attempt++)
+        {
+            $success = $this->avantElasticsearchClient->deleteDocument($params, $missingDocumentExceptionOk, $attempt);
+            if ($success)
+                break;
+        }
     }
 
     protected function fetchDataFromSqlDatabase()

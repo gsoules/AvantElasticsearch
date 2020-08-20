@@ -449,9 +449,7 @@ class AvantElasticsearch
 
         if ($sqlItemsCount == $indexItemsCount)
         {
-            $subject = "Health Check PASSED for $siteId";
             $status = "PASS: SQL and Index both contain $indexItemsCount items";
-//            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
         }
         else
         {
@@ -541,8 +539,8 @@ class AvantElasticsearch
                     // 'attempt' because we don't know if the item is in the shared index, but if it is, it needs to
                     // get deleted. This logic handles the case where the items was public, but the admin just now
                     // unchecked the public box and saved the item. If that's not the case, the delete has no effect.
-                    $failedAttemptOk = true;
-                    $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $failedAttemptOk);
+                    $missingDocumentExceptionOk = true;
+                    $avantElasticsearchIndexBuilder->deleteItemFromIndex($item, $missingDocumentExceptionOk);
                 }
             }
         }
