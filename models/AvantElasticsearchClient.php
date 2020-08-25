@@ -352,6 +352,14 @@ class AvantElasticsearchClient extends AvantElasticsearch
                 $this->recordException($e);
             return null;
         }
+        catch (\Elasticsearch\Common\Exceptions\ServerErrorResponseException $e)
+        {
+            // The server returned a 500 response. Most often it's a 503 error "No server available to handle the request",
+            // but we've also seen a 500 "null" error. Try again.
+            if ($attempt == 0 || $attempt >= 3)
+                $this->recordException($e);
+            return null;
+        }
         catch (Exception $e)
         {
             $this->recordException($e);
