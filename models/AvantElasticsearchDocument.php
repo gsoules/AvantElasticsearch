@@ -750,25 +750,6 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         $itemPath = $this->installation['item_path'] . $itemData['id'];
         $serverUrl = $this->installation['server_url'];
         $itemUrl = $serverUrl . $itemPath;
-
-        // TEMP
-        if (strpos($itemUrl, 'public_html') !== false)
-        {
-            $queryArgs = urldecode(http_build_query($_GET));
-            $requestUri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '<not set>';
-            $e = new Exception();
-            $trace = $e->getTraceAsString();
-            $body = '';
-            $body .= 'ITEM:' . PHP_EOL . $itemData['identifier'];
-            $body .= PHP_EOL . PHP_EOL . 'REQUEST URI:' . PHP_EOL . $requestUri;
-            $body .= PHP_EOL . PHP_EOL . 'SERVER URL:' . PHP_EOL . $serverUrl;
-            $body .= PHP_EOL . PHP_EOL . 'ITEM PATH:' . PHP_EOL . $itemPath;
-            $body .= PHP_EOL . PHP_EOL . 'QUERY:' . PHP_EOL . $queryArgs;
-            $body .= PHP_EOL . PHP_EOL . 'TRACE:' . PHP_EOL . $trace;
-            AvantCommon::sendEmailToAdministrator('ES Error', 'COA item.url', $body);
-        }
-        // END TEMP
-
         $isCoverImage = false;
         $thumbnail = true;
         $thumbUrl = $this->getItemImageFileUrl($itemData, $thumbnail);
@@ -786,6 +767,18 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         }
 
         $urlData['item'] = $itemUrl;
+
+        if (empty($thumbUrl) && plugin_is_active('AvantHybrid'))
+        {
+            $hybridImageRecords = AvantHybrid::getImageRecords($itemData['id']);
+            if ($hybridImageRecords)
+            {
+                $fileName = AvantHybrid::getFileName($hybridImageRecords[0]);
+                $imageUrl = AvantHybrid::getImageUrl($fileName);
+                $thumbUrl = AvantHybrid::getThumbUrl($fileName);
+            }
+        }
+
         if (!empty($thumbUrl))
         {
             $urlData['thumb'] = $thumbUrl;
