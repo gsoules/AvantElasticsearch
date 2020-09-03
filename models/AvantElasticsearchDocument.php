@@ -773,9 +773,9 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             $hybridImageRecords = AvantHybrid::getImageRecords($itemData['id']);
             if ($hybridImageRecords)
             {
-                $fileName = AvantHybrid::getFileName($hybridImageRecords[0]);
-                $imageUrl = AvantHybrid::getImageUrl($fileName);
-                $thumbUrl = AvantHybrid::getThumbUrl($fileName);
+                $hybrid = $hybridImageRecords[0];
+                $imageUrl = AvantHybrid::getImageUrl($hybrid);
+                $thumbUrl = AvantHybrid::getThumbUrl($hybrid);
             }
         }
 
