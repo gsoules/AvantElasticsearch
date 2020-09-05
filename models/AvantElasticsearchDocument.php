@@ -583,6 +583,12 @@ class AvantElasticsearchDocument extends AvantElasticsearch
             }
         }
 
+        if (plugin_is_active('AvantHybrid'))
+        {
+            $hybridImageRecords = AvantHybrid::getImageRecords($itemData['id']);
+            $image += count($hybridImageRecords);
+        }
+
         $total = $audio + $document + $image + $video;
 
         $fileCounts = array(
