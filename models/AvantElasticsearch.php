@@ -65,6 +65,32 @@ class AvantElasticsearch
         return array($this->createFieldText($text));
     }
 
+    public static function deleteItemFromIndexes($item)
+    {
+        // Determine which indexes are enabled.
+        $sharedIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE) == true;
+        $localIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_LOCAL) == true;
+
+        if ($sharedIndexIsEnabled || $localIndexIsEnabled)
+        {
+            $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
+
+            if ($sharedIndexIsEnabled && $item->public)
+            {
+                // Delete the public item from the shared index. A non-public item should not be in the index.
+                $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfSharedIndex());
+                $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+            }
+
+            if ($localIndexIsEnabled)
+            {
+                // Delete the item from the local index.
+                $avantElasticsearchIndexBuilder->setIndexName(AvantElasticsearch::getNameOfLocalIndex());
+                $avantElasticsearchIndexBuilder->deleteItemFromIndex($item);
+            }
+        }
+    }
+
     public static function generateContributorStatistics($indexName)
     {
         $contributorCount = 0;
