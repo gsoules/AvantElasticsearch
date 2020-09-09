@@ -307,7 +307,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
     public function deleteItemFromIndex($item, $missingDocumentExceptionOk = false)
     {
-        if (AvantHybrid::deletingHybridItem())
+        if (AvantCommon::importingHybridItem())
         {
             // Ignore this call when AvantHybrid is deleting a hybrid item. The call gets made indirectly via the
             // hookAfterDeleteItem method for the AvantElasticSearch plugin when HybridImport deletes the hybrid's
