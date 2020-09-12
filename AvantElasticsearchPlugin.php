@@ -51,6 +51,16 @@ class AvantElasticsearchPlugin extends Omeka_Plugin_AbstractPlugin
 
     public function hookAfterDeleteItem($args)
     {
+        if (AvantCommon::importingHybridItem())
+        {
+            // Ignore this call when AvantHybrid is deleting a hybrid item. The call gets made indirectly via the
+            // hookAfterDeleteItem method for the AvantElasticSearch plugin when HybridImport deletes the hybrid's
+            // Omeka item. For some reason, in that situation, $item exists, but is not valid and therefor this method
+            // cannot be used to delete the Hybrid item's Elasticsearch index entries. Instead, HybridImport calls this
+            // method directly before it deletes the Omeka item.
+            return;
+        }
+
         AvantElasticsearch::deleteItemFromIndexes($args['record']);
     }
 

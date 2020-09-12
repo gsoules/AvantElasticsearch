@@ -36,6 +36,13 @@ class AvantElasticsearch
     public function afterSaveItem($args)
     {
         // This method is called when the admin either saves an existing item or adds a new item to the Omeka database.
+
+        if (AvantCommon::importingHybridItem())
+        {
+            // Ignore this call when AvantHybrid is saving an because HybridImport calls updateIndexForItem directly.
+            return;
+        }
+
         $sharedIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_SHARE) == true;
         $localIndexIsEnabled = (bool)get_option(ElasticsearchConfig::OPTION_ES_LOCAL) == true;
 
@@ -546,7 +553,7 @@ class AvantElasticsearch
         $this->indexName = $name;
     }
 
-    public function updateIndexForItem($item, $avantElasticsearchIndexBuilder, $sharedIndexIsEnabled, $localIndexIsEnabled, $isSaveAction = false)
+    public function  updateIndexForItem($item, $avantElasticsearchIndexBuilder, $sharedIndexIsEnabled, $localIndexIsEnabled, $isSaveAction = false)
     {
         if ($sharedIndexIsEnabled)
         {
