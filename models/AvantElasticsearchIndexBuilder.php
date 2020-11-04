@@ -122,7 +122,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
 
         if ($isSharedIndex)
         {
-            // Exclude non-public items from the the shared index.
+            // Exclude non-public items from the shared index.
             // Remove private elements from documents in the shared index.
             //
             // This filtering is necessary to support the overall indexing approach which is to:
@@ -470,7 +470,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         // This method gets all element texts for all items in the database. It returns them as an array of item-field-texts.
         // * Each item-field-texts contains an array of field-texts, one for each of the item's elements.
         // * Each field-texts contains an array of field-text, one for each of the element's values.
-        // * Each field-text contains two values: the element value text and a flag to indicate if the the text is HTML.
+        // * Each field-text contains two values: the element value text and a flag to indicate if the text is HTML.
         //
         // The html flag is only true when the user entered text into an Omeka element that displays the HTML checkbox
         // on the admin Edit page AND they checked the box. Note that an element can have multiple values with some as

@@ -108,7 +108,7 @@ class AvantElasticsearchDocument extends AvantElasticsearch
         // case-insensitive sorting and so that values with leading non alphanumeric characters will sort correctly and
         // not appear at the top. Note also, because element fields, as opposed to sort fields, contain their data in an
         // array of values, even if there's only a single value, they cannot be used for sorting because there's no way
-        // to get Elastcisearch to sort based only on the the first value in the array. This solution allows sorting
+        // to get Elastcisearch to sort based only on the first value in the array. This solution allows sorting
         // in general, but also provides better sorting because of the lower casing and leading character stripping.
         $sortText = preg_replace('/[^a-z\d ]/i', '', strtolower(trim($fieldTextValue)));
 
