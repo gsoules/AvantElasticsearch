@@ -226,7 +226,15 @@ class AvantElasticsearchMappings extends AvantElasticsearch
 
     public function constructElasticsearchSettings()
     {
+        // The setting of 1 shard and 2 replicas is the recommendation from AWS tech support for a 3 node cluster:
+        // "I would recommend using 2 replicas instead of 1. Firstly, this will enable higher availability, should
+        // improve performance, and will still leave the vast majority of storage space free. Additionally, by having
+        // the number of shards be a multiple of the number of nodes, it ensures an even distribution of shards which
+        // should further improve performance."
+
         $settings = [
+            'number_of_shards' => 1,
+            'number_of_replicas' => 2,
             'analysis' => [
                 'normalizer' => [
                     'lowerCaseNormalizer' => [
