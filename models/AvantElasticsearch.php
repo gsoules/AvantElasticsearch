@@ -488,10 +488,43 @@ class AvantElasticsearch
         {
             $subject = "Health Check FAILED for $siteId";
             $status = "FAIL: SQL:$sqlItemsCount Index:$indexItemsCount";
-            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
+            self::analyzeHealthCheckFailure();
+            //AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
         }
 
+
         return $status;
+    }
+
+    protected static function analyzeHealthCheckFailure()
+    {
+        $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
+        $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
+        $avantElasticsearchClient = new AvantElasticsearchClient();
+
+        $sqlItemsData = $avantElasticsearchIndexBuilder->fetchItemsData();
+
+        foreach ($sqlItemsData as $sqlItemsDatum)
+        {
+            $id = $sqlItemsDatum['id'];
+
+            $params = array(
+                'index' => 'devb', //////
+                'body' => [
+                    '_source' => [
+                        'item.*'
+                    ],
+                    'query' => [
+                        'match' => [
+                            'item.id' => $id
+                        ]
+                    ]
+                ]
+            );
+
+            $response = $avantElasticsearchClient->search($params);
+        }
+        return;
     }
 
     public static function handleRemoteRequest($action, $siteId, $password)
