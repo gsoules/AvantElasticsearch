@@ -436,9 +436,19 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    public function constructSearchForItem($id)
+    public function constructSearchForAllElasticSearchItems($index, $sqlItemsCount)
     {
-        
+        $params = array(
+            'index' => $index,
+            'size' => $sqlItemsCount,
+            'body' => [
+                '_source' => [
+                    'item.id'
+                ]
+            ]
+        );
+
+        return $params;
     }
 
     public function constructSearchQuery($queryArgs, $limit, $sort, $indexElementName, $public, $sharedSearchingEnabled, $fuzzy)

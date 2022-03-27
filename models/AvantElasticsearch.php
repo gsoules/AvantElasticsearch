@@ -486,45 +486,44 @@ class AvantElasticsearch
         }
         else
         {
+            $misses = self::analyzeHealthCheckFailure($sqlItemsCount);
+            $missesString = join(',', $misses);
             $subject = "Health Check FAILED for $siteId";
-            $status = "FAIL: SQL:$sqlItemsCount Index:$indexItemsCount";
-            self::analyzeHealthCheckFailure();
-            //AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
+            $status = "FAIL: SQL:$sqlItemsCount Index:$indexItemsCount Missing:$missesString";
+            AvantCommon::sendEmailToAdministrator('daus cron', $subject, $status);
         }
-
 
         return $status;
     }
 
-    protected static function analyzeHealthCheckFailure()
+    protected static function analyzeHealthCheckFailure($sqlItemsCount)
     {
         $avantElasticsearchIndexBuilder = new AvantElasticsearchIndexBuilder();
         $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
         $avantElasticsearchClient = new AvantElasticsearchClient();
 
         $sqlItemsData = $avantElasticsearchIndexBuilder->fetchItemsData();
+        $activeIndexName = $avantElasticsearchQueryBuilder->getNameOfActiveIndex();
+
+        $params = $avantElasticsearchQueryBuilder->constructSearchForAllElasticSearchItems($activeIndexName, $sqlItemsCount);
+        $response = $avantElasticsearchClient->search($params);
+        $hits = $response['hits']['hits'];
+        $misses = [];
+        $ids = [];
+
+        foreach ($hits as $hit)
+        {
+            $ids[] = $hit['_source']['item']['id'];
+        }
 
         foreach ($sqlItemsData as $sqlItemsDatum)
         {
             $id = $sqlItemsDatum['id'];
-
-            $params = array(
-                'index' => 'devb', //////
-                'body' => [
-                    '_source' => [
-                        'item.*'
-                    ],
-                    'query' => [
-                        'match' => [
-                            'item.id' => $id
-                        ]
-                    ]
-                ]
-            );
-
-            $response = $avantElasticsearchClient->search($params);
+            if (!in_array($id, $ids))
+                $misses[] = $id;
         }
-        return;
+
+        return $misses;
     }
 
     public static function handleRemoteRequest($action, $siteId, $password)
