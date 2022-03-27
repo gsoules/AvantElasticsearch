@@ -969,6 +969,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $this->log->logEvent(__("%s documents indexed (%s MB)", $documentCount, $totalSizeMb));
         $this->log->logEvent(__("%s non-public documents skipped", $skipCount));
     }
+
     protected function removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation)
     {
         // This method will remove all of a contributor's items from the shared index
