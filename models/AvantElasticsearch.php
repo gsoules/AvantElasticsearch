@@ -502,20 +502,42 @@ class AvantElasticsearch
         $avantElasticsearchQueryBuilder = new AvantElasticsearchQueryBuilder();
         $avantElasticsearchClient = new AvantElasticsearchClient();
 
+        // Fetch an array containing the Id of every item in the SQL database.
         $sqlItemsData = $avantElasticsearchIndexBuilder->fetchItemsData();
         $activeIndexName = $avantElasticsearchQueryBuilder->getNameOfActiveIndex();
 
-        $params = $avantElasticsearchQueryBuilder->constructSearchForAllElasticSearchItems($activeIndexName, $sqlItemsCount);
-        $response = $avantElasticsearchClient->search($params);
-        $hits = $response['hits']['hits'];
         $misses = [];
+        $remaining = $sqlItemsCount;
+        $maxRequest = 1000;
         $ids = [];
 
-        foreach ($hits as $hit)
+        // Query Elasticsearch to get batches of Ids. It's necessary to batch because the max allowed query is for
+        // 10000 results. Each time through the loop get a batch with Ids that are greater than the previous batch.
+        while ($remaining > 0)
         {
-            $ids[] = $hit['_source']['item']['id'];
+            $first = count($ids);
+            $last = $first + $maxRequest;
+            if ($last > count($sqlItemsData))
+                $last = count($sqlItemsData);
+            $last -= 1;
+            $minId = $sqlItemsData[$first]['id'];
+            $maxId = $sqlItemsData[$last]['id'];;
+
+            $params = $avantElasticsearchQueryBuilder->constructSearchForAllElasticSearchItems($activeIndexName, $maxRequest, $minId, $maxId);
+            $response = $avantElasticsearchClient->search($params);
+            $hits = $response['hits']['hits'];
+
+            // Add each Id to the $ids array. When the loop is finished, the array will contain all of the Ids.
+            foreach ($hits as $hit)
+            {
+                $id = $hit['_source']['item']['id'];
+                $ids[] = $id;
+            }
+
+            $remaining -= $maxRequest;
         }
 
+        // Loop over the Ids for each SQL item to determine which are missing from the array of Elasticsearch Ids.
         foreach ($sqlItemsData as $sqlItemsDatum)
         {
             $id = $sqlItemsDatum['id'];

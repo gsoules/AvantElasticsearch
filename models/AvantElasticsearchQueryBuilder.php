@@ -436,7 +436,7 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
         return $shouldQuery;
     }
 
-    public function constructSearchForAllElasticSearchItems($index, $sqlItemsCount)
+    public function constructSearchForAllElasticSearchItems($index, $sqlItemsCount, $minId, $maxId)
     {
         $params = array(
             'index' => $index,
@@ -444,7 +444,15 @@ class AvantElasticsearchQueryBuilder extends AvantElasticsearch
             'body' => [
                 '_source' => [
                     'item.id'
-                ]
+                ],
+                'query' => [
+                    'range'=> [
+                        'item.id' => [
+                            'gte' => $minId,
+                            'lte' => $maxId
+                            ]
+                        ]
+                    ]
             ]
         );
 
