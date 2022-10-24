@@ -253,7 +253,7 @@ class Connection implements ConnectionInterface
                         throw $exception;
                     } else {
                         // Something went seriously wrong, bail
-                        $exception = new TransportException($response['error']->getMessage());
+                        $exception = new TransportException($response['error']->getMessage(), false);
                         $this->logRequestFail(
                             $request['http_method'],
                             $response['effective_url'],
@@ -311,7 +311,7 @@ class Connection implements ConnectionInterface
     private function getURI($uri, $params)
     {
         if (isset($params) === true && !empty($params)) {
-            array_walk($params, function (&$value, &$key) {
+            array_walk($params, function (&$value) {
                 if ($value === true) {
                     $value = 'true';
                 } elseif ($value === false) {
