@@ -224,7 +224,11 @@ class AvantElasticsearch
                 }
 
                 // Sort the array descending based on its weight.
-                usort($rows, function($a, $b){ return $a[0] < $b[0]; });
+                usort($rows, function ($a, $b) {
+                    if ($a[0] == $b[0])
+                        return 0;
+                    return ($a[0] > $b[0]) ? -1 : 1;
+                });
 
                 // Combine the row HTML into a single string.
                 $rowsHtml = '';
