@@ -245,7 +245,6 @@ class AvantElasticsearchClient extends AvantElasticsearch
         }
         catch (Exception $e)
         {
-
             $this->recordException($e);
             return false;
         }

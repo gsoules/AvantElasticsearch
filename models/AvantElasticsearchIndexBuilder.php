@@ -921,14 +921,15 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $batchStart = $documentCount;
             }
 
-            $batchSize += strlen($line);
-            $totalSize += $batchSize;
             $json = json_decode($line, true);
 
             // Convert the json into a document object structured for either the local or shared index.
             $document = $this->convertDocumentForLocalOrSharedIndex($json, $isSharedIndex, $coreFieldNames);
             if ($document)
             {
+                $batchSize += strlen($line);
+                $totalSize += $batchSize;
+
                 $actionsAndMetadata = [
                     'index' => [
                         '_index' => $this->getNameOfActiveIndex(),
@@ -945,21 +946,34 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                 $skipCount += 1;
             }
 
+            // Determine whether to index the current batch of documents. Do so when either the batch is at or above
+            // the max batch size (it's okay for the last processed document to push the size over the max) or when
+            // the last document has been processed and thus this is the last batch.
             if ($batchSize >= $batchLimit || $documentCount == $fileLineCount)
             {
+                // Update the statistics and display a progress message. Note that the stats are for what is about to
+                // be processed when indexBulkDocuments is called. As such, if an error occurs during indexing, the
+                // stats would be reporting what was supposed to happen, even though an error occurred.
                 $batchEnd = $documentCount;
                 $batchSizeMb = number_format($batchSize / MB_BYTES, 2);
                 $percentDone = round(($batchEnd / $fileLineCount) * 100) . '%';
-                $this->log->logProgress(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
+                $this->log->logEvent(__('%s - Indexing %s documents (%s - %s of %s) %s MB',
                     $percentDone, $batchEnd - $batchStart + 1, $batchStart, $batchEnd, $fileLineCount, $batchSizeMb));
 
-                if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
+                // Index the batch, but only after verifying that there's something to index. There usually is, but
+                // testing the batch size protects against the case where no documents got added to the batch which
+                // can happen if all the items since the last batch was processed were private, but the last line of
+                // JSON has been encountered. In that case, the stats get reported saying 100% done, but no call is
+                // made to indexBulkDocuments.
+                if ($batchSize > 0)
                 {
-                    $this->logClientError();
-                    return;
+                    if (!$this->avantElasticsearchClient->indexBulkDocuments($documentBatchParams))
+                    {
+                        $this->logClientError();
+                        return;
+                    }
+                    $batchSize = 0;
                 }
-
-                $batchSize = 0;
             }
         }
 
