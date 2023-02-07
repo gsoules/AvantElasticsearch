@@ -383,7 +383,7 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
             $firstItemId = $index;
             $lastItemId = min($itemsCount - 1, $index + $chunkSize - 1);
             $percentDone = round(($index / $itemsCount) * 100) . '%';
-            $this->log->logProgress(__('%s - Exporting items %s - %s of %s',
+            $this->log->logEvent(__('%s - Exporting items %s - %s of %s',
                 $percentDone, $firstItemId + 1, $lastItemId + 1, $itemsCount));
 
             $this->sqlFieldTextsData = $this->fetchFieldTextsForRangeOfItems($this->sqlItemsData[$firstItemId]['id'], $this->sqlItemsData[$lastItemId]['id']);
