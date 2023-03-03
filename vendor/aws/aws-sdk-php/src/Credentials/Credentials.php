@@ -88,4 +88,7 @@ class Credentials implements CredentialsInterface, \Serializable
         $this->token = $data['token'];
         $this->expires = $data['expires'];
     }
+
+    public function __serialize(): array {}
+    public function __unserialize(array $data): void {}
 }
