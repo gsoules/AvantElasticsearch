@@ -245,6 +245,10 @@ class AvantElasticsearchFacets extends AvantElasticsearch
                         continue;
                     }
 
+                    if (!array_key_exists('type', $advancedArg))
+                        continue;
+                    if (!array_key_exists('element_id', $advancedArg))
+                        continue;
                     $updatedQueryString .= "&advanced[$index][element_id]=" . urlencode($advancedArg['element_id']);
                     $updatedQueryString .= "&advanced[$index][type]=" . urlencode($advancedArg['type']);
 
