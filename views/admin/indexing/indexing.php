@@ -37,13 +37,23 @@ $contributorId = ElasticsearchConfig::getOptionValueForContributorId();
 $sharedIndexName = AvantElasticsearch::getNameOfSharedIndex();
 
 // Initialize the action options.
-$options = array(
-    'export-all' => ' Export all items from Omeka',
-    'import-local-new' => " Import into new local index ($contributorId)",
-    'import-shared-existing' => " Import into existing shared index ($sharedIndexName)"
+if (AvantSearch::useElasticsearch())
+{
+    $options = array(
+        'export-all' => ' Export all items from Omeka',
+        'import-local-new' => " Import into new local index ($contributorId)",
+        'import-shared-existing' => " Import into existing shared index ($sharedIndexName)"
     );
+}
+else
+{
+    $options = array(
+        'import-local-new' => " Remove local AWS index ($contributorId)",
+        'import-shared-existing' => " Remove site content from AWS shared index ($sharedIndexName)"
+    );
+}
 
-if (AvantElasticsearch::getNewSharedIndexAllowed())
+if (AvantElasticsearch::getNewSharedIndexAllowed() && AvantSearch::useElasticsearch())
 {
     $options['export-some'] = " *Export 100 items from Omeka";
     $options['import-shared-new'] = " *Import into new shared index ($sharedIndexName)";
@@ -69,6 +79,8 @@ $pdfToTextIsSupported = AvantElasticsearchDocument::pdfSearchingIsSupported();
 $pdfReportClass = ' class="health-report-' . ($pdfToTextIsSupported ? 'ok' : 'error') . '"';
 $pdfSupportReport = $pdfToTextIsSupported ? 'PDF searching is enabled' : 'PDF searching is not supported on this server because pdftotext is not installed.';
 echo "<div$pdfReportClass>$pdfSupportReport</div>";
+if (!AvantSearch::useElasticsearch())
+    echo "<div class='health-report-error'>AvantSearch is not using Elasticsearch.</div>";
 
 // Warn if the elasticsearch files directory does not exist.
 $esDirectoryName = $avantElasticsearchIndexBuilder->getElasticsearchFilesDirectoryName();

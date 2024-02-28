@@ -240,6 +240,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         if ($this->avantElasticsearchClient->deleteIndex($params))
         {
             $this->log->logEvent(__('Deleted index: %s', $indexName));
+
+            // This method is called when not using Elasticsearch as a way to delete the local index.
+            // By returning false, it causes performBulkIndexImport to terminate without doing any indexing.
+            if (!AvantSearch::useElasticsearch())
+                return false;
         }
         else
         {
@@ -766,6 +771,11 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
                         // in search results, but if you click on one, you'll get a 404 error because the item
                         // is not in the database.
                         $this->removeItemsFromSharedIndex($indexName, $indexingId, $indexingOperation);
+
+                        // This method is called when not using Elasticsearch as a way to delete the site's content
+                        // from the shared index.
+                        if (!AvantSearch::useElasticsearch())
+                            break;
                     }
                     $this->performBulkIndexImport($indexName, $indexingId, $indexingOperation, $deleteExistingIndex);
                     break;
@@ -877,8 +887,9 @@ class AvantElasticsearchIndexBuilder extends AvantElasticsearch
         $coreFieldNames = $this->getFieldNamesOfCoreElements();
         $isSharedIndex = $indexName == self::getNameOfSharedIndex();
 
-        // Verify that the import file exists.
-        if (!file_exists($importFileName))
+        // Verify that the import file exists. Ignore the text when not using Elasticsearch so that this
+        // method can be used to delete the shared index instead of recreating it. See comments in createNewIndex.
+        if (AvantSearch::useElasticsearch() && !file_exists($importFileName))
         {
             $this->log->logError(__("File %s was not found", $importFileName));
             return;
