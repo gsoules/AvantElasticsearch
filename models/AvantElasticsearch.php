@@ -458,6 +458,9 @@ class AvantElasticsearch
 
     public static function handleHealthCheck($siteId)
     {
+        if (!AvantSearch::useElasticsearch())
+            return "PASS: Not using Elasticsearch";
+
         $db = get_db();
         $table = "{$db->prefix}items";
         $sql = "SELECT COUNT(*) FROM $table";
