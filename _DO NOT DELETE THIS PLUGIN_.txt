@@ -1,0 +1,7 @@
+The AvantS3 plugin depends on the existence of this AvantElasticsearch folder which
+contains the vendor/aws libraries that AvantS3 needs.
+
+The AvantElasticsearch plugin does not need to be installed in order for AvantS3 to work.
+
+Ideally, the AWS libraries should get move into the AvantS3 plugin so that this
+AvantElasticsearch plugin can be removed.
